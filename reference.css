@@ -702,7 +702,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   width: 100%;
   margin: 0 auto;
   padding: 10px 16px 14px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* Controls Toolbar */
@@ -712,6 +712,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   gap: 10px;
   margin-bottom: 8px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 50;
 }
 
 .control-item {
@@ -729,7 +731,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   pointer-events: none;
 }
 
-.controls-toolbar select, .controls-toolbar input {
+.controls-toolbar input {
   width: 100%;
   padding: 8px 12px;
   background: var(--surface);
@@ -739,13 +741,227 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   color: var(--text-main);
 }
 
-.controls-toolbar select {
-  padding-left: 56px;
-  cursor: pointer;
-}
-
 .search-box input {
   padding-left: 10px;
+}
+
+/* Custom TRSS Anchored Dropdown Component */
+.trss-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.dropdown-trigger:hover,
+.dropdown-trigger:focus-visible {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+.dropdown-trigger .control-label {
+  position: static;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.dropdown-trigger .dropdown-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 0.84rem;
+}
+
+.dropdown-trigger .dropdown-arrow {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-left: 6px;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.dropdown-trigger[aria-expanded="true"] .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: 320px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  z-index: 200;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+  padding: 4px 0;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.dropdown-menu.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.dropdown-menu.open-upward {
+  top: auto;
+  bottom: calc(100% + 4px);
+  transform: translateY(4px);
+}
+
+.dropdown-menu.open-upward.open {
+  transform: translateY(0);
+}
+
+.dropdown-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.84rem;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.dropdown-option:hover,
+.dropdown-option:focus {
+  background: #f1f5f9;
+  outline: none;
+}
+
+.dropdown-option.selected {
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.dropdown-option .option-check {
+  width: 14px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--primary);
+  flex-shrink: 0;
+  display: inline-block;
+  text-align: center;
+}
+
+.dropdown-option .option-text {
+  flex: 1;
+  white-space: nowrap;
+}
+
+/* Study Routed Page Back Controls */
+.study-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--text-main);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.study-back-btn:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+
+.study-bottom-nav {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+  flex-shrink: 0;
+}
+
+.study-bottom-nav .bottom-back-btn {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+}
+
+/* Swipe Hint */
+.swipe-hint {
+  display: none;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  margin-top: 3px;
+  user-select: none;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* Flashcard Swipe Transitions */
+.card-3d.swipe-out-left {
+  transform: translateX(-40px) scale(0.97) !important;
+  opacity: 0 !important;
+  transition: transform 0.12s ease-out, opacity 0.12s ease-out !important;
+}
+
+.card-3d.swipe-out-right {
+  transform: translateX(40px) scale(0.97) !important;
+  opacity: 0 !important;
+  transition: transform 0.12s ease-out, opacity 0.12s ease-out !important;
+}
+
+.card-3d.swipe-in-left {
+  transform: translateX(-30px) !important;
+  opacity: 0.5 !important;
+  transition: transform 0.15s ease-out, opacity 0.15s ease-out !important;
+}
+
+.card-3d.swipe-in-right {
+  transform: translateX(30px) !important;
+  opacity: 0.5 !important;
+  transition: transform 0.15s ease-out, opacity 0.15s ease-out !important;
 }
 
 /* Status Bar */
@@ -1402,6 +1618,12 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
     margin-bottom: 4px;
   }
 
+  .controls-toolbar {
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin-bottom: 4px;
+  }
+
   .search-box {
     grid-column: 1 / -1;
   }
@@ -1410,11 +1632,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
     display: none;
   }
 
-  .control-label {
-    display: none;
-  }
-
-  .controls-toolbar select,
   .controls-toolbar input {
     padding: 4px 8px;
     font-size: 0.78rem;
@@ -1422,13 +1639,28 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
     border-radius: var(--radius-sm);
   }
 
-  .search-box input {
-    height: 32px;
-    padding: 5px 10px;
+  .dropdown-trigger {
+    padding: 4px 8px;
+    height: 30px;
+    font-size: 0.78rem;
   }
 
-  .controls-toolbar select {
-    padding-left: 8px;
+  .dropdown-trigger .control-label {
+    font-size: 0.68rem;
+    margin-right: 4px;
+  }
+
+  .dropdown-trigger .dropdown-value {
+    font-size: 0.76rem;
+  }
+
+  .dropdown-menu {
+    max-width: 90vw;
+  }
+
+  .search-box input {
+    height: 30px;
+    padding: 5px 10px;
   }
 
   /* Compact Status Bar */
@@ -1552,6 +1784,22 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
     margin-top: 4px;
     padding: 0;
     flex-shrink: 0;
+  }
+
+  /* Flashcards on Mobile: Swipe replaces Prev/Next buttons */
+  #flashcardsWorkspace .nav-buttons {
+    display: none !important;
+  }
+
+  #flashcardsWorkspace .rating-buttons {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+
+  .swipe-hint {
+    display: block;
   }
 
   .rating-buttons {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="description" content="TRSS — TruReview Student Studier: A free educational study tool by TruJoe Digital featuring interactive scaffolded flashcards and application practice quizzes." />
   <title>TRSS — TruReview Student Studier</title>
-  <link rel="stylesheet" href="reference.css?v=20260919-1" />
+  <link rel="stylesheet" href="reference.css?v=20260919-2" />
 </head>
 <body>
   <div class="app-viewport">
@@ -216,6 +216,7 @@
         <header class="app-header">
           <div class="branding">
             <div class="eyebrow-row">
+              <a href="#/general-psychology/chapter-7" class="study-back-btn top-back-btn" id="studyTopBackBtn" title="Back to Chapter 7 Study Guide">← Back</a>
               <span class="eyebrow">TRSS</span>
               <span class="badge-primary">Chapter 7</span>
             </div>
@@ -240,15 +241,43 @@
         </header>
 
         <div class="app-body">
-          <!-- Toolbar Controls (Level Selector Removed!) -->
+          <!-- Toolbar Controls (Custom In-Page Dropdowns) -->
           <section class="controls-toolbar" aria-label="Deck controls">
             <div class="control-item search-box">
               <label for="searchInput" class="sr-only">Search</label>
               <input id="searchInput" type="search" placeholder="🔍 Search term, cue, or scenario..." autocomplete="off" />
             </div>
-            <div class="control-item">
-              <label for="typeFilter" class="control-label">Set</label>
-              <select id="typeFilter">
+
+            <!-- Custom Set Dropdown -->
+            <div class="control-item trss-dropdown" id="setDropdown">
+              <button type="button" class="dropdown-trigger" id="typeFilterBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by Set">
+                <span class="control-label" id="typeFilterLabel">Set</span>
+                <span class="dropdown-value" id="typeFilterValue">All cards (108)</span>
+                <span class="dropdown-arrow" aria-hidden="true">▾</span>
+              </button>
+              <div class="dropdown-menu" id="typeFilterMenu" role="listbox" aria-label="Filter by Set">
+                <button type="button" class="dropdown-option selected" role="option" aria-selected="true" data-value="all">
+                  <span class="option-check">✓</span>
+                  <span class="option-text">All cards (108)</span>
+                </button>
+                <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="book-term">
+                  <span class="option-check"></span>
+                  <span class="option-text">Book terms (31)</span>
+                </button>
+                <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="lesson-concept">
+                  <span class="option-check"></span>
+                  <span class="option-text">Lesson concepts (53)</span>
+                </button>
+                <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="research-skill">
+                  <span class="option-check"></span>
+                  <span class="option-text">Research &amp; detail (24)</span>
+                </button>
+                <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="review">
+                  <span class="option-check"></span>
+                  <span class="option-text">Needs review</span>
+                </button>
+              </div>
+              <select id="typeFilter" class="sr-only" tabindex="-1" aria-hidden="true">
                 <option value="all">All cards (108)</option>
                 <option value="book-term">Book terms (31)</option>
                 <option value="lesson-concept">Lesson concepts (53)</option>
@@ -256,9 +285,18 @@
                 <option value="review">Needs review</option>
               </select>
             </div>
-            <div class="control-item category-control">
-              <label for="categoryFilter" class="control-label">Section</label>
-              <select id="categoryFilter">
+
+            <!-- Custom Section Dropdown -->
+            <div class="control-item category-control trss-dropdown" id="sectionDropdown">
+              <button type="button" class="dropdown-trigger" id="categoryFilterBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by Section">
+                <span class="control-label" id="categoryFilterLabel">Section</span>
+                <span class="dropdown-value" id="categoryFilterValue">All Sections (15)</span>
+                <span class="dropdown-arrow" aria-hidden="true">▾</span>
+              </button>
+              <div class="dropdown-menu" id="categoryFilterMenu" role="listbox" aria-label="Filter by Section">
+                <!-- Dynamically populated via JavaScript -->
+              </div>
+              <select id="categoryFilter" class="sr-only" tabindex="-1" aria-hidden="true">
                 <option value="all">All Sections (15)</option>
               </select>
             </div>
@@ -347,6 +385,9 @@
                   </div>
                 </div>
               </div>
+              <div class="swipe-hint" id="fcSwipeHint" aria-hidden="true">
+                <span>← Swipe →</span>
+              </div>
             </div>
 
             <!-- Flashcard Control Actions -->
@@ -418,6 +459,11 @@
               </div>
             </div>
           </section>
+
+          <!-- Bottom Back Navigation Control -->
+          <div class="study-bottom-nav">
+            <a href="#/general-psychology/chapter-7" class="study-back-btn bottom-back-btn" id="studyBottomBackBtn" title="Back to Chapter 7 Study Guide">← Back</a>
+          </div>
         </div>
       </section>
     </main>
@@ -443,6 +489,6 @@
   <script src="core-cards.js"></script>
   <script src="lesson-cards.js"></script>
   <script src="extra-cards.js"></script>
-  <script src="reference.js?v=20260919-1"></script>
+  <script src="reference.js?v=20260919-2"></script>
 </body>
 </html>
