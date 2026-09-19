@@ -1,8 +1,8 @@
 # TRSS — Chapter 7 Study & Practice System
 
-Public compiled deployment for TRSS (Chapter 7 Digital Study & Practice Generator) hosted at `https://trss.trujoedigital.com`.
+Public compiled deployment for TRSS (Chapter 7 Digital Study & Practice Generator) hosted at `https://truj0e.github.io/TRSS-Pages/`.
 
-- **Live URL:** [https://trss.trujoedigital.com](https://trss.trujoedigital.com)
+- **Live URL:** [https://truj0e.github.io/TRSS-Pages/](https://truj0e.github.io/TRSS-Pages/)
 - **Features:**
   - 108 comprehensive cards (31 core book terms + 53 lesson concepts + 24 extended detail items).
   - Dual Mode Switcher: 3D Flashcards and 324 Progressive Practice Scenarios Quiz.
