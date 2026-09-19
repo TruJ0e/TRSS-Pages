@@ -153,7 +153,6 @@
 
     // Back Controls
     studyTopBackBtn: document.getElementById("studyTopBackBtn"),
-    studyBottomBackBtn: document.getElementById("studyBottomBackBtn"),
 
     // Status Bar & Empty State
     deckStatus: document.getElementById("deckStatus"),
@@ -1061,9 +1060,8 @@
   if (els.quizNextBtn) els.quizNextBtn.addEventListener("click", nextQuizQuestion);
   if (els.quizSkipBtn) els.quizSkipBtn.addEventListener("click", nextQuizQuestion);
 
-  // Back button listeners
+  // Back button listener
   if (els.studyTopBackBtn) els.studyTopBackBtn.addEventListener("click", handleStudyBack);
-  if (els.studyBottomBackBtn) els.studyBottomBackBtn.addEventListener("click", handleStudyBack);
 
   // Keyboard Shortcuts
   document.addEventListener("keydown", (e) => {

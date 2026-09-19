@@ -891,52 +891,53 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 }
 
 /* Study Routed Page Back Controls */
-.study-back-btn {
+.study-back-btn,
+.top-back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 3px;
+  padding: 2px 7px;
+  height: 22px;
   border-radius: var(--radius-sm);
-  font-size: 0.74rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 600;
   text-decoration: none;
-  color: var(--text-main);
-  background: var(--surface-alt);
+  color: var(--text-muted);
+  background: transparent;
   border: 1px solid var(--border);
   transition: all 0.15s ease;
   white-space: nowrap;
   user-select: none;
+  line-height: 1;
 }
 
-.study-back-btn:hover {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
+.study-back-btn:hover,
+.top-back-btn:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-color: var(--primary-soft);
 }
 
-.study-bottom-nav {
+/* Card Front Hint Group & Swipe Hint */
+.card-hint-group {
   display: flex;
-  justify-content: flex-end;
-  padding-top: 4px;
-  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
 }
 
-.study-bottom-nav .bottom-back-btn {
-  font-size: 0.72rem;
-  padding: 2px 8px;
-}
-
-/* Swipe Hint */
-.swipe-hint {
-  display: none;
-  text-align: center;
-  font-size: 0.72rem;
-  font-weight: 700;
+.card-swipe-hint {
+  font-size: 0.7rem;
+  font-weight: 500;
   color: var(--text-muted);
-  letter-spacing: 0.08em;
-  margin-top: 3px;
+  opacity: 0.75;
+  margin: 0;
+  padding: 0;
+  line-height: 1.2;
   user-select: none;
   pointer-events: none;
-  line-height: 1;
+  text-align: center;
 }
 
 /* Flashcard Swipe Transitions */
@@ -1106,21 +1107,23 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 }
 
 .eyebrow-card {
-  font-size: 0.8rem;
-  font-weight: 800;
+  font-size: 0.78rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .term-heading {
-  font-size: clamp(1.8rem, 4.5vw, 2.75rem);
+  font-size: clamp(2.3rem, 5.2vw, 3.5rem);
   font-weight: 800;
-  line-height: 1.25;
+  line-height: 1.18;
   color: var(--text-main);
-  margin: 0 0 24px 0;
-  max-width: 680px;
+  margin: 0 0 22px 0;
+  max-width: 740px;
+  letter-spacing: -0.02em;
+  word-break: break-word;
 }
 
 .flip-prompt {
@@ -1678,19 +1681,26 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
     padding: 2px 6px;
   }
 
-  /* Flashcard Scene & Sizing */
+  /* Flashcard Scene & Sizing: expands fully into freed space, centered */
   .flashcard-scene {
     padding: 2px 0;
+    width: 100%;
+    max-width: 100%;
   }
 
   .card-3d {
     min-height: 0;
     max-height: none;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
   }
 
   .card-face {
     padding: 12px 14px;
     border-radius: var(--radius-md);
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .card-header {
@@ -1717,14 +1727,28 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   }
 
   .term-heading {
-    font-size: clamp(1.18rem, 5vw, 1.7rem);
-    margin: 0 0 10px 0;
+    font-size: clamp(1.75rem, 7.5vw, 2.45rem);
+    font-weight: 800;
+    line-height: 1.18;
+    margin: 0 0 12px 0;
+    word-break: break-word;
+    letter-spacing: -0.015em;
+  }
+
+  .card-hint-group {
+    gap: 3px;
+    margin-top: auto;
   }
 
   .flip-prompt {
-    padding: 5px 12px;
-    font-size: 0.74rem;
-    gap: 6px;
+    padding: 4px 10px;
+    font-size: 0.72rem;
+    gap: 5px;
+  }
+
+  .card-swipe-hint {
+    font-size: 0.67rem;
+    opacity: 0.85;
   }
 
   /* Back Face */
@@ -1796,10 +1820,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
     width: 100%;
     display: flex;
     gap: 8px;
-  }
-
-  .swipe-hint {
-    display: block;
   }
 
   .rating-buttons {

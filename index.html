@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="description" content="TRSS — TruReview Student Studier: A free educational study tool by TruJoe Digital featuring interactive scaffolded flashcards and application practice quizzes." />
   <title>TRSS — TruReview Student Studier</title>
-  <link rel="stylesheet" href="reference.css?v=20260919-canon1" />
+  <link rel="stylesheet" href="reference.css?v=20260919-canon2" />
 </head>
 <body>
   <div class="app-viewport">
@@ -337,9 +337,14 @@
                   <div class="card-front-content">
                     <p class="eyebrow-card">Term / Academic Concept</p>
                     <h2 id="fcTerm" class="term-heading">Loading...</h2>
-                    <div class="flip-prompt">
-                      <span class="flip-icon">🔄</span>
-                      <span>Tap card or press <kbd>Space</kbd> to flip</span>
+                    <div class="card-hint-group">
+                      <div class="flip-prompt">
+                        <span class="flip-icon">🔄</span>
+                        <span>Tap card or press <kbd>Space</kbd> to flip</span>
+                      </div>
+                      <p class="card-swipe-hint" id="fcSwipeHint" aria-hidden="true">
+                        Swipe left / right to move between cards
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -384,9 +389,6 @@
                     </div>
                   </div>
                 </div>
-              </div>
-              <div class="swipe-hint" id="fcSwipeHint" aria-hidden="true">
-                <span>← Swipe →</span>
               </div>
             </div>
 
@@ -459,11 +461,6 @@
               </div>
             </div>
           </section>
-
-          <!-- Bottom Back Navigation Control -->
-          <div class="study-bottom-nav">
-            <a href="#/general-psychology/chapter-7" class="study-back-btn bottom-back-btn" id="studyBottomBackBtn" title="Back to Chapter 7 Study Guide">← Back</a>
-          </div>
         </div>
       </section>
     </main>
@@ -489,6 +486,6 @@
   <script src="core-cards.js"></script>
   <script src="lesson-cards.js"></script>
   <script src="extra-cards.js"></script>
-  <script src="reference.js?v=20260919-canon1"></script>
+  <script src="reference.js?v=20260919-canon2"></script>
 </body>
 </html>
