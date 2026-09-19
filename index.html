@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="description" content="TRSS — Psychology Chapter 7 Progressive Study & Practice Reference: 108 interactive flashcards and 324 application scenarios." />
+  <title>TRSS — Chapter 7 Study & Practice</title>
+  <link rel="stylesheet" href="reference.css" />
+</head>
+<body>
+  <div class="app-viewport">
+    <header class="app-header">
+      <div class="branding">
+        <div class="eyebrow-row">
+          <span class="eyebrow">TRSS Study Generator</span>
+          <span class="badge-primary">Chapter 7</span>
+        </div>
+        <h1 class="app-title">TRSS Digital Study &amp; Practice</h1>
+      </div>
+
+      <div class="mode-tabs" role="tablist" aria-label="Study modes">
+        <button id="modeFlashcardsBtn" class="mode-btn active" role="tab" aria-selected="true" type="button">
+          <span class="mode-icon">📇</span>
+          <span>Flashcards <span class="tab-count">(108)</span></span>
+        </button>
+        <button id="modeQuizBtn" class="mode-btn" role="tab" aria-selected="false" type="button">
+          <span class="mode-icon">📝</span>
+          <span>Practice Quiz <span class="tab-count">(324)</span></span>
+        </button>
+      </div>
+
+      <div class="header-actions">
+        <button id="shuffleBtn" type="button" title="Shuffle items" class="action-btn">🔀 Shuffle</button>
+        <button id="resetBtn" type="button" title="Reset all progress" class="action-btn ghost">Reset</button>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <!-- Toolbar Controls -->
+      <section class="controls-toolbar" aria-label="Deck controls">
+        <div class="control-item search-box">
+          <label for="searchInput" class="sr-only">Search</label>
+          <input id="searchInput" type="search" placeholder="🔍 Search term, cue, or scenario..." autocomplete="off" />
+        </div>
+        <div class="control-item">
+          <label for="typeFilter" class="control-label">Set</label>
+          <select id="typeFilter">
+            <option value="all">All cards (108)</option>
+            <option value="book-term">Book terms (31)</option>
+            <option value="lesson-concept">Lesson concepts (53)</option>
+            <option value="research-skill">Research &amp; detail (24)</option>
+            <option value="review">Needs review</option>
+          </select>
+        </div>
+        <div class="control-item category-control">
+          <label for="categoryFilter" class="control-label">Section</label>
+          <select id="categoryFilter">
+            <option value="all">All Sections (15)</option>
+          </select>
+        </div>
+        <div class="control-item depth-control" id="depthControlWrap">
+          <label for="depthSelect" class="control-label">Detail</label>
+          <select id="depthSelect">
+            <option value="1">1 — Quick meaning</option>
+            <option value="2">2 — Lesson examples</option>
+            <option value="3" selected>3 — Apply &amp; compare</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Status Bar -->
+      <section class="status-bar" aria-live="polite">
+        <div class="status-left">
+          <span id="deckStatus" class="status-pill">108 cards available</span>
+          <span id="categoryStatus" class="status-meta"></span>
+        </div>
+        <div class="status-right">
+          <span id="progressStatus" class="progress-pill">0 got it · 0 review</span>
+        </div>
+      </section>
+
+      <!-- Empty State -->
+      <section id="emptyState" class="empty-state hidden">
+        <h2>No items match the selected filters.</h2>
+        <p>Try clearing your search query or choosing "All Sections".</p>
+        <button id="clearFiltersBtn" type="button" class="btn-primary">Clear filters</button>
+      </section>
+
+      <!-- Flashcards Workspace -->
+      <section id="flashcardsWorkspace" class="workspace">
+        <div class="flashcard-scene">
+          <div id="flashcardElement" class="card-3d" tabindex="0" role="button" aria-label="Flashcard. Click or press Space to flip." aria-expanded="false">
+            <!-- Front Face -->
+            <div class="card-face card-front">
+              <div class="card-header">
+                <div class="badge-group">
+                  <span id="fcTypeBadge" class="badge">Book term</span>
+                  <span id="fcCategoryBadge" class="badge badge-muted">Motivation</span>
+                </div>
+                <span id="fcCardNumber" class="card-counter">1 / 108</span>
+              </div>
+
+              <div class="card-front-content">
+                <p class="eyebrow-card">Term / Academic Concept</p>
+                <h2 id="fcTerm" class="term-heading">Loading...</h2>
+                <div class="flip-prompt">
+                  <span class="flip-icon">🔄</span>
+                  <span>Tap card or press <kbd>Space</kbd> to flip</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Back Face -->
+            <div class="card-face card-back">
+              <div class="card-header">
+                <div class="badge-group">
+                  <span id="fcBackTypeBadge" class="badge">Book term</span>
+                  <span id="fcBackCategoryBadge" class="badge badge-muted">Motivation</span>
+                </div>
+                <span id="fcBackCardNumber" class="card-counter">1 / 108</span>
+              </div>
+
+              <div class="card-back-content">
+                <h3 id="fcBackTerm" class="term-back-heading">Term</h3>
+
+                <div class="layer-block layer-cue">
+                  <span class="layer-tag">Quick Cue</span>
+                  <div id="fcCue" class="cue-pill">cue</div>
+                  <p id="fcSimple" class="simple-text">simple explanation</p>
+                </div>
+
+                <div id="fcLessonLayer" class="layer-block layer-lesson">
+                  <span class="layer-tag">Lesson Connections</span>
+                  <ul id="fcExamplesList" class="examples-list"></ul>
+                </div>
+
+                <div id="fcApplicationLayer" class="layer-block layer-apply">
+                  <span class="layer-tag">Application Scenario</span>
+                  <ul id="fcApplyList" class="apply-list"></ul>
+                  <div id="fcCompareBox" class="compare-box hidden">
+                    <strong>Distinguish:</strong> <span id="fcCompareText"></span>
+                  </div>
+                </div>
+
+                <div class="flip-back-prompt">
+                  <span class="flip-icon">↩</span>
+                  <span>Tap card or press <kbd>Space</kbd> to flip back</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flashcard Control Actions -->
+        <div class="workspace-actions">
+          <div class="rating-buttons" aria-label="Confidence rating">
+            <button id="fcReviewBtn" type="button" class="btn-rating btn-review" title="Shortcut: 1">
+              <span class="btn-icon">⚠️</span> Needs review <kbd>1</kbd>
+            </button>
+            <button id="fcGotItBtn" type="button" class="btn-rating btn-gotit" title="Shortcut: 2">
+              <span class="btn-icon">✅</span> Got it <kbd>2</kbd>
+            </button>
+          </div>
+          <div class="nav-buttons" aria-label="Card navigation">
+            <button id="fcPrevBtn" type="button" class="btn-nav" title="Previous card (Left arrow)">
+              ← Previous
+            </button>
+            <button id="fcNextBtn" type="button" class="btn-nav btn-primary" title="Next card (Right arrow)">
+              Next →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Practice Quiz Workspace -->
+      <section id="quizWorkspace" class="workspace hidden">
+        <div class="quiz-container">
+          <div class="quiz-card">
+            <div class="quiz-header">
+              <div class="badge-group">
+                <span id="quizLevelBadge" class="badge badge-accent">Application Scenario</span>
+                <span id="quizCategoryBadge" class="badge badge-muted">Category</span>
+              </div>
+              <span id="quizQuestionNumber" class="card-counter">Question 1 / 324</span>
+            </div>
+
+            <div class="quiz-prompt-box">
+              <p class="quiz-prompt-label">Scenario Prompt:</p>
+              <h2 id="quizPromptText" class="quiz-prompt-text">Scenario text goes here...</h2>
+            </div>
+
+            <div id="quizOptionsContainer" class="quiz-options-grid" role="radiogroup" aria-label="Answer options">
+              <!-- Dynamically populated options A, B, C, D -->
+            </div>
+
+            <!-- Quiz Explanation Box -->
+            <div id="quizFeedbackBox" class="quiz-feedback hidden" aria-live="assertive">
+              <div id="feedbackResultTitle" class="feedback-title"></div>
+              <div class="feedback-details">
+                <div class="feedback-cue">
+                  <span class="cue-label">Quick Cue:</span>
+                  <span id="feedbackCueText" class="cue-pill"></span>
+                </div>
+                <p id="feedbackMeaningText" class="feedback-meaning"></p>
+                <div id="feedbackCompareText" class="feedback-compare hidden"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quiz Navigation / Next -->
+        <div class="workspace-actions quiz-actions">
+          <div class="quiz-score-badge">
+            <span>Score: <strong id="quizScoreText">0 / 0</strong></span>
+            <span id="quizAccuracyText" class="accuracy-percent">(0%)</span>
+          </div>
+          <div class="nav-buttons">
+            <button id="quizSkipBtn" type="button" class="btn-nav ghost">Skip</button>
+            <button id="quizNextBtn" type="button" class="btn-nav btn-primary" disabled>Next Question →</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Scripts: 108 cards across core, lesson, and extra cards -->
+  <script src="core-cards.js"></script>
+  <script src="lesson-cards.js"></script>
+  <script src="extra-cards.js"></script>
+  <script src="reference.js"></script>
+</body>
+</html>
