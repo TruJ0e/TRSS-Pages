@@ -489,29 +489,59 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   transition: background 0.15s;
 }
 
-/* Topics Grid */
+/* Responsive Topic Coverage Grid */
 .topic-tags-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
+  width: 100%;
 }
 
 .topic-tag-item {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 11px;
-  font-size: 0.78rem;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 0.82rem;
   font-weight: 600;
   color: #334155;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.15s ease;
+  min-width: 0;
 }
 
-.tag-count {
+.topic-tag-item span:first-child {
+  font-weight: 600;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.28;
+}
+
+.topic-tag-item .tag-count {
   color: var(--text-muted);
   font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .topic-tags-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+}
+
+@media (max-width: 340px) {
+  .topic-tags-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Required Site Footer */
@@ -810,10 +840,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 .dropdown-menu {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
   min-width: 100%;
   width: max-content;
-  max-width: 320px;
+  max-width: min(320px, calc(100vw - 24px));
   max-height: 240px;
   overflow-y: auto;
   background: var(--surface);
@@ -829,6 +858,20 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   padding: 4px 0;
   list-style: none;
   scrollbar-width: thin;
+}
+
+/* Set Dropdown: Left control -> expands right / inward */
+#setDropdown .dropdown-menu {
+  left: 0;
+  right: auto;
+  max-width: min(320px, calc(100vw - 24px));
+}
+
+/* Section Dropdown: Right control -> expands left / inward */
+#sectionDropdown .dropdown-menu {
+  right: 0;
+  left: auto;
+  max-width: min(340px, calc(100vw - 24px));
 }
 
 .dropdown-menu.open {
@@ -851,9 +894,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 .dropdown-option {
   width: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  padding: 7px 12px;
+  padding: 8px 12px;
   border: none;
   background: transparent;
   text-align: left;
@@ -883,11 +926,13 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   flex-shrink: 0;
   display: inline-block;
   text-align: center;
+  padding-top: 1px;
 }
 
 .dropdown-option .option-text {
   flex: 1;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.35;
 }
 
 /* Study Routed Page Back Controls */
@@ -1431,6 +1476,37 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   border-color: var(--danger);
 }
 
+/* Collapsed Irrelevant Choices After Answer */
+.quiz-option-btn.collapsed {
+  display: none !important;
+}
+
+.quiz-options-grid.answered {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.option-status-tag {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.option-status-tag.tag-correct {
+  background: var(--success);
+  color: white;
+}
+
+.option-status-tag.tag-wrong {
+  background: var(--danger);
+  color: white;
+}
+
 /* Quiz Feedback Box */
 .quiz-feedback {
   background: var(--surface-alt);
@@ -1893,6 +1969,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
     height: 22px;
     font-size: 0.72rem;
     border-radius: 6px;
+  }
+
+  .option-status-tag {
+    font-size: 0.65rem;
+    padding: 2px 5px;
   }
 
   .quiz-feedback {

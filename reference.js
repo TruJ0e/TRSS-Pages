@@ -650,11 +650,15 @@
     if (els.quizQuestionNumber) els.quizQuestionNumber.textContent = `Question ${state.quizIndex + 1} / ${deck.length}`;
     if (els.quizPromptText) els.quizPromptText.textContent = q.prompt;
 
-    // Render 4 answer choices
+    // Render answer choices
     if (els.quizOptionsContainer) {
       els.quizOptionsContainer.innerHTML = "";
+      els.quizOptionsContainer.classList.toggle("answered", state.quizAnswered);
       const letters = ["A", "B", "C", "D"];
-      const options = generateOptions(q);
+      if (!q.options) {
+        q.options = generateOptions(q);
+      }
+      const options = q.options;
 
       options.forEach((optText, i) => {
         const btn = document.createElement("button");
@@ -676,10 +680,26 @@
         btn.appendChild(textSpan);
 
         if (state.quizAnswered) {
-          if (optText === q.term) {
+          const isCorrectChoice = optText === q.term;
+          const isSelectedChoice = optText === state.quizSelectedAnswer;
+
+          if (isCorrectChoice) {
             btn.classList.add("correct");
-          } else if (optText === state.quizSelectedAnswer) {
+            btn.setAttribute("aria-checked", "true");
+            const tag = document.createElement("span");
+            tag.className = "option-status-tag tag-correct";
+            tag.textContent = isSelectedChoice ? "✓ Your choice (Correct)" : "✓ Correct answer";
+            btn.appendChild(tag);
+          } else if (isSelectedChoice) {
             btn.classList.add("wrong");
+            btn.setAttribute("aria-checked", "true");
+            const tag = document.createElement("span");
+            tag.className = "option-status-tag tag-wrong";
+            tag.textContent = "✕ Your choice";
+            btn.appendChild(tag);
+          } else {
+            // Collapse other irrelevant choices
+            btn.classList.add("collapsed");
           }
         }
 
@@ -912,6 +932,25 @@
 
   // Custom Anchored Dropdown Component Engine
   function setupCustomDropdowns() {
+    function clampDropdownToViewport(menuEl) {
+      if (!menuEl) return;
+      menuEl.style.transform = "";
+      const rect = menuEl.getBoundingClientRect();
+      const safeMargin = 12;
+      const vw = window.innerWidth;
+
+      let shiftX = 0;
+      if (rect.right > vw - safeMargin) {
+        shiftX = (vw - safeMargin) - rect.right;
+      } else if (rect.left < safeMargin) {
+        shiftX = safeMargin - rect.left;
+      }
+
+      if (shiftX !== 0) {
+        menuEl.style.transform = `translateX(${Math.round(shiftX)}px)`;
+      }
+    }
+
     function toggleDropdown(triggerBtn, menuEl) {
       const isOpen = menuEl.classList.contains("open");
       closeAllDropdowns();
@@ -925,12 +964,14 @@
         menuEl.classList.toggle("open-upward", openUpward);
         menuEl.classList.add("open");
         triggerBtn.setAttribute("aria-expanded", "true");
+        clampDropdownToViewport(menuEl);
       }
     }
 
     function closeAllDropdowns() {
       document.querySelectorAll(".dropdown-menu.open").forEach(m => {
         m.classList.remove("open");
+        m.style.transform = "";
         const trigger = m.parentElement.querySelector(".dropdown-trigger");
         if (trigger) trigger.setAttribute("aria-expanded", "false");
       });
