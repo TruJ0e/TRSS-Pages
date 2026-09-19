@@ -95,6 +95,56 @@
     return [...s3, ...s2, ...s1];
   }
 
+  // Storage Namespace & Keys: TRSS : schema/version : course : chapter
+  const STORAGE_SCHEMA_VERSION = "v1";
+  const COURSE_ID = "general-psychology";
+  const CHAPTER_ID = "chapter-7";
+  const STORAGE_NAMESPACE = `TRSS:${STORAGE_SCHEMA_VERSION}:${COURSE_ID}:${CHAPTER_ID}`;
+  const PROGRESS_STORAGE_KEY = `${STORAGE_NAMESPACE}:progress`;
+  const QUIZ_SCORE_STORAGE_KEY = `${STORAGE_NAMESPACE}:quiz-score`;
+
+  // Local Storage Service (strictly client-side isolation per visitor device/browser)
+  const localStore = {
+    loadProgress() {
+      try {
+        const raw = localStorage.getItem(PROGRESS_STORAGE_KEY) || localStorage.getItem("trss-chapter7-progress");
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        console.warn("TRSS: localStorage unavailable, using session state", e);
+        return {};
+      }
+    },
+    saveProgress(progress) {
+      try {
+        localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+      } catch (e) {
+        console.warn("TRSS: localStorage write failed", e);
+      }
+    },
+    loadQuizScore() {
+      try {
+        const raw = localStorage.getItem(QUIZ_SCORE_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : { correct: 0, total: 0 };
+      } catch (e) {
+        return { correct: 0, total: 0 };
+      }
+    },
+    saveQuizScore(score) {
+      try {
+        localStorage.setItem(QUIZ_SCORE_STORAGE_KEY, JSON.stringify(score));
+      } catch (e) {
+        console.warn("TRSS: localStorage write failed", e);
+      }
+    },
+    resetAll() {
+      try {
+        localStorage.removeItem(PROGRESS_STORAGE_KEY);
+        localStorage.removeItem(QUIZ_SCORE_STORAGE_KEY);
+        localStorage.removeItem("trss-chapter7-progress");
+      } catch (e) {}
+    }
+  };
+
   // Application State
   const state = {
     currentView: "home", // "home" | "course" | "chapter" | "study"
@@ -109,8 +159,8 @@
     quizIndex: 0,
     quizSelectedAnswer: null,
     quizAnswered: false,
-    quizScore: { correct: 0, total: 0 },
-    progress: JSON.parse(localStorage.getItem("trss-chapter7-progress") || "{}")
+    quizScore: localStore.loadQuizScore(),
+    progress: localStore.loadProgress()
   };
 
   // DOM Elements
@@ -258,7 +308,7 @@
   }
 
   function saveProgress() {
-    localStorage.setItem("trss-chapter7-progress", JSON.stringify(state.progress));
+    localStore.saveProgress(state.progress);
   }
 
   function markProgress(status) {
@@ -768,6 +818,7 @@
     }
     state.progress[cardId] = existing;
     saveProgress();
+    localStore.saveQuizScore(state.quizScore);
 
     renderQuiz();
     renderStatusBar();
@@ -1085,7 +1136,7 @@
       if (confirm("Reset your study progress for Chapter 7?")) {
         state.progress = {};
         state.quizScore = { correct: 0, total: 0 };
-        saveProgress();
+        localStore.resetAll();
         applyFilters(true);
       }
     });
