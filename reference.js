@@ -234,7 +234,6 @@
 
     // Quiz Workspace
     quizWorkspace: document.getElementById("quizWorkspace"),
-    quizLevelBadge: document.getElementById("quizLevelBadge"),
     quizCategoryBadge: document.getElementById("quizCategoryBadge"),
     quizQuestionNumber: document.getElementById("quizQuestionNumber"),
     quizPromptText: document.getElementById("quizPromptText"),
@@ -249,6 +248,36 @@
     quizSkipBtn: document.getElementById("quizSkipBtn"),
     quizNextBtn: document.getElementById("quizNextBtn")
   };
+
+  const MINOR_WORDS = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "in", "nor", "of", "on", "or", "per", "the", "to", "vs.", "vs", "via", "with"]);
+
+  // Display-only Title Casing: preserves canonical terms for scoring and data
+  function formatDisplayTerm(term) {
+    if (!term) return "";
+    return term.replace(/\b[a-zA-Z0-9'’]+\b|\([A-Za-z0-9]+\)/g, (match, offset) => {
+      if (match.startsWith("(") && match.endsWith(")")) {
+        return match;
+      }
+      if (/[A-Z]/.test(match)) {
+        return match;
+      }
+      const lower = match.toLowerCase();
+      if (offset === 0) {
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      }
+      if (MINOR_WORDS.has(lower)) {
+        return lower;
+      }
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    });
+  }
+
+  // Display-only Sentence Casing for definitions
+  function formatSentenceCase(str) {
+    if (!str) return "";
+    const trimmed = str.trim();
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  }
 
   function normalize(str) {
     return (str || "").toLowerCase().trim();
@@ -445,7 +474,7 @@
     if (els.fcCategoryBadge) els.fcCategoryBadge.textContent = card.category;
     if (els.fcCardNumber) els.fcCardNumber.textContent = counterText;
     if (els.fcTerm) {
-      els.fcTerm.textContent = card.term;
+      els.fcTerm.textContent = formatDisplayTerm(card.term);
       els.fcTerm.classList.toggle("term-long", card.term.length > 26);
     }
 
@@ -453,9 +482,9 @@
     if (els.fcBackTypeBadge) els.fcBackTypeBadge.textContent = typeLabel;
     if (els.fcBackCategoryBadge) els.fcBackCategoryBadge.textContent = card.category;
     if (els.fcBackCardNumber) els.fcBackCardNumber.textContent = counterText;
-    if (els.fcBackTerm) els.fcBackTerm.textContent = card.term;
+    if (els.fcBackTerm) els.fcBackTerm.textContent = formatDisplayTerm(card.term);
     if (els.fcCue) els.fcCue.textContent = card.cue;
-    if (els.fcSimple) els.fcSimple.textContent = card.simple;
+    if (els.fcSimple) els.fcSimple.textContent = formatSentenceCase(card.simple);
 
     // Lesson Connections / Examples (Naturally shown)
     const hasExamples = (card.examples || []).length > 0;
@@ -657,9 +686,8 @@
     if (state.quizIndex >= deck.length) state.quizIndex = 0;
     const q = deck[state.quizIndex];
 
-    if (els.quizLevelBadge) els.quizLevelBadge.textContent = q.level;
     if (els.quizCategoryBadge) els.quizCategoryBadge.textContent = q.category;
-    if (els.quizQuestionNumber) els.quizQuestionNumber.textContent = `Question ${state.quizIndex + 1} / ${deck.length}`;
+    if (els.quizQuestionNumber) els.quizQuestionNumber.textContent = `${state.quizIndex + 1} / ${deck.length}`;
     if (els.quizPromptText) els.quizPromptText.textContent = q.prompt;
 
     // Render answer choices
@@ -686,7 +714,7 @@
 
         const textSpan = document.createElement("span");
         textSpan.className = "option-text";
-        textSpan.textContent = optText;
+        textSpan.textContent = formatDisplayTerm(optText);
 
         btn.appendChild(letterSpan);
         btn.appendChild(textSpan);
@@ -729,12 +757,12 @@
         if (els.feedbackResultTitle) {
           els.feedbackResultTitle.textContent = isCorrect
             ? "✅ Correct! Excellent recall."
-            : `❌ Incorrect. The correct concept is "${q.term}".`;
+            : `❌ Incorrect. The correct concept is "${formatDisplayTerm(q.term)}".`;
           els.feedbackResultTitle.className = `feedback-title ${isCorrect ? "correct" : "wrong"}`;
         }
 
         if (els.feedbackCueText) els.feedbackCueText.textContent = q.cue;
-        if (els.feedbackMeaningText) els.feedbackMeaningText.textContent = q.simple;
+        if (els.feedbackMeaningText) els.feedbackMeaningText.textContent = formatSentenceCase(q.simple);
         if (els.feedbackCompareText) {
           if (q.compare) {
             els.feedbackCompareText.classList.remove("hidden");
