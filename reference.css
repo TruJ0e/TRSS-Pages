@@ -1175,14 +1175,19 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 }
 
 .term-heading {
-  font-size: clamp(2.3rem, 5.2vw, 3.5rem);
+  font-size: clamp(2.8rem, 6.5vw, 4.2rem);
   font-weight: 800;
-  line-height: 1.18;
+  line-height: 1.15;
   color: var(--text-main);
-  margin: 0 0 22px 0;
-  max-width: 740px;
+  margin: 0 0 20px 0;
+  max-width: 820px;
   letter-spacing: -0.02em;
   word-break: break-word;
+}
+
+.term-heading.term-long {
+  font-size: clamp(2.0rem, 4.5vw, 2.9rem);
+  line-height: 1.2;
 }
 
 .flip-prompt {
@@ -1298,12 +1303,30 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   flex-shrink: 0;
 }
 
-.rating-buttons, .nav-buttons {
+#flashcardsWorkspace .workspace-actions {
+  justify-content: center;
+  margin-top: 10px;
+}
+
+#flashcardsWorkspace .nav-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+#flashcardsWorkspace .btn-nav {
+  min-width: 140px;
+  padding: 10px 24px;
+  font-size: 0.95rem;
+  justify-content: center;
+}
+
+.nav-buttons {
   display: flex;
   gap: 8px;
 }
 
-.btn-rating, .btn-nav {
+.btn-nav {
   padding: 9px 16px;
   border-radius: var(--radius-sm);
   font-size: 0.88rem;
@@ -1312,37 +1335,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   align-items: center;
   gap: 6px;
   transition: all 0.15s ease;
-  border: 1px solid transparent;
-}
-
-.btn-rating kbd {
-  background: rgba(0,0,0,0.06);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-}
-
-.btn-review {
-  background: var(--warn-bg);
-  color: var(--warn);
-  border-color: var(--warn-border);
-}
-
-.btn-review:hover {
-  background: #fef3c7;
-}
-
-.btn-gotit {
-  background: var(--success-bg);
-  color: var(--success);
-  border-color: var(--success-border);
-}
-
-.btn-gotit:hover {
-  background: #dcfce7;
-}
-
-.btn-nav {
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-main);
@@ -1825,12 +1817,17 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   }
 
   .term-heading {
-    font-size: clamp(1.75rem, 7.5vw, 2.45rem);
+    font-size: clamp(2.7rem, 11vw, 4.1rem);
     font-weight: 800;
-    line-height: 1.18;
-    margin: 0 0 12px 0;
+    line-height: 1.14;
+    margin: 0 0 10px 0;
     word-break: break-word;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
+  }
+
+  .term-heading.term-long {
+    font-size: clamp(1.75rem, 6.5vw, 2.3rem);
+    line-height: 1.18;
   }
 
   .card-hint-group {
@@ -1908,22 +1905,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
     flex-shrink: 0;
   }
 
-  /* Flashcards on Mobile: Swipe replaces Prev/Next buttons */
-  #flashcardsWorkspace .nav-buttons {
+  /* Flashcards on Mobile: Swipe replaces navigation buttons; workspace-actions completely hidden */
+  #flashcardsWorkspace .workspace-actions {
     display: none !important;
-  }
-
-  #flashcardsWorkspace .rating-buttons {
-    flex: 1;
-    width: 100%;
-    display: flex;
-    gap: 8px;
-  }
-
-  .rating-buttons {
-    display: flex;
-    gap: 4px;
-    flex: 1.15;
   }
 
   .nav-buttons {
@@ -1945,9 +1929,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
     gap: 3px;
   }
 
-  .btn-rating kbd {
-    display: none;
-  }
 
   /* Quiz Workspace on Mobile */
   .quiz-card {

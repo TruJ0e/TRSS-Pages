@@ -149,7 +149,7 @@
   const state = {
     currentView: "home", // "home" | "course" | "chapter" | "study"
     mode: "flashcards",  // "flashcards" | "quiz"
-    setFilter: "all",    // "all" | "book-term" | "lesson-concept" | "research-skill" | "review"
+    setFilter: "all",    // "all" | "book-term" | "lesson-concept" | "research-skill"
     sectionFilter: "all",// "all" | <categoryName>
     searchQuery: "",
     flashcardDeck: [...allCards],
@@ -207,7 +207,6 @@
     // Status Bar & Empty State
     deckStatus: document.getElementById("deckStatus"),
     categoryStatus: document.getElementById("categoryStatus"),
-    progressStatus: document.getElementById("progressStatus"),
     emptyState: document.getElementById("emptyState"),
     clearFiltersBtn: document.getElementById("clearFiltersBtn"),
 
@@ -230,8 +229,6 @@
     fcApplicationLayer: document.getElementById("fcApplicationLayer"),
     fcCompareBox: document.getElementById("fcCompareBox"),
     fcCompareText: document.getElementById("fcCompareText"),
-    fcReviewBtn: document.getElementById("fcReviewBtn"),
-    fcGotItBtn: document.getElementById("fcGotItBtn"),
     fcPrevBtn: document.getElementById("fcPrevBtn"),
     fcNextBtn: document.getElementById("fcNextBtn"),
 
@@ -307,40 +304,6 @@
     }
   }
 
-  function saveProgress() {
-    localStore.saveProgress(state.progress);
-  }
-
-  function markProgress(status) {
-    const card = state.flashcardDeck[state.flashcardIndex];
-    if (!card) return;
-    const existing = state.progress[card.id] || { seen: 0, gotIt: 0, review: 0 };
-    existing.seen += 1;
-    existing.status = status;
-    if (status === "got-it") existing.gotIt += 1;
-    if (status === "review") existing.review += 1;
-    existing.updatedAt = new Date().toISOString();
-    state.progress[card.id] = existing;
-    saveProgress();
-
-    // If currently studying the Needs Review queue, remove immediately
-    if (state.setFilter === "review") {
-      applyFilters(false);
-      // If review pool is now empty, complete the scoped session
-      if (state.flashcardDeck.length === 0) {
-        completeScopedSession();
-        return;
-      }
-      if (state.flashcardIndex >= state.flashcardDeck.length) {
-        state.flashcardIndex = 0;
-      }
-      renderFlashcards();
-      renderStatusBar();
-      return;
-    }
-
-    nextFlashcard();
-  }
 
   // Completion Behavior: reset temporary scope to All Cards and All Sections
   function completeScopedSession() {
@@ -399,8 +362,6 @@
 
     // Filter eligible targets
     const eligibleTargets = allCards.filter(card => {
-      const cardProgress = state.progress[card.id]?.status;
-
       // Set dimension
       let setMatches = false;
       if (setVal === "all") {
@@ -411,8 +372,6 @@
         setMatches = (card.sourceSet === "lesson-concept");
       } else if (setVal === "research-skill") {
         setMatches = (card.sourceSet === "research-skill");
-      } else if (setVal === "review") {
-        setMatches = (cardProgress === "review");
       }
 
       // Section dimension
@@ -485,7 +444,10 @@
     if (els.fcTypeBadge) els.fcTypeBadge.textContent = typeLabel;
     if (els.fcCategoryBadge) els.fcCategoryBadge.textContent = card.category;
     if (els.fcCardNumber) els.fcCardNumber.textContent = counterText;
-    if (els.fcTerm) els.fcTerm.textContent = card.term;
+    if (els.fcTerm) {
+      els.fcTerm.textContent = card.term;
+      els.fcTerm.classList.toggle("term-long", card.term.length > 26);
+    }
 
     // Back Face: Scaffolded Breakdown
     if (els.fcBackTypeBadge) els.fcBackTypeBadge.textContent = typeLabel;
@@ -807,17 +769,6 @@
     state.quizScore.total += 1;
     if (isCorrect) state.quizScore.correct += 1;
 
-    // Track card progress
-    const cardId = question.cardId;
-    const existing = state.progress[cardId] || { seen: 0, gotIt: 0, review: 0 };
-    existing.seen += 1;
-    if (isCorrect) existing.gotIt += 1;
-    else {
-      existing.review += 1;
-      existing.status = "review";
-    }
-    state.progress[cardId] = existing;
-    saveProgress();
     localStore.saveQuizScore(state.quizScore);
 
     renderQuiz();
@@ -856,16 +807,6 @@
       els.categoryStatus.textContent = state.sectionFilter !== "all"
         ? `· Section: ${state.sectionFilter}`
         : "";
-    }
-
-    if (els.progressStatus) {
-      let gotItCount = 0;
-      let reviewCount = 0;
-      Object.values(state.progress).forEach(p => {
-        if (p.status === "got-it") gotItCount++;
-        if (p.status === "review") reviewCount++;
-      });
-      els.progressStatus.textContent = `${gotItCount} got it · ${reviewCount} review`;
     }
 
     // Update Mode Tab counts
@@ -1145,8 +1086,6 @@
   // Flashcards interaction
   if (els.fcNextBtn) els.fcNextBtn.addEventListener("click", nextFlashcard);
   if (els.fcPrevBtn) els.fcPrevBtn.addEventListener("click", prevFlashcard);
-  if (els.fcGotItBtn) els.fcGotItBtn.addEventListener("click", () => markProgress("got-it"));
-  if (els.fcReviewBtn) els.fcReviewBtn.addEventListener("click", () => markProgress("review"));
 
   // Quiz interaction
   if (els.quizNextBtn) els.quizNextBtn.addEventListener("click", nextQuizQuestion);
@@ -1170,10 +1109,6 @@
         nextFlashcard();
       } else if (e.key === "ArrowLeft") {
         prevFlashcard();
-      } else if (e.key === "1") {
-        markProgress("review");
-      } else if (e.key === "2") {
-        markProgress("got-it");
       }
     } else if (state.mode === "quiz") {
       if (!state.quizAnswered && ["1", "2", "3", "4"].includes(e.key)) {

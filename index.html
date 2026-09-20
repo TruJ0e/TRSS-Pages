@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="description" content="TRSS — TruReview Student Studier: A free educational study tool by TruJoe Digital featuring interactive scaffolded flashcards and application practice quizzes." />
   <title>TRSS — TruReview Student Studier</title>
-  <link rel="stylesheet" href="reference.css?v=20260919-canon4" />
+  <link rel="stylesheet" href="reference.css?v=20260919-canon5" />
 </head>
 <body>
   <div class="app-viewport">
@@ -272,17 +272,12 @@
                   <span class="option-check"></span>
                   <span class="option-text">Research &amp; detail (24)</span>
                 </button>
-                <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="review">
-                  <span class="option-check"></span>
-                  <span class="option-text">Needs review</span>
-                </button>
               </div>
               <select id="typeFilter" class="sr-only" tabindex="-1" aria-hidden="true">
                 <option value="all">All cards (108)</option>
                 <option value="book-term">Book terms (31)</option>
                 <option value="lesson-concept">Lesson concepts (53)</option>
                 <option value="research-skill">Research &amp; detail (24)</option>
-                <option value="review">Needs review</option>
               </select>
             </div>
 
@@ -307,9 +302,6 @@
             <div class="status-left">
               <span id="deckStatus" class="status-pill">108 cards available</span>
               <span id="categoryStatus" class="status-meta"></span>
-            </div>
-            <div class="status-right">
-              <span id="progressStatus" class="progress-pill">0 got it · 0 review</span>
             </div>
           </section>
 
@@ -392,16 +384,8 @@
               </div>
             </div>
 
-            <!-- Flashcard Control Actions -->
+            <!-- Flashcard Control Actions (Centered Prev/Next on Desktop, Gesture Swipe on Mobile) -->
             <div class="workspace-actions">
-              <div class="rating-buttons" aria-label="Confidence rating">
-                <button id="fcReviewBtn" type="button" class="btn-rating btn-review" title="Shortcut: 1">
-                  <span class="btn-icon">⚠️</span> Needs review <kbd>1</kbd>
-                </button>
-                <button id="fcGotItBtn" type="button" class="btn-rating btn-gotit" title="Shortcut: 2">
-                  <span class="btn-icon">✅</span> Got it <kbd>2</kbd>
-                </button>
-              </div>
               <div class="nav-buttons" aria-label="Card navigation">
                 <button id="fcPrevBtn" type="button" class="btn-nav" title="Previous card (Left arrow)">
                   ← Previous
@@ -486,6 +470,6 @@
   <script src="core-cards.js"></script>
   <script src="lesson-cards.js"></script>
   <script src="extra-cards.js"></script>
-  <script src="reference.js?v=20260919-canon4"></script>
+  <script src="reference.js?v=20260919-canon5"></script>
 </body>
 </html>
