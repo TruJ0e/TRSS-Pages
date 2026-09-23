@@ -4,7 +4,7 @@ window.CH14_CORE_CARDS = [
     "term": "Delusions",
     "type": "book-term",
     "category": "Schizophrenia",
-    "cue": "Think: unrealistic beliefs associated with schizophrenia",
+    "cue": "false beliefs",
     "simple": "unrealistic beliefs associated with schizophrenia, such as feelings of persecution or grandiosity.",
     "examples": [
       "Schizophrenia is a psychological disorder characterized by hallucinations, delusions, disorganized thought and speech, disorders of movement, restricted affect, and avolition or asociality.",
@@ -22,7 +22,7 @@ window.CH14_CORE_CARDS = [
     "term": "Major depressive disorder",
     "type": "book-term",
     "category": "Mood disorders",
-    "cue": "Think: common and serious psychological disorder characterized by persistent sadness and loss of interest.",
+    "cue": "lasting sadness",
     "simple": "a common and serious psychological disorder characterized by persistent sadness and loss of interest.",
     "examples": [
       "To be diagnosed with major depressive disorder, a person must show at least five of the abovementioned symptoms (and others) for at least 2 weeks and must represent a change in their previous level of functioning."
@@ -38,7 +38,7 @@ window.CH14_CORE_CARDS = [
     "term": "Dissociative amnesia",
     "type": "book-term",
     "category": "Anxiety, trauma, and somatic disorders",
-    "cue": "Think: dissociative disorder characterized by forgetting important personal information.",
+    "cue": "memory gaps",
     "simple": "a dissociative disorder characterized by forgetting important personal information.",
     "examples": [
       "Dissociative disorders take several forms, including dissociative amnesia, dissociative fugue, depersonalization, and dissociative identity disorder.",
@@ -55,7 +55,7 @@ window.CH14_CORE_CARDS = [
     "term": "Dissociative fugue",
     "type": "book-term",
     "category": "Anxiety, trauma, and somatic disorders",
-    "cue": "Think: dissociative disorder involving identity confusion with sudden travel.",
+    "cue": "identity -> travel",
     "simple": "a dissociative disorder involving identity confusion with sudden travel.",
     "examples": [
       "Dissociative disorders take several forms, including dissociative amnesia, dissociative fugue, depersonalization, and dissociative identity disorder.",
@@ -72,7 +72,7 @@ window.CH14_CORE_CARDS = [
     "term": "Dissociative identity disorder",
     "type": "book-term",
     "category": "Anxiety, trauma, and somatic disorders",
-    "cue": "Think: dissociative disorder characterized by multiple distinct personalities",
+    "cue": "many selves",
     "simple": "a dissociative disorder characterized by multiple distinct personalities, formerly called split personality.",
     "examples": [
       "It is commonly mistaken for dissociative identity disorder, or “split personality,” but it has nothing to do with that condition.",
@@ -90,7 +90,7 @@ window.CH14_CORE_CARDS = [
     "term": "Prevalence",
     "type": "book-term",
     "category": "Psychological disorder basics",
-    "cue": "Think: how frequently a disorder occurs in a population",
+    "cue": "how common",
     "simple": "how frequently a disorder occurs in a population",
     "examples": [
       "Prevalence appears as a key idea in Psychological disorder basics."
@@ -106,7 +106,7 @@ window.CH14_CORE_CARDS = [
     "term": "Inattention",
     "type": "book-term",
     "category": "Childhood disorders",
-    "cue": "Think: inability to maintain sustained attention or on-task behavior for an ageappropriate length of time",
+    "cue": "can't focus",
     "simple": "the inability to maintain sustained attention or on-task behavior for an ageappropriate length of time",
     "examples": [
       "Inattention appears as a key idea in Childhood disorders."
@@ -122,7 +122,7 @@ window.CH14_CORE_CARDS = [
     "term": "Hyperactivity",
     "type": "book-term",
     "category": "Childhood disorders",
-    "cue": "Think: expressing a high level of motor activity",
+    "cue": "can't sit still",
     "simple": "expressing a high level of motor activity, such as fidgeting and squirming, and finding it difficult to engage in structured activities",
     "examples": [
       "Critics believe this has resulted in an overdiagnosis of attentiondeficit/hyperactivity disorder (ADHD), autism, and childhood bipolar disorder.",

@@ -4,7 +4,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Nervous System",
     "type": "lesson-concept",
     "category": "Stress and immune functioning",
-    "cue": "Think: stress response activates the sympathetic division of the autonomic nervous system",
+    "cue": "stress alarm system",
     "simple": "The stress response activates the sympathetic division of the autonomic nervous system, initiating the fight-or-flight response.",
     "examples": [
       "The stress response activates the sympathetic division of the autonomic nervous system, initiating the fight-or-flight response.",
@@ -22,7 +22,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Autonomic Nervous",
     "type": "lesson-concept",
     "category": "Stress and immune functioning",
-    "cue": "Think: stress response activates the sympathetic division of the autonomic nervous system",
+    "cue": "auto-pilot nerves",
     "simple": "The stress response activates the sympathetic division of the autonomic nervous system, initiating the fight-or-flight response.",
     "examples": [
       "The stress response activates the sympathetic division of the autonomic nervous system, initiating the fight-or-flight response.",
@@ -40,7 +40,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Stress Response",
     "type": "lesson-concept",
     "category": "Stress basics",
-    "cue": "Think: stress response includes physiological and behavioral aspects that mobilize the body’s resources to enhance...",
+    "cue": "body mobilizes",
     "simple": "The stress response includes physiological and behavioral aspects that mobilize the body’s resources to enhance one’s survival.",
     "examples": [
       "The stress response includes physiological and behavioral aspects that mobilize the body’s resources to enhance one’s survival.",
@@ -58,7 +58,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Stress basics",
     "type": "lesson-concept",
     "category": "Stress basics",
-    "cue": "Think: How can you differentiate between stress and a stressor?",
+    "cue": "stress vs stressor",
     "simple": "How can you differentiate between stress and a stressor?",
     "examples": [
       "How can you differentiate between stress and a stressor?",
@@ -75,7 +75,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Stress and health",
     "type": "lesson-concept",
     "category": "Stress and health",
-    "cue": "Think: Stress directly affects the body and therefore health.",
+    "cue": "stress harms health",
     "simple": "Stress directly affects the body and therefore health.",
     "examples": [
       "Stress directly affects the body and therefore health.",
@@ -91,8 +91,8 @@ window.CH16_LESSON_CARDS = [
     "term": "Health Effects of Stress",
     "type": "lesson-concept",
     "category": "Health Effects of Stress",
-    "cue": "Think: media.cengage.com/076035dd-1b4b-4151-9432bd215bfe357c) Personality type also influence stress-related health...",
-    "simple": "media.cengage.com/076035dd-1b4b-4151-9432bd215bfe357c) Personality type also influence stress-related health issues.",
+    "cue": "personality + health",
+    "simple": "personality type also influences stress-related health issues.",
     "examples": [
       "media.cengage.com/076035dd-1b4b-4151-9432bd215bfe357c) Personality type also influence stress-related health issues.",
       "Type A personalities (competitive and work-focused individuals) are at higher heart disease risk primarily due to hostility, not competitiveness, while Type B personalities (relaxed and easygoing) are more relaxed."
@@ -108,7 +108,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Coping with stress",
     "type": "lesson-concept",
     "category": "Coping with stress",
-    "cue": "Think: We all have to deal with stress.",
+    "cue": "dealing with it",
     "simple": "We all have to deal with stress.",
     "examples": [
       "We all have to deal with stress.",
@@ -125,8 +125,8 @@ window.CH16_LESSON_CARDS = [
     "term": "Psychology and health",
     "type": "lesson-concept",
     "category": "Psychology and health",
-    "cue": "Think: # Psychology and health",
-    "simple": "# Psychology and health",
+    "cue": "mind-body link",
+    "simple": "how psychological factors affect physical health.",
     "examples": [
       "Health psychology is a branch of psychology that investigates the relationships between psychological variables and health.",
       "Health psychologists use the biopsychosocial model, that views health and illness as resulting from biological (such as genes), psychological (such as lifestyle choices and stress), and social factors (such as social...",
@@ -143,8 +143,8 @@ window.CH16_LESSON_CARDS = [
     "term": "Positive psychology",
     "type": "lesson-concept",
     "category": "Positive psychology",
-    "cue": "Think: What Is Positive Psychology?",
-    "simple": "What Is Positive Psychology?",
+    "cue": "science of well-being",
+    "simple": "the study of well-being, strengths, and flourishing.",
     "examples": [
       "What Is Positive Psychology?",
       "The field of positive psychology is an approach that emphasizes normal behavior and human strengths.",
@@ -161,8 +161,8 @@ window.CH16_LESSON_CARDS = [
     "term": "Stress and immune functioning",
     "type": "lesson-concept",
     "category": "Stress and immune functioning",
-    "cue": "Think: # Stress and immune functioning",
-    "simple": "# Stress and immune functioning",
+    "cue": "stress weakens immunity",
+    "simple": "how stress affects the immune system.",
     "examples": [
       "Worldwide, 62% of people say that they feel stressed to the point that it has negatively affected their daily life.",
       "Stressors that can affect people include financial, workplace, health, family, and social stresses.",
@@ -179,7 +179,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Confounding variables",
     "type": "lesson-concept",
     "category": "Confounding variables",
-    "cue": "Think: researchers found that family stress was not directly related to higher levels of inflammation in the...",
+    "cue": "hidden third factor",
     "simple": "The researchers found that family stress was not directly related to higher levels of inflammation in the participants.",
     "examples": [
       "The researchers found that family stress was not directly related to higher levels of inflammation in the participants.",
@@ -195,8 +195,8 @@ window.CH16_LESSON_CARDS = [
     "term": "Dependent variables",
     "type": "lesson-concept",
     "category": "Dependent variables",
-    "cue": "Think: Independent variables",
-    "simple": "Independent variables",
+    "cue": "measured outcome",
+    "simple": "the outcome measured in a study.",
     "examples": [
       "The researchers found that family stress was not directly related to higher levels of inflammation in the participants.",
       "The response of the autonomic nervous system played an important role in determining if experiencing family stress was associated with heightened inflammation.",
@@ -212,7 +212,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Independent variables",
     "type": "lesson-concept",
     "category": "Independent variables",
-    "cue": "Think: researchers found that family stress was not directly related to higher levels of inflammation in the...",
+    "cue": "what's manipulated",
     "simple": "The researchers found that family stress was not directly related to higher levels of inflammation in the participants.",
     "examples": [
       "The researchers found that family stress was not directly related to higher levels of inflammation in the participants.",
@@ -228,7 +228,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Family Stress",
     "type": "lesson-concept",
     "category": "Stress and immune functioning",
-    "cue": "Think: Oshri and colleagues (2020) studied how the autonomic nervous system could modulate the impact of family...",
+    "cue": "harsh parenting harms",
     "simple": "Oshri and colleagues studied how the autonomic nervous system could modulate the impact of family stress—in particular, harsh parenting—on inflammatory processes in children.",
     "examples": [
       "Oshri and colleagues (2020) studied how the autonomic nervous system could modulate the impact of family stress—in particular, harsh parenting—on inflammatory processes in children.",
@@ -246,7 +246,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Mental Health",
     "type": "lesson-concept",
     "category": "Psychology and health",
-    "cue": "Think: However, long-term activation of the stress response can lead to prolonged suppression of bodily systems",
+    "cue": "chronic stress damage",
     "simple": "However, long-term activation of the stress response can lead to prolonged suppression of bodily systems, resulting in detrimental effects on physical and mental health.",
     "examples": [
       "However, long-term activation of the stress response can lead to prolonged suppression of bodily systems, resulting in detrimental effects on physical and mental health.",
@@ -264,7 +264,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Heart Rate",
     "type": "lesson-concept",
     "category": "Stress basics",
-    "cue": "Think: Heart rate, blood pressure",
+    "cue": "body revs up",
     "simple": "Heart rate, blood pressure, and respiration all increase; processes that are nonessential for immediate survival, such as digestion, are inhibited.",
     "examples": [
       "Heart rate, blood pressure, and respiration all increase; processes that are nonessential for immediate survival, such as digestion, are inhibited.",
@@ -282,7 +282,7 @@ window.CH16_LESSON_CARDS = [
     "term": "General Adaptation",
     "type": "lesson-concept",
     "category": "Stress and immune functioning",
-    "cue": "Think: Hans Selye described the pattern of responses the body goes through while experiencing a chronic stressor in the...",
+    "cue": "Selye's 3 stages",
     "simple": "Hans Selye described the pattern of responses the body goes through while experiencing a chronic stressor in the general adaptation syndrome.",
     "examples": [
       "Hans Selye described the pattern of responses the body goes through while experiencing a chronic stressor in the general adaptation syndrome (GAS).",
@@ -300,7 +300,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Adaptation Syndrome",
     "type": "lesson-concept",
     "category": "Stress and immune functioning",
-    "cue": "Think: Hans Selye described the pattern of responses the body goes through while experiencing a chronic stressor in the...",
+    "cue": "alarm -> resist -> exhaust",
     "simple": "Hans Selye described the pattern of responses the body goes through while experiencing a chronic stressor in the general adaptation syndrome.",
     "examples": [
       "Hans Selye described the pattern of responses the body goes through while experiencing a chronic stressor in the general adaptation syndrome (GAS).",
@@ -318,7 +318,7 @@ window.CH16_LESSON_CARDS = [
     "term": "Social Support",
     "type": "lesson-concept",
     "category": "Health Effects of Stress",
-    "cue": "Think: Hostile individuals face more conflict",
+    "cue": "hostility isolates",
     "simple": "Hostile individuals face more conflict, less social support, and higher stress-related mortality.",
     "examples": [
       "Hostile individuals face more conflict, less social support, and higher stress-related mortality.",

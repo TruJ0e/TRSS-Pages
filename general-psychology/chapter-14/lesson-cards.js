@@ -4,8 +4,8 @@ window.CH14_LESSON_CARDS = [
     "term": "Psychological Disorders",
     "type": "lesson-concept",
     "category": "Psychological disorder basics",
-    "cue": "Think: Psychological disorders are conditions characterized by a “clinically significant disturbance in an individual’s...",
-    "simple": "Psychological disorders are conditions characterized by a “clinically significant disturbance in an individual’s cognition, emotion regulation, or behavior that reflects a dysfunction in the psychological, biological,...",
+    "cue": "disordered mind",
+    "simple": "conditions marked by a clinically significant disturbance in cognition, emotion regulation, or behavior, reflecting a psychological, biological, or developmental dysfunction.",
     "examples": [
       "Psychological disorders are conditions characterized by a “clinically significant disturbance in an individual’s cognition, emotion regulation, or behavior that reflects a dysfunction in the psychological, biological,...",
       "Psychologists use this information when referring to the classification systems for psychological disorders.",
@@ -22,7 +22,7 @@ window.CH14_LESSON_CARDS = [
     "term": "Bipolar Disorder",
     "type": "lesson-concept",
     "category": "Mood disorders",
-    "cue": "Think: Critics believe this has resulted in an overdiagnosis of attentiondeficit/hyperactivity disorder (ADHD)",
+    "cue": "bipolar: overdiagnosed?",
     "simple": "Critics believe this has resulted in an overdiagnosis of attentiondeficit/hyperactivity disorder, autism, and childhood bipolar disorder.",
     "examples": [
       "Critics believe this has resulted in an overdiagnosis of attentiondeficit/hyperactivity disorder (ADHD), autism, and childhood bipolar disorder.",
@@ -40,8 +40,8 @@ window.CH14_LESSON_CARDS = [
     "term": "Psychological disorder basics",
     "type": "lesson-concept",
     "category": "Psychological disorder basics",
-    "cue": "Think: # Psychological disorder basics",
-    "simple": "# Psychological disorder basics",
+    "cue": "disorder basics",
+    "simple": "the basic ideas behind what counts as a psychological disorder.",
     "examples": [
       "Psychological disorders are conditions characterized by a “clinically significant disturbance in an individual’s cognition, emotion regulation, or behavior that reflects a dysfunction in the psychological, biological,...",
       "Psychologists consider several aspects of experience when determining what constitutes abnormal behavior.",
@@ -58,8 +58,8 @@ window.CH14_LESSON_CARDS = [
     "term": "Childhood disorders",
     "type": "lesson-concept",
     "category": "Childhood disorders",
-    "cue": "Think: # Childhood disorders",
-    "simple": "# Childhood disorders",
+    "cue": "kid disorders",
+    "simple": "psychological disorders that appear in childhood.",
     "examples": [
       "Several psychological disorders are typically diagnosed in childhood and continue throughout the life span.",
       "These disorders are termed neurodevelopmental disorders and include autism spectrum disorder (ASD) and attention deficit hyperactivity disorder (ADHD), among others.",
@@ -76,8 +76,8 @@ window.CH14_LESSON_CARDS = [
     "term": "Schizophrenia",
     "type": "lesson-concept",
     "category": "Schizophrenia",
-    "cue": "Think: What Is Schizophrenia?",
-    "simple": "What Is Schizophrenia?",
+    "cue": "split from reality",
+    "simple": "a disorder marked by delusions, hallucinations, disorganized speech, and abnormal behavior.",
     "examples": [
       "What Is Schizophrenia?",
       "Schizophrenia is a psychological disorder characterized by hallucinations, delusions, disorganized thought and speech, disorders of movement, restricted affect, and avolition or asociality.",
@@ -94,7 +94,7 @@ window.CH14_LESSON_CARDS = [
     "term": "Mood disorders",
     "type": "lesson-concept",
     "category": "Mood disorders",
-    "cue": "Think: Bipolar disorder is a psychological disorder that causes unusual shifts in mood",
+    "cue": "mood swings",
     "simple": "Bipolar disorder is a psychological disorder that causes unusual shifts in mood, energy, concentration, and activity level.",
     "examples": [
       "Bipolar disorder is a psychological disorder that causes unusual shifts in mood, energy, concentration, and activity level.",
@@ -111,8 +111,8 @@ window.CH14_LESSON_CARDS = [
     "term": "Anxiety, trauma, and somatic disorders",
     "type": "lesson-concept",
     "category": "Anxiety, trauma, and somatic disorders",
-    "cue": "Think: # Anxiety, trauma",
-    "simple": "# Anxiety, trauma, and somatic disorders",
+    "cue": "fear + body",
+    "simple": "disorders centered on fear, trauma responses, and physical symptoms.",
     "examples": [
       "While everyone experiences anxiety, those with anxiety disorders have experienced anxiety in ways that are not proportional to their circumstances.",
       "Anxiety disorders are relatively common, with approximately 25% to 30% of the U.S. population meeting the criteria for an anxiety disorder during their lifetime.",
@@ -129,7 +129,7 @@ window.CH14_LESSON_CARDS = [
     "term": "Personality disorders",
     "type": "lesson-concept",
     "category": "Personality disorders",
-    "cue": "Think: Personality disorders are prevalent in the general population",
+    "cue": "common: 1 in 10",
     "simple": "Personality disorders are prevalent in the general population, with studies reporting that 9% to 15% of the population have at least one personality disorder.",
     "examples": [
       "A personality disorder is a disorder characterized by impairments in identity, personality traits, and the ability to establish empathy or intimacy.",
@@ -146,8 +146,8 @@ window.CH14_LESSON_CARDS = [
     "term": "Self-diagnosis and AI tools",
     "type": "lesson-concept",
     "category": "Self-diagnosis and AI tools",
-    "cue": "Think: # Self-diagnosis and AI tools",
-    "simple": "# Self-diagnosis and AI tools",
+    "cue": "googling symptoms",
+    "simple": "using AI tools and online resources to self-diagnose mental health conditions.",
     "examples": [
       "Getting a quick answer to a question can be important, especially when it is a health-related question.",
       "Many people turn to the internet, including AI tools, because they can get their questions answered much faster than waiting for a doctor’s appointment.",
@@ -164,7 +164,7 @@ window.CH14_LESSON_CARDS = [
     "term": "Abnormal Behavior",
     "type": "lesson-concept",
     "category": "Psychological disorder basics",
-    "cue": "Think: Psychologists consider several aspects of experience when determining what constitutes abnormal behavior.",
+    "cue": "defining abnormal",
     "simple": "Psychologists consider several aspects of experience when determining what constitutes abnormal behavior.",
     "examples": [
       "Psychologists consider several aspects of experience when determining what constitutes abnormal behavior.",
@@ -182,7 +182,7 @@ window.CH14_LESSON_CARDS = [
     "term": "Mental Disorders",
     "type": "lesson-concept",
     "category": "Psychological disorder basics",
-    "cue": "Think: Two classification systems are widely used by mental health professionals",
+    "cue": "DSM + ICD",
     "simple": "Two classification systems are widely used by mental health professionals: the Diagnostic and Statistical Manual of Mental Disorders, published by the American Psychiatric Association, and the International Statistical...",
     "examples": [
       "Two classification systems are widely used by mental health professionals: the Diagnostic and Statistical Manual of Mental Disorders (DSM-5), published by the American Psychiatric Association, and the International...",
@@ -200,8 +200,8 @@ window.CH14_LESSON_CARDS = [
     "term": "Biopsychosociocultural Model",
     "type": "lesson-concept",
     "category": "Psychological disorder basics",
-    "cue": "Think: By combining the best aspects of the above considerations",
-    "simple": "By combining the best aspects of the above considerations, we settle on this definition: abnormal behavior is distressing What Is the Biopsychosociocultural Model?",
+    "cue": "bio-psycho-social-cultural",
+    "simple": "abnormal behavior explained by interacting biological, psychological, social, and cultural factors.",
     "examples": [
       "By combining the best aspects of the above considerations, we settle on this definition: abnormal behavior is distressing What Is the Biopsychosociocultural Model?",
       "An integrated approach to psychological disorders uses the biopsychosociocultural model, which views mental disorders as the result of interactions among biological, psychological, social, and cultural factors.",
@@ -218,7 +218,7 @@ window.CH14_LESSON_CARDS = [
     "term": "Hyperactivity Disorder",
     "type": "lesson-concept",
     "category": "Childhood disorders",
-    "cue": "Think: Critics believe this has resulted in an overdiagnosis of attentiondeficit/hyperactivity disorder (ADHD)",
+    "cue": "ADHD: overdiagnosed?",
     "simple": "Critics believe this has resulted in an overdiagnosis of attentiondeficit/hyperactivity disorder, autism, and childhood bipolar disorder.",
     "examples": [
       "Critics believe this has resulted in an overdiagnosis of attentiondeficit/hyperactivity disorder (ADHD), autism, and childhood bipolar disorder.",
@@ -236,7 +236,7 @@ window.CH14_LESSON_CARDS = [
     "term": "Disorganized Speech",
     "type": "lesson-concept",
     "category": "Schizophrenia",
-    "cue": "Think: main symptoms of schizophrenia are delusions",
+    "cue": "jumbled talking",
     "simple": "The main symptoms of schizophrenia are delusions, hallucinations, disorganized speech, and grossly disorganized or abnormal motor behavior.",
     "examples": [
       "The main symptoms of schizophrenia are delusions, hallucinations, disorganized speech, and grossly disorganized or abnormal motor behavior.",
@@ -254,8 +254,8 @@ window.CH14_LESSON_CARDS = [
     "term": "Dissociative Disorder",
     "type": "lesson-concept",
     "category": "Anxiety, trauma, and somatic disorders",
-    "cue": "Think: Let’s review the key characteristics of Dissociative disorders are characterized by disruptions in a person’s...",
-    "simple": "Let’s review the key characteristics of Dissociative disorders are characterized by disruptions in a person’s identity, memory, or consciousness.",
+    "cue": "identity split",
+    "simple": "disorders characterized by disruptions in a person's identity, memory, or consciousness.",
     "examples": [
       "Let’s review the key characteristics of Dissociative disorders are characterized by disruptions in a person’s identity, memory, or consciousness.",
       "Dissociative disorders take several forms, including dissociative amnesia, dissociative fugue, depersonalization, and dissociative identity disorder.",

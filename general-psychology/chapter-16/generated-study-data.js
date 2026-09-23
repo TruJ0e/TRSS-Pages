@@ -5,27 +5,24 @@ window.CH16_STUDY_DATA = {
   "title": "Chapter 16: The Healthy Mind",
   "prefix": "CH16",
   "counts": {
-    "book-term": 22,
+    "book-term": 10,
     "lesson-concept": 19,
     "research-skill": 0
   },
-  "totalCards": 41,
-  "totalQuestions": 123,
+  "totalCards": 29,
+  "totalQuestions": 87,
   "categories": [
     "Confounding variables",
     "Coping with stress",
     "Dependent variables",
-    "General adaptation syndrome",
     "Health Effects of Stress",
     "Independent variables",
-    "Personality and stress",
     "Positive psychology",
     "Psychology and health",
     "Stress and health",
     "Stress and immune functioning",
-    "Stress basics",
-    "Stress physiology"
+    "Stress basics"
   ],
-  "generatedAt": "2026-09-23T19:01:31.735510+00:00",
-  "generator": "trss-generator + authoritative Cengage key-term correction"
+  "generatedAt": "2026-09-23T15:11:40.203811+00:00",
+  "generator": "trss-generator (HeuristicCardGenerator)"
 };

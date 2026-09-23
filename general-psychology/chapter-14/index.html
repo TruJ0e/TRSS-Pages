@@ -1,110 +1,301 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chapter 14: The Troubled Mind — TRSS Study &amp; Practice</title>
-<link rel="stylesheet" href="styles.css">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="description" content="TRSS — TruReview Student Studier: Chapter 14 The Troubled Mind interactive study guide with scaffolded flashcards and application practice quizzes." />
+<title>Chapter 14: The Troubled Mind — TRSS Study Guide</title>
+<link rel="stylesheet" href="reference.css" />
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <span class="logo">TRSS</span>
-    <div>
-      <h1>Chapter 14: The Troubled Mind</h1>
-      <p class="sub">psychology-chapter-14 · <span id="stat-cards">…</span> cards · <span id="stat-questions">…</span> practice questions</p>
+<div class="app-viewport">
+  <!-- Top Site Navigation & Breadcrumbs Bar -->
+  <header class="site-topbar">
+    <div class="topbar-left">
+      <a href="../../" class="site-logo-link" title="TRSS Home">
+        <span class="site-logo-badge">TRSS</span>
+        <span class="site-logo-text">TruReview Student Studier</span>
+      </a>
     </div>
-  </div>
-  <nav class="modes" role="tablist">
-    <button class="mode active" data-mode="reference" role="tab">📘 Reference</button>
-    <button class="mode" data-mode="flashcards" role="tab">📇 Flashcards</button>
-    <button class="mode" data-mode="quiz" role="tab">📝 Practice Quiz</button>
-  </nav>
-</header>
 
-<main>
-  <!-- Reference view -->
-  <section id="view-reference" class="view active">
-    <div class="ref-layout">
-      <aside class="ref-side">
-        <input id="ref-search" type="search" placeholder="Search terms…" aria-label="Search terms">
-        <select id="ref-category" aria-label="Filter by section"><option value="">All Sections</option></select>
-        <select id="ref-type" aria-label="Filter by card type">
-          <option value="">All Types</option>
-          <option value="book-term">Book terms</option>
-          <option value="lesson-concept">Lesson concepts</option>
-          <option value="research-skill">Research skills</option>
-        </select>
-        <ul id="ref-list" class="ref-list"></ul>
-      </aside>
-      <article id="ref-detail" class="ref-detail">
-        <p class="empty">Select a card to see Term → Quick Cue → Plain Meaning → Examples → Apply → Distinctions.</p>
-      </article>
-    </div>
-  </section>
+    <nav class="site-breadcrumbs" id="siteBreadcrumbs" aria-label="Breadcrumb navigation">
+      <ol class="breadcrumbs-list">
+        <li><a href="../../" id="bcHome" class="breadcrumb-link">TRSS</a></li>
+        <li class="breadcrumb-sep" id="bcSepCourse">›</li>
+        <li><a href="../../#/general-psychology" id="bcCourse" class="breadcrumb-link">General Psychology</a></li>
+        <li class="breadcrumb-sep" id="bcSepChapter">›</li>
+        <li><a href="./" id="bcChapter" class="breadcrumb-link">Chapter 14</a></li>
+        <li class="breadcrumb-sep" id="bcSepStudy">›</li>
+        <li><span id="bcStudy" class="breadcrumb-current">Study</span></li>
+      </ol>
+    </nav>
 
-  <!-- Flashcards view -->
-  <section id="view-flashcards" class="view">
-    <div class="fc-controls">
-      <button id="fc-prev">← Prev</button>
-      <button id="fc-flip">Flip (Space)</button>
-      <button id="fc-next">Next →</button>
-      <button id="fc-shuffle">Shuffle</button>
-      <span id="fc-count" class="muted"></span>
+    <div class="topbar-right">
+      <a href="../../" class="topbar-nav-btn" id="navHomeBtn">Home</a>
+      <a href="../../#/general-psychology" class="topbar-nav-btn" id="navCoursesBtn">Courses</a>
     </div>
-    <div class="fc-stage">
-      <div id="fc-card" class="fc-card" tabindex="0" aria-label="Flashcard. Activate to flip.">
-        <div class="fc-inner">
-          <div class="fc-face fc-front"><h2 id="fc-term"></h2><p class="muted">Tap card or press Space to flip</p></div>
-          <div class="fc-face fc-back">
-            <p><strong>Quick cue:</strong> <span id="fc-cue"></span></p>
-            <p><strong>Plain meaning:</strong> <span id="fc-simple"></span></p>
-            <p><strong>Example:</strong> <span id="fc-example"></span></p>
+  </header>
+
+  <!-- Main Views Container -->
+  <main class="site-content" id="siteContent">
+    <section id="studyView" class="page-view">
+      <header class="app-header">
+        <div class="branding">
+          <div class="eyebrow-row">
+            <a href="../../#/general-psychology" class="study-back-btn top-back-btn" id="studyTopBackBtn" title="Back to General Psychology">← Back</a>
+            <span class="eyebrow">TRSS</span>
+            <span class="badge-primary">Chapter 14</span>
           </div>
+          <h2 class="app-title">TruReview Student Studier</h2>
         </div>
+
+        <div class="mode-tabs" role="tablist" aria-label="Study modes">
+          <button id="modeFlashcardsBtn" class="mode-btn active" role="tab" aria-selected="true" type="button">
+            <span class="mode-icon">📇</span>
+            <span>Flashcards <span class="tab-count">(23)</span></span>
+          </button>
+          <button id="modeQuizBtn" class="mode-btn" role="tab" aria-selected="false" type="button">
+            <span class="mode-icon">📝</span>
+            <span>Practice Quiz <span class="tab-count">(69)</span></span>
+          </button>
+        </div>
+
+        <div class="header-actions">
+          <button id="shuffleBtn" type="button" title="Shuffle items" class="action-btn">🔀 Shuffle</button>
+          <button id="resetBtn" type="button" title="Reset all progress" class="action-btn ghost">Reset</button>
+        </div>
+      </header>
+
+      <div class="app-body">
+        <!-- Toolbar Controls (Custom In-Page Dropdowns) -->
+        <section class="controls-toolbar" aria-label="Deck controls">
+          <div class="control-item search-box">
+            <label for="searchInput" class="sr-only">Search</label>
+            <input id="searchInput" type="search" placeholder="🔍 Search term, cue, or scenario..." autocomplete="off" />
+          </div>
+
+          <!-- Custom Set Dropdown -->
+          <div class="control-item trss-dropdown" id="setDropdown">
+            <button type="button" class="dropdown-trigger" id="typeFilterBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by Set">
+              <span class="control-label" id="typeFilterLabel">Set</span>
+              <span class="dropdown-value" id="typeFilterValue">All cards (23)</span>
+              <span class="dropdown-arrow" aria-hidden="true">▾</span>
+            </button>
+            <div class="dropdown-menu" id="typeFilterMenu" role="listbox" aria-label="Filter by Set">
+              <button type="button" class="dropdown-option selected" role="option" aria-selected="true" data-value="all">
+                <span class="option-check">✓</span>
+                <span class="option-text">All cards (23)</span>
+              </button>
+              <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="book-term">
+                <span class="option-check"></span>
+                <span class="option-text">Book terms (8)</span>
+              </button>
+              <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="lesson-concept">
+                <span class="option-check"></span>
+                <span class="option-text">Lesson concepts (15)</span>
+              </button>
+              <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="research-skill">
+                <span class="option-check"></span>
+                <span class="option-text">Research &amp; detail (0)</span>
+              </button>
+            </div>
+            <select id="typeFilter" class="sr-only" tabindex="-1" aria-hidden="true">
+              <option value="all">All cards (23)</option>
+              <option value="book-term">Book terms (8)</option>
+              <option value="lesson-concept">Lesson concepts (15)</option>
+              <option value="research-skill">Research &amp; detail (0)</option>
+            </select>
+          </div>
+
+          <!-- Custom Section Dropdown -->
+          <div class="control-item category-control trss-dropdown" id="sectionDropdown">
+            <button type="button" class="dropdown-trigger" id="categoryFilterBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by Section">
+              <span class="control-label" id="categoryFilterLabel">Section</span>
+              <span class="dropdown-value" id="categoryFilterValue">All Sections</span>
+              <span class="dropdown-arrow" aria-hidden="true">▾</span>
+            </button>
+            <div class="dropdown-menu" id="categoryFilterMenu" role="listbox" aria-label="Filter by Section">
+              <!-- Dynamically populated via JavaScript -->
+            </div>
+            <select id="categoryFilter" class="sr-only" tabindex="-1" aria-hidden="true">
+              <option value="all">All Sections</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- Status Bar -->
+        <section class="status-bar" aria-live="polite">
+          <div class="status-left">
+            <span id="deckStatus" class="status-pill">23 cards available</span>
+            <span id="categoryStatus" class="status-meta"></span>
+          </div>
+        </section>
+
+        <!-- Empty State -->
+        <section id="emptyState" class="empty-state hidden">
+          <h2>No items match the selected filters.</h2>
+          <p>Try clearing your search query or choosing "All Sections".</p>
+          <button id="clearFiltersBtn" type="button" class="btn-primary">Clear filters</button>
+        </section>
+
+        <!-- Flashcards Workspace -->
+        <section id="flashcardsWorkspace" class="workspace">
+          <div class="flashcard-scene">
+            <div id="flashcardElement" class="card-3d" tabindex="0" role="button" aria-label="Flashcard. Click or press Space to flip." aria-expanded="false">
+              <!-- Front Face -->
+              <div class="card-face card-front">
+                <div class="card-header">
+                  <div class="badge-group">
+                    <span id="fcTypeBadge" class="badge">Book term</span>
+                    <span id="fcCategoryBadge" class="badge badge-muted">Section</span>
+                  </div>
+                  <span id="fcCardNumber" class="card-counter">1 / 23</span>
+                </div>
+
+                <div class="card-front-content">
+                  <p class="eyebrow-card">Term / Academic Concept</p>
+                  <h2 id="fcTerm" class="term-heading">Loading...</h2>
+                  <div class="card-hint-group">
+                    <div class="flip-prompt">
+                      <span class="flip-icon">🔄</span>
+                      <span>Tap card or press <kbd>Space</kbd> to flip</span>
+                    </div>
+                    <p class="card-swipe-hint" id="fcSwipeHint" aria-hidden="true">
+                      Swipe left / right to move between cards
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Back Face (Scaffolded Breakdown: Cue -> Meaning -> Examples -> Distinctions) -->
+              <div class="card-face card-back">
+                <div class="card-header">
+                  <div class="badge-group">
+                    <span id="fcBackTypeBadge" class="badge">Book term</span>
+                    <span id="fcBackCategoryBadge" class="badge badge-muted">Section</span>
+                  </div>
+                  <span id="fcBackCardNumber" class="card-counter">1 / 23</span>
+                </div>
+
+                <div class="card-back-content">
+                  <h3 id="fcBackTerm" class="term-back-heading">Term</h3>
+
+                  <!-- 1. Quick Cue & Simplified Meaning -->
+                  <div class="layer-block layer-cue">
+                    <span class="layer-tag">Quick Cue &amp; Meaning</span>
+                    <div id="fcCue" class="cue-pill">cue</div>
+                    <p id="fcSimple" class="simple-text">simple explanation</p>
+                  </div>
+
+                  <!-- 2. Lesson Connections / Examples -->
+                  <div id="fcLessonLayer" class="layer-block layer-lesson">
+                    <span class="layer-tag">Lesson Connections</span>
+                    <ul id="fcExamplesList" class="examples-list"></ul>
+                  </div>
+
+                  <!-- 3. Application & Distinctions -->
+                  <div id="fcApplicationLayer" class="layer-block layer-apply">
+                    <span class="layer-tag">Distinguish It</span>
+                    <div id="fcCompareBox" class="compare-box hidden">
+                      <span id="fcCompareText"></span>
+                    </div>
+                  </div>
+
+                  <div class="flip-back-prompt">
+                    <span class="flip-icon">↩</span>
+                    <span>Tap card or press <kbd>Space</kbd> to flip back</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Flashcard Control Actions -->
+          <div class="workspace-actions">
+            <div class="nav-buttons" aria-label="Card navigation">
+              <button id="fcPrevBtn" type="button" class="btn-nav" title="Previous card (Left arrow)">
+                ← Previous
+              </button>
+              <button id="fcNextBtn" type="button" class="btn-nav btn-primary" title="Next card (Right arrow)">
+                Next →
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Practice Quiz Workspace -->
+        <section id="quizWorkspace" class="workspace hidden">
+          <div class="quiz-container">
+            <div class="quiz-card">
+              <div class="quiz-header">
+                <span id="quizCategoryBadge" class="badge badge-muted">Category</span>
+                <span id="quizQuestionNumber" class="card-counter">1 / 69</span>
+              </div>
+
+              <div class="quiz-prompt-box">
+                <p class="quiz-prompt-label">Scenario Prompt:</p>
+                <h2 id="quizPromptText" class="quiz-prompt-text">Scenario text goes here...</h2>
+              </div>
+
+              <div id="quizOptionsContainer" class="quiz-options-grid" role="radiogroup" aria-label="Answer options">
+                <!-- Dynamically populated options A, B, C, D -->
+              </div>
+
+              <!-- Quiz Explanation Box -->
+              <div id="quizFeedbackBox" class="quiz-feedback hidden" aria-live="assertive">
+                <div id="feedbackResultTitle" class="feedback-title"></div>
+                <div class="feedback-details">
+                  <div class="feedback-cue">
+                    <span class="cue-label">Quick Cue:</span>
+                    <span id="feedbackCueText" class="cue-pill"></span>
+                  </div>
+                  <p id="feedbackMeaningText" class="feedback-meaning"></p>
+                  <div id="feedbackCompareText" class="feedback-compare hidden"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quiz Navigation / Next -->
+          <div class="workspace-actions quiz-actions">
+            <div class="quiz-score-badge">
+              <span>Score: <strong id="quizScoreText">0 / 0</strong></span>
+              <span id="quizAccuracyText" class="accuracy-percent">(0%)</span>
+            </div>
+            <div class="nav-buttons">
+              <button id="quizSkipBtn" type="button" class="btn-nav ghost">Skip</button>
+              <button id="quizNextBtn" type="button" class="btn-nav btn-primary" disabled>Next Question →</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <!-- Required Site Footer (Across All TRSS Views) -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-logo-col">
+        <a href="https://trujoedigital.com" target="_blank" rel="noopener noreferrer" class="footer-logo-link" title="TruJoe Digital">
+          <img src="../../trujoe-digital-logo.png" alt="TruJoe Digital" class="footer-logo-img" />
+        </a>
+      </div>
+      <div class="footer-text-col">
+        <div class="footer-brand">TRSS — TruReview Student Studier</div>
+        <div class="footer-tagline">A free educational study tool by TruJoe Digital.</div>
+        <div class="footer-disclaimer">Not affiliated with, sponsored by, or endorsed by TrueReview or TrueReview Online LLC.</div>
       </div>
     </div>
-  </section>
+  </footer>
+</div>
 
-  <!-- Quiz view -->
-  <section id="view-quiz" class="view">
-    <div id="quiz-setup" class="quiz-setup">
-      <h2>Practice Quiz</h2>
-      <p>3 scenario-based questions per card: <strong>L3</strong> application, <strong>L2</strong> lesson scenario, <strong>L1</strong> core meaning.</p>
-      <label>Section:
-        <select id="quiz-category"><option value="">All Sections</option></select>
-      </label>
-      <button id="quiz-start" class="primary">Start Practice Quiz</button>
-    </div>
-    <div id="quiz-run" class="quiz-run" hidden>
-      <div class="quiz-progress"><div id="quiz-bar"></div></div>
-      <p class="muted"><span id="quiz-pos"></span> · <span id="quiz-level"></span> · Score: <span id="quiz-score">0 / 0</span></p>
-      <h3 id="quiz-stem"></h3>
-      <div id="quiz-options" class="quiz-options"></div>
-      <div id="quiz-feedback" class="quiz-feedback" hidden></div>
-      <button id="quiz-next" class="primary" hidden>Next →</button>
-    </div>
-    <div id="quiz-done" class="quiz-setup" hidden>
-      <h2>Done!</h2>
-      <p id="quiz-final"></p>
-      <button id="quiz-restart" class="primary">Restart Quiz</button>
-    </div>
-  </section>
-</main>
-
-<footer class="foot">
-  <details>
-    <summary>Learning targets</summary>
-    <ul id="targets"></ul>
-  </details>
-  <p class="muted">Generated locally by trss-generator · zero-cost · no network calls.</p>
-</footer>
-
+<!-- Chapter config + card data + study runtime -->
+<script>
+window.TRSS_CHAPTER = { num: 14, title: "The Troubled Mind", prefix: "CH14", course: "general-psychology" };
+</script>
 <script src="core-cards.js"></script>
 <script src="lesson-cards.js"></script>
 <script src="extra-cards.js"></script>
-<script src="generated-study-data.js"></script>
-<script src="lesson-targets.js"></script>
-<script src="app.js"></script>
+<script src="study.js"></script>
 </body>
 </html>
