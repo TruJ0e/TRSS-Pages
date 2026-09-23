@@ -38,7 +38,69 @@
 
   <!-- Main Views Container -->
   <main class="site-content" id="siteContent">
-    <section id="studyView" class="page-view">
+      <section id="chapterView" class="page-view hidden">
+        <div class="view-container">
+          <div class="page-hero">
+            <div class="eyebrow-row">
+              <span class="badge badge-primary">General Psychology</span>
+              <span class="badge badge-accent">Chapter 14</span>
+            </div>
+            <h1 class="page-heading">Chapter 14 Study Guide: The Troubled Mind</h1>
+            <p class="page-lead">
+              Comprehensive study and practice reference covering all 58 Chapter 14 concepts across 7 syllabus sections, paired with 174 practical scenario questions.
+            </p>
+          </div>
+
+          <!-- Study Launcher Cards -->
+          <div class="launcher-grid">
+            <div class="launcher-card">
+              <div class="launcher-header">
+                <span class="launcher-icon">📇</span>
+                <span class="badge badge-primary">58 Flashcards</span>
+              </div>
+              <h3 class="launcher-title">Interactive Flashcards</h3>
+              <p class="launcher-desc">
+                Scaffolded learning breakdown presenting Term &rarr; Quick Cue &rarr; Plain Meaning &rarr; Lesson Examples &rarr; Distinctions naturally on every card.
+              </p>
+              <a href="./?mode=flashcards" class="btn-primary launcher-btn" id="launchFlashcardsBtn">
+                Launch Flashcards (58) →
+              </a>
+            </div>
+
+            <div class="launcher-card">
+              <div class="launcher-header">
+                <span class="launcher-icon">📝</span>
+                <span class="badge badge-accent">174 Questions</span>
+              </div>
+              <h3 class="launcher-title">Practice Quiz</h3>
+              <p class="launcher-desc">
+                3 scenario-based questions per study item designed to test actual application and conceptual distinctions, complete with real-time feedback and cues.
+              </p>
+              <a href="./?mode=quiz" class="btn-primary launcher-btn" id="launchQuizBtn">
+                Start Practice Quiz (174) →
+              </a>
+            </div>
+          </div>
+
+          <!-- Chapter Topics Overview -->
+          <div class="section-block">
+            <div class="section-header">
+              <h3 class="section-title">Chapter 14 Sections &amp; Coverage</h3>
+              <p class="section-desc">Study concepts organized by textbook and lecture sections.</p>
+            </div>
+            <div class="topic-tags-grid">
+              <div class="topic-tag-item"><span>Anxiety, trauma, and somatic disorders</span> <span class="tag-count">(20 cards)</span></div>
+              <div class="topic-tag-item"><span>Childhood disorders</span> <span class="tag-count">(3 cards)</span></div>
+              <div class="topic-tag-item"><span>Mood disorders</span> <span class="tag-count">(9 cards)</span></div>
+              <div class="topic-tag-item"><span>Personality disorders</span> <span class="tag-count">(5 cards)</span></div>
+              <div class="topic-tag-item"><span>Psychological disorder basics</span> <span class="tag-count">(9 cards)</span></div>
+              <div class="topic-tag-item"><span>Schizophrenia</span> <span class="tag-count">(9 cards)</span></div>
+              <div class="topic-tag-item"><span>Self-diagnosis and research</span> <span class="tag-count">(3 cards)</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    <section id="studyView" class="page-view hidden">
       <header class="app-header">
         <div class="branding">
           <div class="eyebrow-row">
@@ -78,21 +140,21 @@
           <div class="control-item trss-dropdown" id="setDropdown">
             <button type="button" class="dropdown-trigger" id="typeFilterBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by Set">
               <span class="control-label" id="typeFilterLabel">Set</span>
-              <span class="dropdown-value" id="typeFilterValue">All cards (23)</span>
+              <span class="dropdown-value" id="typeFilterValue">All cards (58)</span>
               <span class="dropdown-arrow" aria-hidden="true">▾</span>
             </button>
             <div class="dropdown-menu" id="typeFilterMenu" role="listbox" aria-label="Filter by Set">
               <button type="button" class="dropdown-option selected" role="option" aria-selected="true" data-value="all">
                 <span class="option-check">✓</span>
-                <span class="option-text">All cards (23)</span>
+                <span class="option-text">All cards (58)</span>
               </button>
               <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="book-term">
                 <span class="option-check"></span>
-                <span class="option-text">Book terms (8)</span>
+                <span class="option-text">Book terms (31)</span>
               </button>
               <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="lesson-concept">
                 <span class="option-check"></span>
-                <span class="option-text">Lesson concepts (15)</span>
+                <span class="option-text">Lesson concepts (27)</span>
               </button>
               <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="research-skill">
                 <span class="option-check"></span>
@@ -100,9 +162,9 @@
               </button>
             </div>
             <select id="typeFilter" class="sr-only" tabindex="-1" aria-hidden="true">
-              <option value="all">All cards (23)</option>
-              <option value="book-term">Book terms (8)</option>
-              <option value="lesson-concept">Lesson concepts (15)</option>
+              <option value="all">All cards (58)</option>
+              <option value="book-term">Book terms (31)</option>
+              <option value="lesson-concept">Lesson concepts (27)</option>
               <option value="research-skill">Research &amp; detail (0)</option>
             </select>
           </div>

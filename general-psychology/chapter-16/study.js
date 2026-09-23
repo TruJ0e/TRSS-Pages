@@ -933,15 +933,18 @@
     }
   }
 
-  // Standalone chapter page: the study view is the whole page.
+  // Standalone chapter page: landing (chapter view) by default; study views via ?mode=.
   function handleRouting() {
-    showView("study");
     const params = new URLSearchParams(window.location.search || "");
     const mode = params.get("mode");
     if (mode === "quiz") {
+      showView("study");
       switchMode("quiz");
     } else if (mode === "flashcards") {
+      showView("study");
       switchMode("flashcards");
+    } else {
+      showView("chapter");
     }
   }
 
