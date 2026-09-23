@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 14: The Troubled Mind — TRSS Study &amp; Practice</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">TRSS</span>
+    <div>
+      <h1>Chapter 14: The Troubled Mind</h1>
+      <p class="sub">psychology-chapter-14 · <span id="stat-cards">…</span> cards · <span id="stat-questions">…</span> practice questions</p>
+    </div>
+  </div>
+  <nav class="modes" role="tablist">
+    <button class="mode active" data-mode="reference" role="tab">📘 Reference</button>
+    <button class="mode" data-mode="flashcards" role="tab">📇 Flashcards</button>
+    <button class="mode" data-mode="quiz" role="tab">📝 Practice Quiz</button>
+  </nav>
+</header>
+
+<main>
+  <!-- Reference view -->
+  <section id="view-reference" class="view active">
+    <div class="ref-layout">
+      <aside class="ref-side">
+        <input id="ref-search" type="search" placeholder="Search terms…" aria-label="Search terms">
+        <select id="ref-category" aria-label="Filter by section"><option value="">All Sections</option></select>
+        <select id="ref-type" aria-label="Filter by card type">
+          <option value="">All Types</option>
+          <option value="book-term">Book terms</option>
+          <option value="lesson-concept">Lesson concepts</option>
+          <option value="research-skill">Research skills</option>
+        </select>
+        <ul id="ref-list" class="ref-list"></ul>
+      </aside>
+      <article id="ref-detail" class="ref-detail">
+        <p class="empty">Select a card to see Term → Quick Cue → Plain Meaning → Examples → Apply → Distinctions.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Flashcards view -->
+  <section id="view-flashcards" class="view">
+    <div class="fc-controls">
+      <button id="fc-prev">← Prev</button>
+      <button id="fc-flip">Flip (Space)</button>
+      <button id="fc-next">Next →</button>
+      <button id="fc-shuffle">Shuffle</button>
+      <span id="fc-count" class="muted"></span>
+    </div>
+    <div class="fc-stage">
+      <div id="fc-card" class="fc-card" tabindex="0" aria-label="Flashcard. Activate to flip.">
+        <div class="fc-inner">
+          <div class="fc-face fc-front"><h2 id="fc-term"></h2><p class="muted">Tap card or press Space to flip</p></div>
+          <div class="fc-face fc-back">
+            <p><strong>Quick cue:</strong> <span id="fc-cue"></span></p>
+            <p><strong>Plain meaning:</strong> <span id="fc-simple"></span></p>
+            <p><strong>Example:</strong> <span id="fc-example"></span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quiz view -->
+  <section id="view-quiz" class="view">
+    <div id="quiz-setup" class="quiz-setup">
+      <h2>Practice Quiz</h2>
+      <p>3 scenario-based questions per card: <strong>L3</strong> application, <strong>L2</strong> lesson scenario, <strong>L1</strong> core meaning.</p>
+      <label>Section:
+        <select id="quiz-category"><option value="">All Sections</option></select>
+      </label>
+      <button id="quiz-start" class="primary">Start Practice Quiz</button>
+    </div>
+    <div id="quiz-run" class="quiz-run" hidden>
+      <div class="quiz-progress"><div id="quiz-bar"></div></div>
+      <p class="muted"><span id="quiz-pos"></span> · <span id="quiz-level"></span> · Score: <span id="quiz-score">0 / 0</span></p>
+      <h3 id="quiz-stem"></h3>
+      <div id="quiz-options" class="quiz-options"></div>
+      <div id="quiz-feedback" class="quiz-feedback" hidden></div>
+      <button id="quiz-next" class="primary" hidden>Next →</button>
+    </div>
+    <div id="quiz-done" class="quiz-setup" hidden>
+      <h2>Done!</h2>
+      <p id="quiz-final"></p>
+      <button id="quiz-restart" class="primary">Restart Quiz</button>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <details>
+    <summary>Learning targets</summary>
+    <ul id="targets"></ul>
+  </details>
+  <p class="muted">Generated locally by trss-generator · zero-cost · no network calls.</p>
+</footer>
+
+<script src="core-cards.js"></script>
+<script src="lesson-cards.js"></script>
+<script src="extra-cards.js"></script>
+<script src="generated-study-data.js"></script>
+<script src="lesson-targets.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+window.CH14_LESSON_TARGETS = [
+  "Define each key term in Anxiety, trauma, and somatic disorders in your own words.",
+  "Distinguish related concepts within Anxiety, trauma, and somatic disorders and apply them to a new scenario.",
+  "Define each key term in Bachelor’s degree in your own words.",
+  "Distinguish related concepts within Bachelor’s degree and apply them to a new scenario.",
+  "Define each key term in Childhood disorders in your own words.",
+  "Distinguish related concepts within Childhood disorders and apply them to a new scenario.",
+  "Define each key term in Master’s degree in your own words.",
+  "Distinguish related concepts within Master’s degree and apply them to a new scenario.",
+  "Define each key term in Mood disorders in your own words.",
+  "Distinguish related concepts within Mood disorders and apply them to a new scenario.",
+  "Define each key term in Personality disorders in your own words.",
+  "Distinguish related concepts within Personality disorders and apply them to a new scenario.",
+  "Define each key term in Psychological disorder basics in your own words.",
+  "Distinguish related concepts within Psychological disorder basics and apply them to a new scenario.",
+  "Define each key term in Schizophrenia in your own words.",
+  "Distinguish related concepts within Schizophrenia and apply them to a new scenario.",
+  "Define each key term in Self-diagnosis and AI tools in your own words.",
+  "Distinguish related concepts within Self-diagnosis and AI tools and apply them to a new scenario.",
+  "Explain how the sections of Chapter 14 connect to the chapter's main ideas."
+];
