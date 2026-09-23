@@ -232,7 +232,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 #homeView,
 #courseView,
 #chapterView,
-#guideView {
+#guideView,
+.page-view {
   overflow-y: auto;
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
