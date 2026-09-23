@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="TRSS Comprehensive Exam Guide — every concept from every chapter in one complete reference." />
+  <title>Comprehensive Exam Guide — TRSS</title>
+  <link rel="stylesheet" href="../../reference.css" />
+  <style>
+    .guide-search { max-width: 560px; margin: 18px 0 6px; }
+    .guide-search input {
+      width: 100%; padding: 12px 16px; font-size: 16px;
+      border: 1px solid #d7dce3; border-radius: 10px;
+    }
+    .guide-count { color: #5b6470; font-size: 14px; margin: 8px 0 0; }
+    .guide-toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 8px; }
+    .guide-toc a {
+      padding: 8px 14px; border-radius: 999px; background: #eef2f7;
+      color: #1f2a37; text-decoration: none; font-size: 14px; font-weight: 600;
+    }
+    .guide-chapter { margin: 34px 0 8px; padding-top: 18px; border-top: 2px solid #e3e8ef; }
+    .guide-chapter h2 { margin: 0 0 4px; font-size: 24px; }
+    .guide-chapter .guide-chapter-meta { color: #5b6470; font-size: 14px; margin: 0 0 14px; }
+    .guide-category { margin: 20px 0 6px; font-size: 18px; }
+    .guide-concept {
+      background: #fff; border: 1px solid #e3e8ef; border-radius: 10px;
+      padding: 12px 16px; margin: 10px 0;
+    }
+    .guide-term { font-weight: 700; font-size: 16px; margin: 0 0 4px; }
+    .guide-def { margin: 0 0 6px; line-height: 1.55; }
+    .guide-cue { font-size: 13px; color: #6b7280; font-style: italic; margin: 0 0 6px; }
+    .guide-examples { margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: #374151; }
+    .guide-examples li { margin: 3px 0; }
+    .guide-empty { padding: 30px 0; color: #5b6470; }
+    @media print {
+      .site-topbar, .guide-search, .guide-toc, .guide-count { display: none !important; }
+      .app-viewport { display: block; }
+      .guide-concept { break-inside: avoid; border: none; border-bottom: 1px solid #ddd; border-radius: 0; padding: 8px 0; }
+      .guide-chapter { break-before: auto; }
+      body { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-viewport">
+    <header class="site-topbar">
+      <div class="topbar-left">
+        <a href="../../" class="site-logo-link" title="TRSS Home">
+          <span class="site-logo-badge">TRSS</span>
+          <span class="site-logo-text">TruReview Student Studier</span>
+        </a>
+      </div>
+      <div class="topbar-right">
+        <a href="../../" class="topbar-nav-btn">Home</a>
+      </div>
+    </header>
+
+    <main class="site-content">
+      <section class="page-view">
+        <div class="view-container">
+          <div class="page-hero">
+            <div class="eyebrow-row">
+              <span class="badge badge-primary">TRSS</span>
+              <span class="badge badge-accent">Exam Prep</span>
+            </div>
+            <h1 class="page-heading">Comprehensive Exam Guide</h1>
+            <p class="page-lead" id="guideLead">
+              Every concept from every chapter, in one complete reference.
+            </p>
+            <div class="guide-search">
+              <input id="guideSearch" type="search" placeholder="Search all concepts…" aria-label="Search all concepts" />
+            </div>
+            <p class="guide-count" id="guideCount"></p>
+            <nav class="guide-toc" id="guideToc" aria-label="Chapters"></nav>
+          </div>
+
+          <div id="guideContent"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Chapter card data: every chapter's cards imported into this one guide -->
+  <script src="../../core-cards.js"></script>
+  <script src="../../lesson-cards.js"></script>
+  <script src="../../extra-cards.js"></script>
+  <script src="../chapter-14/core-cards.js"></script>
+  <script src="../chapter-14/lesson-cards.js"></script>
+  <script src="../chapter-14/extra-cards.js"></script>
+  <script src="../chapter-16/core-cards.js"></script>
+  <script src="../chapter-16/lesson-cards.js"></script>
+  <script src="../chapter-16/extra-cards.js"></script>
+  <script>
+    (function () {
+      "use strict";
+
+      var CHAPTERS = [
+        { subject: "General Psychology", num: 7, title: "Emotion & Motivation", prefix: "CH7" },
+        { subject: "General Psychology", num: 14, title: "The Troubled Mind", prefix: "CH14" },
+        { subject: "General Psychology", num: 16, title: "The Healthy Mind", prefix: "CH16" }
+      ];
+
+      function esc(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      }
+
+      function chapterCards(prefix) {
+        var out = [];
+        ["CORE", "LESSON", "EXTRA"].forEach(function (kind) {
+          var arr = window[prefix + "_" + kind + "_CARDS"];
+          if (Array.isArray(arr)) out = out.concat(arr);
+        });
+        return out;
+      }
+
+      // Build the model: subject -> chapters -> categories (first-seen order)
+      var subjects = [];
+      var subjectIndex = {};
+      var totalConcepts = 0;
+      CHAPTERS.forEach(function (ch) {
+        var cards = chapterCards(ch.prefix);
+        totalConcepts += cards.length;
+        var catOrder = [];
+        var catMap = {};
+        cards.forEach(function (c) {
+          var cat = c.category || "General";
+          if (!catMap[cat]) { catMap[cat] = []; catOrder.push(cat); }
+          catMap[cat].push(c);
+        });
+        ch.cards = cards;
+        ch.catOrder = catOrder;
+        ch.catMap = catMap;
+        ch.anchor = "ch-" + ch.prefix.toLowerCase();
+        if (!subjectIndex[ch.subject]) {
+          subjectIndex[ch.subject] = { name: ch.subject, chapters: [] };
+          subjects.push(subjectIndex[ch.subject]);
+        }
+        subjectIndex[ch.subject].chapters.push(ch);
+      });
+
+      document.getElementById("guideLead").textContent =
+        "Every concept from every chapter, in one complete reference — " +
+        totalConcepts + " concepts across " + CHAPTERS.length + " chapters.";
+
+      // Table of contents
+      var toc = document.getElementById("guideToc");
+      CHAPTERS.forEach(function (ch) {
+        var a = document.createElement("a");
+        a.href = "#" + ch.anchor;
+        a.textContent = "Ch " + ch.num + " (" + ch.cards.length + ")";
+        toc.appendChild(a);
+      });
+
+      // Render
+      var content = document.getElementById("guideContent");
+      var html = "";
+      subjects.forEach(function (subj) {
+        html += '<div class="guide-subject"><h2 class="section-title" style="margin-top:34px">' +
+          esc(subj.name) + "</h2>";
+        subj.chapters.forEach(function (ch) {
+          html += '<section class="guide-chapter" id="' + ch.anchor + '" data-chapter="' + ch.anchor + '">' +
+            "<h2>Chapter " + ch.num + ": " + esc(ch.title) + "</h2>" +
+            '<p class="guide-chapter-meta">' + ch.cards.length + " concepts &middot; " +
+            ch.catOrder.length + " sections</p>";
+          ch.catOrder.forEach(function (cat) {
+            html += '<h3 class="guide-category" data-category>' + esc(cat) + "</h3>";
+            ch.catMap[cat].forEach(function (c, i) {
+              var hay = (c.term + " " + c.simple + " " + (c.cue || "") + " " +
+                (c.examples || []).join(" ")).toLowerCase();
+              html += '<article class="guide-concept" data-hay="' + esc(hay) + '" data-concept>';
+              html += '<p class="guide-term">' + esc(c.term) + "</p>";
+              html += '<p class="guide-def">' + esc(c.simple) + "</p>";
+              if (c.cue) html += '<p class="guide-cue">Cue: ' + esc(c.cue) + "</p>";
+              if (c.examples && c.examples.length) {
+                html += '<ul class="guide-examples">';
+                c.examples.forEach(function (ex) { html += "<li>" + esc(ex) + "</li>"; });
+                html += "</ul>";
+              }
+              html += "</article>";
+            });
+          });
+          html += "</section>";
+        });
+        html += "</div>";
+      });
+      content.innerHTML = html;
+
+      // Search
+      var search = document.getElementById("guideSearch");
+      var count = document.getElementById("guideCount");
+      var concepts = Array.prototype.slice.call(content.querySelectorAll("[data-concept]"));
+      function updateCount(visible) {
+        count.textContent = visible == null
+          ? totalConcepts + " concepts"
+          : visible + " of " + totalConcepts + " concepts match";
+      }
+      updateCount(null);
+      search.addEventListener("input", function () {
+        var q = search.value.trim().toLowerCase();
+        var visible = 0;
+        concepts.forEach(function (el) {
+          var show = !q || el.getAttribute("data-hay").indexOf(q) !== -1;
+          el.style.display = show ? "" : "none";
+          if (show) visible++;
+        });
+        // Hide categories/chapters with nothing visible
+        Array.prototype.forEach.call(content.querySelectorAll("[data-category]"), function (h) {
+          var sib = h.nextElementSibling, any = false;
+          while (sib && !sib.hasAttribute("data-category") && sib.tagName !== "SECTION") {
+            if (sib.hasAttribute("data-concept") && sib.style.display !== "none") { any = true; break; }
+            sib = sib.nextElementSibling;
+          }
+          h.style.display = any ? "" : "none";
+        });
+        Array.prototype.forEach.call(content.querySelectorAll("[data-chapter]"), function (sec) {
+          var any = Array.prototype.some.call(
+            sec.querySelectorAll("[data-concept]"),
+            function (el) { return el.style.display !== "none"; }
+          );
+          sec.style.display = any ? "" : "none";
+        });
+        if (!q) {
+          Array.prototype.forEach.call(
+            content.querySelectorAll("[data-category],[data-chapter]"),
+            function (el) { el.style.display = ""; }
+          );
+        }
+        updateCount(q ? visible : null);
+        if (q && visible === 0) {
+          count.textContent = "No concepts match — try a different search.";
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
