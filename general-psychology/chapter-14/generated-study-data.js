@@ -5,12 +5,12 @@ window.CH14_STUDY_DATA = {
   "title": "Chapter 14: The Troubled Mind",
   "prefix": "CH14",
   "counts": {
-    "book-term": 8,
+    "book-term": 31,
     "lesson-concept": 15,
     "research-skill": 0
   },
-  "totalCards": 23,
-  "totalQuestions": 69,
+  "totalCards": 46,
+  "totalQuestions": 138,
   "categories": [
     "Anxiety, trauma, and somatic disorders",
     "Childhood disorders",
@@ -20,6 +20,6 @@ window.CH14_STUDY_DATA = {
     "Schizophrenia",
     "Self-diagnosis and AI tools"
   ],
-  "generatedAt": "2026-09-23T15:11:40.104644+00:00",
-  "generator": "trss-generator (HeuristicCardGenerator)"
+  "generatedAt": "2026-09-23T19:05:00Z",
+  "generator": "trss-generator + corrected Cengage Chapter 14 key-term set"
 };
