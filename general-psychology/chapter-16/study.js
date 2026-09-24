@@ -7,6 +7,10 @@
   // Chapter identity (num/prefix/course) supplied by the hosting page.
   const TRSS_CHAPTER = window.TRSS_CHAPTER || { num: 7, prefix: "CH7", course: "general-psychology" };
 
+  // Display label for the study unit ("Chapter 14", "Exam 1", ...). Pages that
+  // omit unitLabel fall back to "Chapter N", preserving chapter behavior.
+  const UNIT_LABEL = TRSS_CHAPTER.unitLabel || ("Chapter " + TRSS_CHAPTER.num);
+
   // Tag cards by canonical source set
   const coreCards = (window[TRSS_CHAPTER.prefix + "_CORE_CARDS"] || []).map(c => ({ ...c, sourceSet: "book-term" }));
   const lessonCards = (window[TRSS_CHAPTER.prefix + "_LESSON_CARDS"] || []).map(c => ({ ...c, sourceSet: "lesson-concept" }));
@@ -49,7 +53,7 @@
     // Level 2: Lesson Context Scenario
     const level2Questions = targets.map(card => {
       const examplePrompt = (card.examples && card.examples.length > 0)
-        ? `In the Chapter ${TRSS_CHAPTER.num} lesson: "${card.examples[0]}". Which concept is being described?`
+        ? `In the ${UNIT_LABEL} lesson: "${card.examples[0]}". Which concept is being described?`
         : `Which concept connects directly with: "${card.simple}"?`;
       return {
         id: `${card.id}-lesson`,
@@ -1099,7 +1103,7 @@
 
   if (els.resetBtn) {
     els.resetBtn.addEventListener("click", () => {
-      if (confirm("Reset your study progress for Chapter " + TRSS_CHAPTER.num + "?")) {
+      if (confirm("Reset your study progress for " + UNIT_LABEL + "?")) {
         state.progress = {};
         state.quizScore = { correct: 0, total: 0 };
         localStore.resetAll();
