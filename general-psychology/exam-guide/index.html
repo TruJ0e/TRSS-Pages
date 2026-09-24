@@ -377,7 +377,19 @@
   </footer>
   </div>
 
-  <!-- Chapter card data: every chapter's cards imported into this one guide -->
+  <!-- Chapter card data: every chapter's cards imported into this one guide.
+       Data scripts MUST load before the merge below and before study.js:
+       study.js snapshots window[prefix+"_CORE_CARDS"] at load time.
+       CH7 data lives at the site root; CH14/CH16 data in their chapter folders. -->
+  <script src="../../../core-cards.js"></script>
+  <script src="../../../lesson-cards.js"></script>
+  <script src="../../../extra-cards.js"></script>
+  <script src="../chapter-14/core-cards.js"></script>
+  <script src="../chapter-14/lesson-cards.js"></script>
+  <script src="../chapter-14/extra-cards.js"></script>
+  <script src="../chapter-16/core-cards.js"></script>
+  <script src="../chapter-16/lesson-cards.js"></script>
+  <script src="../chapter-16/extra-cards.js"></script>
   <script>
     // Exam 1 = one base-model study unit built from every chapter's card data.
     window.TRSS_CHAPTER = { num: 1, title: "Exam 1", prefix: "EXAM1", course: "general-psychology", unitLabel: "Exam 1" };
@@ -389,15 +401,6 @@
       [].concat(window.CH7_EXTRA_CARDS || [], window.CH14_EXTRA_CARDS || [], window.CH16_EXTRA_CARDS || []);
   </script>
   <script src="study.js"></script>
-  <script src="../../core-cards.js"></script>
-  <script src="../../lesson-cards.js"></script>
-  <script src="../../extra-cards.js"></script>
-  <script src="../chapter-14/core-cards.js"></script>
-  <script src="../chapter-14/lesson-cards.js"></script>
-  <script src="../chapter-14/extra-cards.js"></script>
-  <script src="../chapter-16/core-cards.js"></script>
-  <script src="../chapter-16/lesson-cards.js"></script>
-  <script src="../chapter-16/extra-cards.js"></script>
   <script>
     (function () {
       "use strict";
