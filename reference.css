@@ -240,6 +240,14 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   padding: 24px 16px 36px;
 }
 
+/* iOS Safari will not scroll an element that is both display:flex (column)
+   and overflow-y:auto -- the scroll box itself must be display:block.
+   #guideView keeps flex:1/min-height:0 from .page-view as a flex *item* of
+   .site-content, so its height stays bound to the viewport. */
+#guideView {
+  display: block;
+}
+
 .view-container {
   max-width: 920px;
   width: 100%;
