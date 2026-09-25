@@ -91,7 +91,7 @@
               <div class="launcher-card">
                 <div class="launcher-header">
                   <span class="launcher-icon">📇</span>
-                  <span class="badge badge-primary">311 Flashcards</span>
+                  <span class="badge badge-primary" id="launchFcBadge">311 Flashcards</span>
                 </div>
                 <h3 class="launcher-title">Interactive Flashcards</h3>
                 <p class="launcher-desc">
@@ -105,7 +105,7 @@
               <div class="launcher-card">
                 <div class="launcher-header">
                   <span class="launcher-icon">📝</span>
-                  <span class="badge badge-accent">933 Questions</span>
+                  <span class="badge badge-accent" id="launchQuizBadge">933 Questions</span>
                 </div>
                 <h3 class="launcher-title">Practice Quiz</h3>
                 <p class="launcher-desc">
@@ -464,6 +464,49 @@
         a.textContent = "Ch " + ch.num + " (" + ch.cards.length + ")";
         toc.appendChild(a);
       });
+
+      // Base model section 3: every number a student sees is derived from the
+      // merged card data, never hardcoded. study.js re-renders the mode-tab
+      // counts, deck status, and card counters at runtime; the launcher
+      // badges/buttons and the set-filter dropdown live outside study.js, so
+      // they are derived here from the same EXAM1_* arrays.
+      var exam1Cards = {
+        all: [].concat(window.EXAM1_CORE_CARDS || [], window.EXAM1_LESSON_CARDS || [], window.EXAM1_EXTRA_CARDS || []),
+        core: window.EXAM1_CORE_CARDS || [],
+        lesson: window.EXAM1_LESSON_CARDS || [],
+        extra: window.EXAM1_EXTRA_CARDS || []
+      };
+      var exam1FcTotal = exam1Cards.all.length;
+      var exam1QuizTotal = exam1FcTotal * 3;
+      var exam1SetLabels = {
+        all: "All cards (" + exam1FcTotal + ")",
+        "book-term": "Book terms (" + exam1Cards.core.length + ")",
+        "lesson-concept": "Lesson concepts (" + exam1Cards.lesson.length + ")",
+        "research-skill": "Research & detail (" + exam1Cards.extra.length + ")"
+      };
+      function exam1SetText(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text;
+      }
+      exam1SetText("launchFcBadge", exam1FcTotal + " Flashcards");
+      exam1SetText("launchQuizBadge", exam1QuizTotal + " Questions");
+      exam1SetText("launchFlashcardsBtn", "Launch Flashcards (" + exam1FcTotal + ") \u2192");
+      exam1SetText("launchQuizBtn", "Start Practice Quiz (" + exam1QuizTotal + ") \u2192");
+      Array.prototype.forEach.call(
+        document.querySelectorAll("#typeFilterMenu .dropdown-option"),
+        function (opt) {
+          var label = exam1SetLabels[opt.getAttribute("data-value")];
+          var txt = opt.querySelector(".option-text");
+          if (label && txt) txt.textContent = label;
+        }
+      );
+      var exam1TypeSel = document.getElementById("typeFilter");
+      if (exam1TypeSel) {
+        Array.prototype.forEach.call(exam1TypeSel.options, function (o) {
+          if (exam1SetLabels[o.value]) o.textContent = exam1SetLabels[o.value];
+        });
+      }
+      exam1SetText("typeFilterValue", exam1SetLabels.all);
 
       // Render
       var content = document.getElementById("guideContent");
