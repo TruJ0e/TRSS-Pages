@@ -1,0 +1,12 @@
+{
+  "script": "ch14-lecture-script.md",
+  "script_sha256": "a145fbaddab0283388596cfcdb85998f99ef09d99ba007f83636406983fee1d7",
+  "voice": {
+    "name": "en_US-lessac-medium",
+    "sample_rate": 22050,
+    "generator": "piper-tts 1.8.0"
+  },
+  "format": "mp3",
+  "duration_sec": 5074.9,
+  "note": "Sections mirror the deterministic composer output; see script."
+}

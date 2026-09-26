@@ -7,8 +7,8 @@
   // Chapter identity (num/prefix/course) supplied by the hosting page.
   const TRSS_CHAPTER = window.TRSS_CHAPTER || { num: 7, prefix: "CH7", course: "general-psychology" };
 
-  // Display label for the study unit ("Chapter 14", "Exam 1", ...). Pages that
-  // omit unitLabel fall back to "Chapter N", preserving chapter behavior.
+  // Display label for the study unit. Multi-chapter units (e.g. the Exam
+  // Guide) set TRSS_CHAPTER.unitLabel; plain chapters fall back to "Chapter N".
   const UNIT_LABEL = TRSS_CHAPTER.unitLabel || ("Chapter " + TRSS_CHAPTER.num);
 
   // Tag cards by canonical source set
@@ -258,6 +258,361 @@
     quizNextBtn: document.getElementById("quizNextBtn")
   };
 
+  // ---------------------------------------------------------------------------
+  // TRSS_TTS: browser-native text-to-speech (speechSynthesis). Zero-cost, no
+  // network, no API keys. Purely additive: speaker buttons and the listen
+  // toggle are injected into the DOM at runtime, so no template-HTML changes
+  // are needed and every chapter built from this runtime gains TTS.
+  //
+  // iOS notes: speechSynthesis requires a user gesture (the speaker buttons
+  // qualify); voices arrive asynchronously (handled via voiceschanged); long
+  // utterances are truncated on iOS, so text is chunked by sentence and the
+  // chain is guarded by a token so stop() always wins.
+  // ---------------------------------------------------------------------------
+  const TRSS_TTS = (function () {
+    const SETTINGS_KEY = "TRSS:v1:tts-settings";
+    const MAX_CHUNK = 180; // keep well under the iOS utterance cutoff
+
+    const settings = { enabled: true, voiceURI: "", rate: 1 };
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (raw) Object.assign(settings, JSON.parse(raw));
+    } catch (e) { /* storage unavailable: run on defaults */ }
+
+    let chainToken = 0;
+
+    function save() {
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+      catch (e) { /* ignore */ }
+    }
+
+    function supported() {
+      return typeof window !== "undefined" &&
+        "speechSynthesis" in window &&
+        typeof window.SpeechSynthesisUtterance !== "undefined";
+    }
+
+    function voiceList() {
+      if (!supported()) return [];
+      try { return window.speechSynthesis.getVoices() || []; }
+      catch (e) { return []; }
+    }
+
+    // Saved voice first, else the first English voice, else the device default.
+    function pickVoice() {
+      const vs = voiceList();
+      if (!vs.length) return null;
+      if (settings.voiceURI) {
+        const saved = vs.find(v => v.voiceURI === settings.voiceURI);
+        if (saved) return saved;
+      }
+      return vs.find(v => (v.lang || "").toLowerCase().indexOf("en") === 0) || vs[0];
+    }
+
+    // Split into sentence-sized chunks; merge short ones up to MAX_CHUNK.
+    function chunkText(text) {
+      const clean = String(text).replace(/\s+/g, " ").trim();
+      if (!clean) return [];
+      const sentences = clean.match(/[^.!?]+[.!?]+["'”)]?|\S[^.!?]*$/g) || [clean];
+      const chunks = [];
+      let cur = "";
+      sentences.forEach(s => {
+        s = s.trim();
+        if (!s) return;
+        if (cur && (cur + " " + s).length > MAX_CHUNK) {
+          chunks.push(cur); cur = s;
+        } else {
+          cur = cur ? cur + " " + s : s;
+        }
+      });
+      if (cur) chunks.push(cur);
+      return chunks;
+    }
+
+    function speakChunks(chunks, voice, token) {
+      if (token !== chainToken || !chunks.length) return;
+      const synth = window.speechSynthesis;
+      const u = new window.SpeechSynthesisUtterance(chunks[0]);
+      if (voice) u.voice = voice;
+      u.rate = settings.rate || 1;
+      if (chunks.length > 1) {
+        u.onend = () => speakChunks(chunks.slice(1), voice, token);
+        u.onerror = () => { /* a failed chunk ends the chain */ };
+      }
+      synth.speak(u);
+    }
+
+    function speak(text) {
+      if (!settings.enabled || !supported()) return;
+      const chunks = chunkText(text);
+      if (!chunks.length) return;
+      stop();
+      speakChunks(chunks, pickVoice(), chainToken);
+    }
+
+    function stop() {
+      chainToken++;
+      // Pre-generated audio shares the stop path: navigation, flip, and
+      // mode switches silence it exactly like live synthesis.
+      if (typeof TRSS_AUDIO !== "undefined") TRSS_AUDIO.stop();
+      if (!supported()) return;
+      try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+    }
+
+    function setEnabled(on) {
+      settings.enabled = Boolean(on);
+      if (!settings.enabled) stop();
+      save();
+      paintToggle();
+    }
+
+    // -- current study content ------------------------------------------------
+    function currentCard() {
+      const deck = state.flashcardDeck || [];
+      return deck.length ? deck[state.flashcardIndex] || deck[0] : null;
+    }
+
+    function currentQuestion() {
+      const deck = state.quizDeck || [];
+      return deck.length ? deck[state.quizIndex] || deck[0] : null;
+    }
+
+    function flashcardFrontText() {
+      const c = currentCard();
+      return c ? formatDisplayTerm(c.term) : "";
+    }
+
+    function flashcardBackText() {
+      const c = currentCard();
+      if (!c) return "";
+      return [formatDisplayTerm(c.term), c.cue, formatSentenceCase(c.simple)]
+        .filter(Boolean).join(". ");
+    }
+
+    function quizQuestionText() {
+      const q = currentQuestion();
+      if (!q) return "";
+      const letters = ["A", "B", "C", "D"];
+      const opts = (q.options || []).map((t, i) => letters[i] + ". " + formatDisplayTerm(t)).join(" ");
+      return q.prompt + (opts ? " Options: " + opts : "");
+    }
+
+    // -- DOM injection (no template-HTML changes) ------------------------------
+    let built = false; // init() runs once: the module is a page singleton
+    let toggleBtn = null;
+    let voiceSelect = null;
+    let rateInput = null;
+
+    function injectStyles() {
+      if (document.getElementById("trss-tts-styles")) return;
+      const st = document.createElement("style");
+      st.id = "trss-tts-styles";
+      st.textContent = [
+        ".tts-controls{display:flex;align-items:center;gap:6px;}",
+        ".tts-speak-btn{border:1px solid var(--border,#d8d2c4);background:var(--surface,#fffdf8);",
+        " border-radius:999px;cursor:pointer;font-size:15px;line-height:1;padding:6px 9px;margin-left:8px;}",
+        ".tts-speak-btn:hover{background:var(--surface-hover,#f4efe3);}",
+        ".tts-speak-btn:focus-visible{outline:2px solid var(--accent,#b3541e);outline-offset:2px;}",
+        ".tts-settings{position:relative;}",
+        ".tts-settings>summary{list-style:none;cursor:pointer;border:1px solid var(--border,#d8d2c4);",
+        " background:var(--surface,#fffdf8);border-radius:8px;padding:6px 9px;font-size:15px;}",
+        ".tts-settings>summary::-webkit-details-marker{display:none;}",
+        ".tts-settings-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:220px;",
+        " background:var(--surface,#fffdf8);border:1px solid var(--border,#d8d2c4);border-radius:10px;",
+        " padding:10px 12px;box-shadow:0 8px 24px rgba(60,40,20,.18);display:flex;flex-direction:column;gap:8px;}",
+        ".tts-settings-panel label{font-size:12px;font-weight:600;display:flex;flex-direction:column;gap:4px;}",
+        ".tts-settings-panel select,.tts-settings-panel input{width:100%;}",
+        ".tts-toggle[aria-pressed=\"false\"]{opacity:.55;}"
+      ].join("\n");
+      document.head.appendChild(st);
+    }
+
+    function paintToggle() {
+      if (!toggleBtn) return;
+      toggleBtn.setAttribute("aria-pressed", settings.enabled ? "true" : "false");
+      toggleBtn.innerHTML = settings.enabled ? "🔊 Listen" : "🔇 Muted";
+      toggleBtn.title = settings.enabled ? "Turn spoken audio off" : "Turn spoken audio on";
+    }
+
+    function refreshVoices() {
+      if (!voiceSelect) return;
+      const vs = voiceList();
+      voiceSelect.innerHTML = "";
+      vs.forEach(v => {
+        const o = document.createElement("option");
+        o.value = v.voiceURI;
+        o.textContent = v.name + (v.lang ? " (" + v.lang + ")" : "");
+        voiceSelect.appendChild(o);
+      });
+      const pick = pickVoice();
+      voiceSelect.value = (pick && pick.voiceURI) || (vs[0] && vs[0].voiceURI) || "";
+      if (!settings.voiceURI && pick) { settings.voiceURI = pick.voiceURI; save(); }
+    }
+
+    function buildHeaderControls() {
+      const host = els.resetBtn && els.resetBtn.parentElement;
+      if (!host) return;
+      injectStyles();
+
+      const wrap = document.createElement("div");
+      wrap.className = "tts-controls";
+
+      toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.id = "ttsToggleBtn";
+      toggleBtn.className = "action-btn tts-toggle";
+      toggleBtn.addEventListener("click", () => setEnabled(!settings.enabled));
+      paintToggle();
+
+      const det = document.createElement("details");
+      det.className = "tts-settings";
+      const sum = document.createElement("summary");
+      sum.className = "tts-settings-toggle";
+      sum.textContent = "⚙";
+      sum.setAttribute("aria-label", "Voice settings");
+      sum.title = "Voice settings";
+      const panel = document.createElement("div");
+      panel.className = "tts-settings-panel";
+
+      const vLabel = document.createElement("label");
+      vLabel.textContent = "Voice";
+      voiceSelect = document.createElement("select");
+      voiceSelect.id = "ttsVoiceSelect";
+      voiceSelect.setAttribute("aria-label", "Voice");
+      voiceSelect.addEventListener("change", () => {
+        settings.voiceURI = voiceSelect.value; save();
+      });
+      vLabel.appendChild(voiceSelect);
+
+      const rLabel = document.createElement("label");
+      const rSpan = document.createElement("span");
+      rSpan.id = "ttsRateLabel";
+      rLabel.appendChild(rSpan);
+      rateInput = document.createElement("input");
+      rateInput.type = "range";
+      rateInput.id = "ttsRateInput";
+      rateInput.min = "0.5"; rateInput.max = "2"; rateInput.step = "0.1";
+      rateInput.value = String(settings.rate || 1);
+      rateInput.setAttribute("aria-label", "Speaking rate");
+      const paintRate = () => { rSpan.textContent = "Rate: " + Number(rateInput.value).toFixed(1) + "×"; };
+      paintRate();
+      rateInput.addEventListener("input", () => {
+        settings.rate = Number(rateInput.value) || 1; paintRate(); save();
+      });
+      rLabel.appendChild(rateInput);
+
+      panel.appendChild(vLabel);
+      panel.appendChild(rLabel);
+      det.appendChild(sum);
+      det.appendChild(panel);
+      wrap.appendChild(toggleBtn);
+      wrap.appendChild(det);
+      host.appendChild(wrap);
+
+      refreshVoices();
+      if (supported() && "onvoiceschanged" in window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = refreshVoices;
+      }
+    }
+
+    function addSpeakButton(anchorEl, getText, getAudioUrl, label) {
+      if (!anchorEl || !anchorEl.parentElement) return null;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "tts-speak-btn";
+      b.textContent = "🔊";
+      b.setAttribute("aria-label", label);
+      b.title = label;
+      // The flashcard face flips on click — keep the button from flipping it.
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const url = (typeof getAudioUrl === "function") ? getAudioUrl() : null;
+        // Pre-generated Piper audio wins when the build emitted it for this
+        // card face; the header Listen/Muted toggle gates both paths.
+        if (url && settings.enabled) { TRSS_AUDIO.play(url); return; }
+        speak(getText());
+      });
+      anchorEl.insertAdjacentElement("afterend", b);
+      return b;
+    }
+
+    // Pre-generated audio URLs for the current card faces (null = fall back
+    // to live speechSynthesis). Quiz questions are generated and shuffled
+    // client-side, so they always use live synthesis.
+    function flashcardFrontAudio() {
+      const c = currentCard();
+      return c ? TRSS_AUDIO.urlFor(c.id, "front") : null;
+    }
+
+    function flashcardBackAudio() {
+      const c = currentCard();
+      return c ? TRSS_AUDIO.urlFor(c.id, "back") : null;
+    }
+
+    function buildSpeakButtons() {
+      addSpeakButton(els.fcTerm, flashcardFrontText, flashcardFrontAudio, "Read term aloud");
+      addSpeakButton(els.fcBackTerm, flashcardBackText, flashcardBackAudio, "Read definition aloud");
+      addSpeakButton(els.quizPromptText, quizQuestionText, null, "Read question aloud");
+    }
+
+    function init() {
+      if (built || !supported()) return; // no speechSynthesis: leave the page untouched
+      built = true;
+      buildHeaderControls();
+      buildSpeakButtons();
+    }
+
+    return { speak, stop, chunkText, init, supported,
+             get settings() { return settings; },
+             setEnabled, refreshVoices };
+  })();
+
+  // TRSS_AUDIO: pre-generated Piper narration (build-time, feature 4).
+  // Complements TRSS_TTS: when tools/piper-audio has emitted an
+  // audio-manifest.js for this chapter (window.<PREFIX>_AUDIO), the speaker
+  // buttons play the pre-generated file; otherwise they fall back to live
+  // speechSynthesis. The manifest is read lazily at tap time, so it only
+  // needs to load before the first tap. Zero runtime cost when absent.
+  const TRSS_AUDIO = (function () {
+    function manifest() {
+      try { return window[TRSS_CHAPTER.prefix + "_AUDIO"] || null; }
+      catch (e) { return null; }
+    }
+
+    function urlFor(cardId, face) {
+      const m = manifest();
+      if (!m || !m.cards || !cardId) return null;
+      const entry = m.cards[cardId];
+      const file = entry && entry[face];
+      return file ? String(file) : null;
+    }
+
+    let el = null; // single shared <audio> element, created lazily
+    function player() {
+      if (!el) { el = new Audio(); el.preload = "auto"; }
+      return el;
+    }
+
+    function play(url) {
+      try {
+        const a = player();
+        a.pause();
+        a.src = url;
+        const p = a.play();
+        if (p && typeof p.catch === "function") p.catch(() => { /* ignore */ });
+      } catch (e) { /* caller falls back to synthesis */ }
+    }
+
+    function stop() {
+      if (!el) return;
+      try { el.pause(); el.removeAttribute("src"); } catch (e) { /* ignore */ }
+    }
+
+    function available() { return manifest() !== null; }
+
+    return { urlFor, play, stop, available };
+  })();
+
   const MINOR_WORDS = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "in", "nor", "of", "on", "or", "per", "the", "to", "vs.", "vs", "via", "with"]);
 
   // Display-only Title Casing: preserves canonical terms for scoring and data
@@ -446,6 +801,7 @@
 
   function switchMode(newMode) {
     state.mode = newMode;
+    TRSS_TTS.stop();
     const isFc = newMode === "flashcards";
     if (els.modeFlashcardsBtn) {
       els.modeFlashcardsBtn.classList.toggle("active", isFc);
@@ -531,6 +887,7 @@
 
   function toggleFlip() {
     if (!state.flashcardDeck.length || !els.fcElement) return;
+    TRSS_TTS.stop();
     state.isFlipped = !state.isFlipped;
     els.fcElement.classList.toggle("flipped", state.isFlipped);
     els.fcElement.setAttribute("aria-expanded", state.isFlipped ? "true" : "false");
@@ -538,6 +895,7 @@
 
   function nextFlashcard() {
     if (!state.flashcardDeck.length) return;
+    TRSS_TTS.stop();
     if (state.flashcardIndex >= state.flashcardDeck.length - 1) {
       const isFiltered = state.setFilter !== "all" || state.sectionFilter !== "all" || Boolean(state.searchQuery);
       if (isFiltered) {
@@ -555,6 +913,7 @@
 
   function prevFlashcard() {
     if (!state.flashcardDeck.length) return;
+    TRSS_TTS.stop();
     state.flashcardIndex = (state.flashcardIndex - 1 + state.flashcardDeck.length) % state.flashcardDeck.length;
     state.isFlipped = false;
     renderFlashcards();
@@ -814,6 +1173,7 @@
 
   function nextQuizQuestion() {
     if (!state.quizDeck.length) return;
+    TRSS_TTS.stop();
     if (state.quizIndex >= state.quizDeck.length - 1) {
       const isFiltered = state.setFilter !== "all" || state.sectionFilter !== "all" || Boolean(state.searchQuery);
       if (isFiltered) {
@@ -1154,6 +1514,7 @@
   populateCategories();
   setupCustomDropdowns();
   initFlashcardSwipe();
+  TRSS_TTS.init();
   applyFilters(false);
   handleRouting();
 
@@ -1164,7 +1525,9 @@
     window.__TRSS_TEST_HOOK__({
       allCards,
       buildScopedQuizQueue,
-      generateOptions
+      generateOptions,
+      TRSS_TTS,
+      TRSS_AUDIO
     });
   }
 })();

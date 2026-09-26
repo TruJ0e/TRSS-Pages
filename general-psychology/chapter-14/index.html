@@ -98,6 +98,81 @@
               <div class="topic-tag-item"><span>Self-diagnosis and research</span> <span class="tag-count">(3 cards)</span></div>
             </div>
           </div>
+          <!-- Recommended Lectures -->
+          <div class="section-block lectures-block">
+            <div class="section-header">
+              <h3 class="section-title">Recommended Lectures</h3>
+              <p class="section-desc">Curated video lectures covering this chapter’s key ideas — watch to reinforce what the flashcards drill.</p>
+            </div>
+            <div class="lectures-grid">
+              <figure class="lecture-card">
+                <div class="lecture-embed">
+                  <iframe src="https://www.youtube-nocookie.com/embed/wuhJ-GkRRQc"
+                          title="Psychological Disorders: Crash Course Psychology #28" loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowfullscreen></iframe>
+                </div>
+                <figcaption class="lecture-caption">
+                  <span class="lecture-title">Psychological Disorders: Crash Course Psychology #28</span>
+                  <span class="lecture-source">CrashCourse · <a href="https://www.youtube.com/watch?v=wuhJ-GkRRQc" target="_blank" rel="noopener">Watch on YouTube</a></span>
+                </figcaption>
+              </figure>
+              <figure class="lecture-card">
+                <div class="lecture-embed">
+                  <iframe src="https://www.youtube-nocookie.com/embed/aX7jnVXXG5o"
+                          title="OCD and Anxiety Disorders: Crash Course Psychology #29" loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowfullscreen></iframe>
+                </div>
+                <figcaption class="lecture-caption">
+                  <span class="lecture-title">OCD and Anxiety Disorders: Crash Course Psychology #29</span>
+                  <span class="lecture-source">CrashCourse · <a href="https://www.youtube.com/watch?v=aX7jnVXXG5o" target="_blank" rel="noopener">Watch on YouTube</a></span>
+                </figcaption>
+              </figure>
+              <figure class="lecture-card">
+                <div class="lecture-embed">
+                  <iframe src="https://www.youtube-nocookie.com/embed/ZwMlHkWKDwM"
+                          title="Depressive and Bipolar Disorders: Crash Course Psychology #30" loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowfullscreen></iframe>
+                </div>
+                <figcaption class="lecture-caption">
+                  <span class="lecture-title">Depressive and Bipolar Disorders: Crash Course Psychology #30</span>
+                  <span class="lecture-source">CrashCourse · <a href="https://www.youtube.com/watch?v=ZwMlHkWKDwM" target="_blank" rel="noopener">Watch on YouTube</a></span>
+                </figcaption>
+              </figure>
+              <figure class="lecture-card">
+                <div class="lecture-embed">
+                  <iframe src="https://www.youtube-nocookie.com/embed/uxktavpRdzU"
+                          title="Schizophrenia &amp; Dissociative Disorders: Crash Course Psychology #32" loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowfullscreen></iframe>
+                </div>
+                <figcaption class="lecture-caption">
+                  <span class="lecture-title">Schizophrenia &amp; Dissociative Disorders: Crash Course Psychology #32</span>
+                  <span class="lecture-source">CrashCourse · <a href="https://www.youtube.com/watch?v=uxktavpRdzU" target="_blank" rel="noopener">Watch on YouTube</a></span>
+                </figcaption>
+              <figure class="lecture-card audio-lecture-card">
+                <div class="lecture-audio">
+                  <audio controls preload="none" src="lectures/ch14-lecture.mp3" style="width:100%"></audio>
+                </div>
+                <figcaption class="lecture-caption">
+                  <span class="lecture-title">TRSS audio lecture: Chapter 14: The Troubled Mind</span>
+                  <span class="lecture-source">AI-narrated walkthrough of every concept &middot; <a href="lectures/ch14-lecture.mp3" download>Download MP3</a> &middot; <a href="lectures/ch14-lecture-script.md">Read the script</a></span>
+                </figcaption>
+              </figure>
+              </figure>
+            </div>
+          </div>
+          <style>
+          .lectures-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1rem}
+          .lecture-card{margin:0}
+          .lecture-embed{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:.5rem;background:#000}
+          .lecture-embed iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0}
+          .lecture-caption{display:flex;flex-direction:column;gap:.2rem;margin-top:.5rem;font-size:.85rem}
+          .lecture-title{font-weight:600}
+          .lecture-source{opacity:.75;font-size:.8rem}
+          </style>
         </div>
       </section>
     <section id="studyView" class="page-view hidden">
@@ -358,6 +433,7 @@ window.TRSS_CHAPTER = { num: 14, title: "The Troubled Mind", prefix: "CH14", cou
 <script src="core-cards.js"></script>
 <script src="lesson-cards.js"></script>
 <script src="extra-cards.js"></script>
+<script src="audio-manifest.js"></script>
 <script src="study.js"></script>
 <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3fd9092e9ea4f07',t:'MTc5MDIwODYxMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3fe81dd2d5cf5fb',t:'MTc5MDIxODQ5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>

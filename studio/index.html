@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>TRSS Upload Studio — PDF → your flashcards</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         max-width: 900px; margin: 0 auto; padding: 24px 16px 80px;
+         line-height: 1.5; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: #666; margin: 0 0 24px; }
+  .panel { border: 1px solid #ccc; border-radius: 12px; padding: 18px;
+           margin-bottom: 16px; }
+  .panel h2 { font-size: 1.15rem; margin: 0 0 8px; }
+  .drop { border: 2px dashed #9db8e2; border-radius: 12px; padding: 28px;
+          text-align: center; margin: 8px 0 4px; cursor: pointer; }
+  .drop.over { border-color: #1a73e8; background: #eef4fe; }
+  button { font-size: 0.95rem; padding: 10px 20px; border-radius: 10px;
+           border: 1px solid #1a73e8; background: none; color: #1a73e8;
+           cursor: pointer; margin: 12px 8px 0 0; }
+  button.primary { background: #1a73e8; color: #fff; border: 0;
+                   font-size: 1.05rem; padding: 12px 28px; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.danger { border-color: #c5221f; color: #c5221f; }
+  #log { background: #111; color: #d7f0d7; border-radius: 10px; padding: 14px;
+         font-family: ui-monospace, monospace; font-size: 0.85rem;
+         white-space: pre-wrap; max-height: 180px; overflow-y: auto; }
+  #reader { border: 1px solid #ddd; border-radius: 10px; padding: 16px;
+            max-height: 480px; overflow-y: auto; background: #fafafa;
+            user-select: text; }
+  #reader h3 { margin: 16px 0 6px; font-size: 0.95rem; color: #555; }
+  #reader h3:first-child { margin-top: 0; }
+  #reader .page-text { white-space: pre-wrap; font-size: 0.95rem; }
+  #offer { position: absolute; z-index: 50; margin: 0; padding: 8px 16px;
+           background: #1a73e8; color: #fff; border: 0; border-radius: 999px;
+           box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: 0.9rem; }
+  .cardrow { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
+             border-bottom: 1px solid #eee; flex-wrap: wrap; }
+  .cardrow .spacer { flex: 1; }
+  .cardrow button { margin: 0; padding: 6px 14px; font-size: 0.85rem; }
+  .badge { font-size: 0.72rem; padding: 3px 10px; border-radius: 999px;
+           background: #e8eefc; color: #1a3fa0; white-space: nowrap; }
+  .badge.lesson { background: #e6f4ea; color: #137333; }
+  .badge.extra { background: #fef7e0; color: #8a5a00; }
+  .cat { font-size: 0.85rem; color: #666; }
+  #editor { border: 1px solid #ccc; border-radius: 14px; padding: 22px;
+            max-width: 560px; width: calc(100vw - 48px); }
+  #editor::backdrop { background: rgba(0,0,0,.35); }
+  #editor label { display: block; font-weight: 600; margin: 12px 0 4px;
+                  font-size: 0.9rem; }
+  #editor input[type="text"], #editor select, #editor textarea {
+    width: 100%; box-sizing: border-box; padding: 9px; font-size: 0.95rem;
+    border: 1px solid #bbb; border-radius: 8px; font-family: inherit; }
+  #editor textarea { min-height: 64px; resize: vertical; }
+  #editor-errors { color: #c5221f; font-size: 0.88rem; margin-top: 10px;
+                   white-space: pre-wrap; }
+  .hint { font-size: 0.85rem; color: #666; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+  <h1>📥 TRSS Upload Studio</h1>
+  <p class="sub">Drop in a PDF, read it here, select any text to make a
+  flashcard. Everything runs in your browser — your file never leaves this
+  device. Cards export as JSON in the TRSS base-model schema.</p>
+
+  <section class="panel" id="step-upload">
+    <h2>1 · Load your document</h2>
+    <div class="drop" id="drop">Drop a PDF or .txt file here, or
+      <input type="file" id="file" accept=".pdf,.txt" aria-label="Document file">
+    </div>
+    <button class="primary" id="extract">Extract text</button>
+    <p class="hint">Tip: PDFs with selectable text work best. Scanned-image
+    PDFs (no selectable text) won't extract.</p>
+    <div id="log" aria-live="polite">Starting…</div>
+  </section>
+
+  <section class="panel" id="step-read" hidden>
+    <h2>2 · Read &amp; select text</h2>
+    <p class="hint">Highlight any term or phrase below, then tap
+    <strong>Make flashcard</strong>.</p>
+    <div id="reader" aria-label="Extracted document text"></div>
+  </section>
+
+  <section class="panel" id="step-cards">
+    <h2>3 · Your cards <span class="cat" id="card-count">no cards yet</span></h2>
+    <div class="toolbar">
+      <button id="export">⬇ Export JSON</button>
+      <button id="import">⬆ Import JSON</button>
+      <input type="file" id="import-file" accept=".json,application/json" hidden aria-label="Import cards JSON">
+      <button id="clear" class="danger">Clear all</button>
+    </div>
+    <div id="card-list" style="margin-top:8px"></div>
+  </section>
+
+  <button id="offer" hidden>✏️ Make flashcard</button>
+
+  <dialog id="editor" aria-labelledby="editor-title">
+    <h2 id="editor-title">New flashcard</h2>
+    <form method="dialog" id="editor-form">
+      <label for="f-term">Term <span class="hint">(from your selection — edit as needed)</span></label>
+      <input type="text" id="f-term" maxlength="200" required>
+
+      <label for="f-type">Card type</label>
+      <select id="f-type">
+        <option value="book-term">book-term — key term from the book</option>
+        <option value="lesson-concept">lesson-concept — idea from the lesson</option>
+        <option value="research-skill">research-skill — research / detail</option>
+      </select>
+
+      <label for="f-category">Section / category</label>
+      <input type="text" id="f-category" list="category-list" maxlength="80"
+             placeholder="e.g. Emotion &amp; Motivation">
+      <datalist id="category-list"></datalist>
+
+      <label for="f-simple">Meaning <span class="hint">(plain language)</span></label>
+      <textarea id="f-simple" maxlength="2000"></textarea>
+
+      <label for="f-cue">Recall cue <span class="hint">(a quick trigger, e.g. “Think: fight-or-flight”)</span></label>
+      <input type="text" id="f-cue" maxlength="300">
+
+      <label for="f-examples">Examples <span class="hint">(one per line)</span></label>
+      <textarea id="f-examples" maxlength="2000"></textarea>
+
+      <label for="f-apply">Apply it <span class="hint">(a prompt to use the concept)</span></label>
+      <textarea id="f-apply" maxlength="2000"></textarea>
+
+      <label for="f-compare">Compare <span class="hint">(optional — how it differs from nearby concepts)</span></label>
+      <textarea id="f-compare" maxlength="1000"></textarea>
+
+      <div id="editor-errors" role="alert"></div>
+      <div style="margin-top:14px">
+        <button class="primary" id="editor-save">Save card</button>
+        <button id="editor-cancel" formnovalidate>Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/studio.js"></script>
+</body>
+</html>

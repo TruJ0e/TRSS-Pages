@@ -152,6 +152,20 @@
                 <div class="chapter-card-cta">Open Exam 1 Study Guide &rarr;</div>
               </a>
 
+              <!-- Upload Studio Card -->
+              <a href="studio/" class="chapter-card active-card">
+                <div class="card-status-badge badge-active">New &middot; On-device</div>
+                <h3 class="chapter-card-title">Upload Studio</h3>
+                <div class="chapter-card-stats">
+                  <span class="stat-pill">&#128196; PDF</span>
+                  <span class="stat-pill">&#128274; Private</span>
+                </div>
+                <p class="chapter-card-desc">
+                  Turn your own PDFs into flashcards &mdash; select any text to make a card. Everything runs in your browser; your file never leaves this device.
+                </p>
+                <div class="chapter-card-cta">Open Upload Studio &rarr;</div>
+              </a>
+
             </div>
           </div>
         </div>
@@ -222,6 +236,69 @@
               <div class="topic-tag-item"><span>Achievement motivation</span> <span class="tag-count">(5 cards)</span></div>
             </div>
           </div>
+          <!-- Recommended Lectures -->
+          <div class="section-block lectures-block">
+            <div class="section-header">
+              <h3 class="section-title">Recommended Lectures</h3>
+              <p class="section-desc">Curated video lectures covering this chapter’s key ideas — watch to reinforce what the flashcards drill.</p>
+            </div>
+            <div class="lectures-grid">
+              <figure class="lecture-card">
+                <div class="lecture-embed">
+                  <iframe src="https://www.youtube-nocookie.com/embed/gAMbkJk6gnE"
+                          title="Feeling All the Feels: Crash Course Psychology #25" loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowfullscreen></iframe>
+                </div>
+                <figcaption class="lecture-caption">
+                  <span class="lecture-title">Feeling All the Feels: Crash Course Psychology #25</span>
+                  <span class="lecture-source">CrashCourse · <a href="https://www.youtube.com/watch?v=gAMbkJk6gnE" target="_blank" rel="noopener">Watch on YouTube</a></span>
+                </figcaption>
+              </figure>
+              <figure class="lecture-card">
+                <div class="lecture-embed">
+                  <iframe src="https://www.youtube-nocookie.com/embed/9hdSLiHaJz8"
+                          title="The Power of Motivation: Crash Course Psychology #17" loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowfullscreen></iframe>
+                </div>
+                <figcaption class="lecture-caption">
+                  <span class="lecture-title">The Power of Motivation: Crash Course Psychology #17</span>
+                  <span class="lecture-source">CrashCourse · <a href="https://www.youtube.com/watch?v=9hdSLiHaJz8" target="_blank" rel="noopener">Watch on YouTube</a></span>
+                </figcaption>
+              </figure>
+              <figure class="lecture-card">
+                <div class="lecture-embed">
+                  <iframe src="https://www.youtube-nocookie.com/embed/4KbSRXP0wik"
+                          title="Emotion, Stress, and Health: Crash Course Psychology #26" loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowfullscreen></iframe>
+                </div>
+                <figcaption class="lecture-caption">
+                  <span class="lecture-title">Emotion, Stress, and Health: Crash Course Psychology #26</span>
+                  <span class="lecture-source">CrashCourse · <a href="https://www.youtube.com/watch?v=4KbSRXP0wik" target="_blank" rel="noopener">Watch on YouTube</a></span>
+                </figcaption>
+              <figure class="lecture-card audio-lecture-card">
+                <div class="lecture-audio">
+                  <audio controls preload="none" src="lectures/ch7-lecture.mp3" style="width:100%"></audio>
+                </div>
+                <figcaption class="lecture-caption">
+                  <span class="lecture-title">TRSS audio lecture: Chapter 7: Emotion &amp; Motivation</span>
+                  <span class="lecture-source">AI-narrated walkthrough of every concept &middot; <a href="lectures/ch7-lecture.mp3" download>Download MP3</a> &middot; <a href="lectures/ch7-lecture-script.md">Read the script</a></span>
+                </figcaption>
+              </figure>
+              </figure>
+            </div>
+          </div>
+          <style>
+          .lectures-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1rem}
+          .lecture-card{margin:0}
+          .lecture-embed{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:.5rem;background:#000}
+          .lecture-embed iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0}
+          .lecture-caption{display:flex;flex-direction:column;gap:.2rem;margin-top:.5rem;font-size:.85rem}
+          .lecture-title{font-weight:600}
+          .lecture-source{opacity:.75;font-size:.8rem}
+          </style>
         </div>
       </section>
 
@@ -481,6 +558,7 @@
   <script src="core-cards.js"></script>
   <script src="lesson-cards.js"></script>
   <script src="extra-cards.js"></script>
-  <script src="reference.js?v=20260919-canon6"></script>
+  <script src="audio-manifest.js"></script>
+<script src="reference.js?v=20260919-canon6"></script>
 <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3fd99f0be07f152',t:'MTc5MDIwODk5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
