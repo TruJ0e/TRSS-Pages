@@ -80,6 +80,12 @@
              accept=".pdf,.txt,.md,.markdown,.docx,.pptx,.epub,.png,.jpg,.jpeg,.webp,.gif,.bmp,.mp3,.wav,.m4a,.ogg,.webm,.mp4">
     </div>
     <button class="primary" id="extract">Process files</button>
+    <button id="paste">📋 Paste text</button>
+    <div id="paste-fallback" hidden style="margin-top:12px">
+      <p class="hint">Clipboard read was blocked &mdash; long-press in the box and paste manually, then tap &ldquo;Use this text&rdquo;.</p>
+      <textarea id="paste-text" rows="6" style="width:100%;box-sizing:border-box;padding:9px;font-size:0.95rem;border:1px solid #bbb;border-radius:8px;font-family:inherit" placeholder="Paste your study text here&hellip;"></textarea>
+      <div><button class="primary" id="paste-use" style="margin-top:8px">Use this text</button></div>
+    </div>
     <p class="hint">PDF · images (OCR) · Word · PowerPoint · EPUB books ·
     lecture audio · plain text. Tip: PDFs with selectable text work best —
     scanned pages work better dropped in as images. OCR reads printed text
