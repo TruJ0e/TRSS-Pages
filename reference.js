@@ -268,10 +268,17 @@
     const SETTINGS_KEY = "TRSS:v1:tts-settings";
     const MAX_CHUNK = 180; // keep well under the iOS utterance cutoff
 
-    const settings = { enabled: true, voiceURI: "", rate: 1 };
+    const settings = { enabled: true, voiceURI: "", rate: 1.15, v: 2 };
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
-      if (raw) Object.assign(settings, JSON.parse(raw));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        Object.assign(settings, parsed);
+        // v2: the default rate moved 1.0 -> 1.15. Settings saved before v2
+        // carry no version stamp, so adopt the quicker default then.
+        if (!parsed.v && settings.rate === 1) settings.rate = 1.15;
+        settings.v = 2;
+      }
     } catch (e) { /* storage unavailable: run on defaults */ }
 
     let chainToken = 0;
@@ -293,7 +300,10 @@
       catch (e) { return []; }
     }
 
-    // Saved voice first, else the first English voice, else the device default.
+    // Saved voice first, else the most natural-sounding English voice we can
+    // find (premium / neural device voices beat the flat built-in default),
+    // else the device default.
+    const PREMIUM_VOICE_RE = /google us english|samantha|aria|jenny|guy neural|davis|nicolas|neural|natural|premium|enhanced/i;
     function pickVoice() {
       const vs = voiceList();
       if (!vs.length) return null;
@@ -301,7 +311,10 @@
         const saved = vs.find(v => v.voiceURI === settings.voiceURI);
         if (saved) return saved;
       }
-      return vs.find(v => (v.lang || "").toLowerCase().indexOf("en") === 0) || vs[0];
+      const en = vs.filter(v => (v.lang || "").toLowerCase().indexOf("en") === 0);
+      return en.find(v => PREMIUM_VOICE_RE.test(v.name || "")) ||
+        en.find(v => (v.lang || "").toLowerCase() === "en-us") ||
+        en[0] || vs[0];
     }
 
     // Split into sentence-sized chunks; merge short ones up to MAX_CHUNK.
@@ -329,7 +342,7 @@
       const synth = window.speechSynthesis;
       const u = new window.SpeechSynthesisUtterance(chunks[0]);
       if (voice) u.voice = voice;
-      u.rate = settings.rate || 1;
+      u.rate = settings.rate || 1.15;
       if (chunks.length > 1) {
         u.onend = () => speakChunks(chunks.slice(1), voice, token);
         u.onerror = () => { /* a failed chunk ends the chain */ };
@@ -345,8 +358,63 @@
       speakChunks(chunks, pickVoice(), chainToken);
     }
 
+    // -- quiz read-along: the prompt, then each choice as its own utterance,
+    // highlighting the choice currently being read --------------------------
+    function clearReadingHighlight() {
+      const lit = document.querySelectorAll(".quiz-option-btn.tts-reading");
+      for (const b of lit) b.classList.remove("tts-reading");
+    }
+
+    function quizOptionButtons() {
+      return els.quizOptionsContainer
+        ? Array.from(els.quizOptionsContainer.querySelectorAll(".quiz-option-btn"))
+        : [];
+    }
+
+    function speakQuiz() {
+      if (!settings.enabled || !supported()) return;
+      const q = currentQuestion();
+      if (!q) return;
+      stop();
+      const token = chainToken;
+      const voice = pickVoice();
+      const synth = window.speechSynthesis;
+      const rate = settings.rate || 1.15;
+      const letters = ["A", "B", "C", "D"];
+      const btns = quizOptionButtons();
+      const steps = [{ text: q.prompt, btn: null }];
+      (q.options || []).forEach((opt, i) => {
+        steps.push({ text: letters[i] + ". " + formatDisplayTerm(opt), btn: btns[i] || null });
+      });
+      let si = 0;
+      function nextStep() {
+        if (token !== chainToken || si >= steps.length) { clearReadingHighlight(); return; }
+        const step = steps[si++];
+        const chunks = chunkText(step.text);
+        let ci = 0;
+        (function nextChunk() {
+          if (token !== chainToken) { clearReadingHighlight(); return; }
+          if (ci >= chunks.length) { nextStep(); return; }
+          const u = new window.SpeechSynthesisUtterance(chunks[ci++]);
+          if (voice) u.voice = voice;
+          u.rate = rate;
+          if (step.btn) {
+            u.onstart = () => { if (token === chainToken) step.btn.classList.add("tts-reading"); };
+            u.onend = () => { step.btn.classList.remove("tts-reading"); nextChunk(); };
+            u.onerror = () => step.btn.classList.remove("tts-reading");
+          } else {
+            u.onend = nextChunk;
+            u.onerror = () => { /* a failed chunk ends the chain */ };
+          }
+          synth.speak(u);
+        })();
+      }
+      nextStep();
+    }
+
     function stop() {
       chainToken++;
+      clearReadingHighlight();
       // Pre-generated audio shares the stop path: navigation, flip, and
       // mode switches silence it exactly like live synthesis.
       if (typeof TRSS_AUDIO !== "undefined") TRSS_AUDIO.stop();
@@ -417,7 +485,8 @@
         " padding:10px 12px;box-shadow:0 8px 24px rgba(60,40,20,.18);display:flex;flex-direction:column;gap:8px;}",
         ".tts-settings-panel label{font-size:12px;font-weight:600;display:flex;flex-direction:column;gap:4px;}",
         ".tts-settings-panel select,.tts-settings-panel input{width:100%;}",
-        ".tts-toggle[aria-pressed=\"false\"]{opacity:.55;}"
+        ".tts-toggle[aria-pressed=\"false\"]{opacity:.55;}",
+        ".quiz-option-btn.tts-reading{outline:3px solid var(--accent,#b3541e);outline-offset:2px;background:var(--surface-hover,#f4efe3);}",
       ].join("\n");
       document.head.appendChild(st);
     }
@@ -487,12 +556,12 @@
       rateInput.type = "range";
       rateInput.id = "ttsRateInput";
       rateInput.min = "0.5"; rateInput.max = "2"; rateInput.step = "0.1";
-      rateInput.value = String(settings.rate || 1);
+      rateInput.value = String(settings.rate || 1.15);
       rateInput.setAttribute("aria-label", "Speaking rate");
       const paintRate = () => { rSpan.textContent = "Rate: " + Number(rateInput.value).toFixed(1) + "×"; };
       paintRate();
       rateInput.addEventListener("input", () => {
-        settings.rate = Number(rateInput.value) || 1; paintRate(); save();
+        settings.rate = Number(rateInput.value) || 1.15; paintRate(); save();
       });
       rLabel.appendChild(rateInput);
 
@@ -510,7 +579,7 @@
       }
     }
 
-    function addSpeakButton(anchorEl, getText, getAudioUrl, label) {
+    function addSpeakButton(anchorEl, getText, getAudioUrl, label, onSpeak) {
       if (!anchorEl || !anchorEl.parentElement) return null;
       const b = document.createElement("button");
       b.type = "button";
@@ -521,6 +590,7 @@
       // The flashcard face flips on click — keep the button from flipping it.
       b.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (typeof onSpeak === "function") { onSpeak(); return; }
         const url = (typeof getAudioUrl === "function") ? getAudioUrl() : null;
         // Pre-generated Piper audio wins when the build emitted it for this
         // card face; the header Listen/Muted toggle gates both paths.
@@ -547,7 +617,7 @@
     function buildSpeakButtons() {
       addSpeakButton(els.fcTerm, flashcardFrontText, flashcardFrontAudio, "Read term aloud");
       addSpeakButton(els.fcBackTerm, flashcardBackText, flashcardBackAudio, "Read definition aloud");
-      addSpeakButton(els.quizPromptText, quizQuestionText, null, "Read question aloud");
+      addSpeakButton(els.quizPromptText, quizQuestionText, null, "Read question aloud", speakQuiz);
     }
 
     function init() {
