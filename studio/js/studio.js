@@ -112,6 +112,56 @@ async function extractPdfText(file, onProgress) {
   return { numPages: pdf.numPages, pages };
 }
 
+/* ── Scanned-PDF fallback: render each page to an image and OCR it ──
+ * Scanned PDFs have no text layer, so text extraction yields empty pages
+ * ("Page 1", "Page 2", nothing under them). Instead of making the user
+ * convert pages to images by hand, do it automatically: render each page
+ * to a canvas and run it through the shared Tesseract worker from the
+ * image ingestor. Pages that yield no text are skipped. Capped so a huge
+ * scan can't hang a phone. */
+const SCANNED_PDF_PAGE_CAP = 30;
+
+async function ocrScannedPdf(file, numPages, onProgress) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  const total = Math.min(numPages, SCANNED_PDF_PAGE_CAP);
+  const pages = [];
+  for (let i = 1; i <= total; i++) {
+    if (onProgress) onProgress(i - 1, total, "Reading scanned page " + i + "/" + total);
+    try {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      if (!blob) continue;
+      blob.name = "page-" + i + ".png";
+      const r = await extractImage(blob, () => {});
+      const text = (r.pages[0] && r.pages[0].text ? r.pages[0].text : "").trim();
+      if (text) pages.push({ n: i, text });
+    } catch (e) {
+      // Blank or unreadable page — skip it and keep going.
+    }
+    await sleep(0);
+  }
+  if (onProgress) onProgress(total, total, "Done");
+  if (!pages.length) {
+    throw new Error("Couldn't find readable text in this PDF — even reading " +
+      "the pages as images. Try clearer scans or photos of the pages.");
+  }
+  let label = file.name + " — PDF (scanned, OCR, " + pages.length + "/" +
+    numPages + " pages with text)";
+  if (numPages > SCANNED_PDF_PAGE_CAP) {
+    label += " — first " + SCANNED_PDF_PAGE_CAP + " pages only";
+  }
+  return { pages, label };
+}
+
 /* Human-readable page title: extractors use a number ("Page N") or a
  * string label ("Slide 3", "Chapter: Photosynthesis"). */
 function pageTitle(p) {
@@ -207,8 +257,18 @@ $("extract").addEventListener("click", async () => {
         log("Extracting text from PDF: " + file.name);
         const r = await extractPdfText(file,
           (i, n) => log("…page " + i + "/" + n));
-        out = { pages: r.pages,
-                label: file.name + " — PDF (" + r.numPages + " pages)" };
+        const chars = r.pages.reduce(
+          (a, p) => a + (p.text ? p.text.length : 0), 0);
+        if (r.numPages > 0 && chars < 200) {
+          // Scanned PDF: no text layer. Read the pages as images automatically.
+          log("No readable text found — this looks like a scanned PDF. " +
+            "Reading pages as images instead (slower, automatic)…");
+          out = await ocrScannedPdf(file, r.numPages,
+            (d, t, label) => log("…" + label + " (" + d + "/" + t + ")"));
+        } else {
+          out = { pages: r.pages,
+                  label: file.name + " — PDF (" + r.numPages + " pages)" };
+        }
       } else {
         const kind = supportedDocExt(name) || supportedMediaExt(name);
         if (!kind || !INGESTORS[kind]) {
