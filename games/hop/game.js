@@ -38,6 +38,7 @@ if (!CHAPTER_ORDER.includes(chapter)) chapter = CHAPTER_ORDER[0];
 let best = parseInt(localStorage.getItem(LS_BEST) || '0', 10) || 0;
 
 let score = 0, lives = START_LIVES, graceT = 0;
+let firstRound = true;
 let player, platforms, popups, camY;
 let platformW = 120;
 
@@ -129,7 +130,7 @@ function spawnWorld() {
   player = { x: W / 2, y: 0, w: 30, h: 30, vy: JUMP_V };
   const baseY = H * 0.72;
   player.y = baseY - player.h;
-  let y = baseY + 60, x = W / 2;
+  let y = baseY, x = W / 2;
   while (y > -H * 2) { // enough platforms above the screen
     platforms.push({ x: x - platformW / 2, y, w: platformW, h: 16, term: '', isTarget: false });
     const dx = (Math.random() * 2 - 1) * 190;
@@ -137,7 +138,7 @@ function spawnWorld() {
     y -= 60 + Math.random() * 50;
   }
   camY = player.y - H * 0.38;
-  graceT = 0;
+  graceT = 2.5; // spawn grace so a new player learns steering before lives are at risk
 }
 function genAbove() {
   let top = Infinity;
@@ -169,7 +170,14 @@ function newRound() {
   defText.textContent = target.simple;
   // exactly one correct platform: pick one above the player, relabel everything
   const above = platforms.filter(p => p.y < player.y - 20);
-  const correct = above.length ? above[(Math.random() * above.length) | 0] : platforms[0];
+  let correct;
+  if (firstRound && above.length) {
+    // first round: nearest platform above, so a new player can actually reach it
+    correct = above.reduce((a, b) => (Math.abs(a.y - player.y) < Math.abs(b.y - player.y) ? a : b));
+    firstRound = false;
+  } else {
+    correct = above.length ? above[(Math.random() * above.length) | 0] : platforms[0];
+  }
   const others = platforms.length - 1;
   const distractors = others > 0 ? pickDistractors(cards, target.id, others) : [];
   let di = 0;
@@ -184,7 +192,7 @@ function newRound() {
 function startGame() {
   if (!cards.length) { loadCardsThenStart(); return; }
   deck = shuffle(cards.slice()); deckIdx = 0; target = null;
-  score = 0; lives = START_LIVES;
+  score = 0; lives = START_LIVES; firstRound = true;
   scoreEl.textContent = '0'; updateLives();
   spawnWorld();
   newRound();
@@ -238,7 +246,7 @@ function showMenu(note) {
     '<p>Bounce between platforms. Land on the platform whose <b>term</b> matches the definition at the top. Wrong term or a fall costs a life — you have 3.</p>' +
     (note ? '<p class="hint">' + escapeHtml(note) + '</p>' : '') +
     '<button class="bigbtn" id="startBtn">▶ Start</button>' +
-    '<p class="hint">Best score: <b>' + best + '</b><br>Move: tap left / right half of the screen, or ← → keys.</p>';
+    '<p class="hint">Best score: <b>' + best + '</b><br>Move: press and hold the left / right half of the screen, or ← → keys.</p>';
   $('startBtn').addEventListener('click', () => {
     ensureAudio();
     if (cards.length) startGame(); else loadCardsThenStart();
