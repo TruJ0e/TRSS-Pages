@@ -365,7 +365,11 @@ const AUTODRAFT_STOP = new Set(("this that these those it its they them their " 
   "he she we you i the a an one some such what which who how why when where " +
   "there here something anything nothing everything someone anyone " +
   "chapter page figure table section lesson module unit slide term definition " +
-  "note example ex tip warning key answer question summary overview objective").split(" "));
+  "note example ex tip warning key answer question summary overview objective " +
+  "conclusion result results introduction").split(" "));
+// Auxiliary/modal verbs: a "term" containing one is a sentence fragment.
+const AUTODRAFT_VERBS = new Set(
+  "was were is are be been being has have had will would could should did does do can may might must shall".split(" "));
 
 function autodraftSentences(text) {
   const out = [];
@@ -389,6 +393,8 @@ function autodraftTermOk(term) {
   if (term.split(/\s+/).length > 8) return false;
   if (/[.!?]/.test(term)) return false;          // sentence fragment, not a term
   if (/^\d+$/.test(term.replace(/\s/g, ""))) return false; // bare number
+  if (term.split(/\s+/).some((w) =>
+      AUTODRAFT_VERBS.has(w.toLowerCase().replace(/[^a-z]/g, "")))) return false;
   const first = term.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "");
   if (AUTODRAFT_STOP.has(first)) return false;   // "chapter 3", "this", ...
   return true;
@@ -420,13 +426,20 @@ function extractDrafts(pages) {
   for (const p of pages || []) {
     const text = String((p && p.text) || "").trim();
     if (!text) continue;
-    // 1) glossary lines: "Term: definition" / "Term — definition"
-    const lines = text.split(/\n/);
-    for (const raw of lines) {
+    // 1) glossary units: "Term: definition" / "Term — definition".
+    // Pasted text often arrives as one long line, so long lines are also
+    // tried sentence-by-sentence (the whole-line match would swallow
+    // unrelated sentences into one bloated definition).
+    for (const raw of text.split(/\n/)) {
       const l = raw.trim();
-      if (!l || l.length > 260) continue;
-      let m = /^([^:\n]{2,70}?)\s*[:\u2013\u2014-]\s+(.{15,})$/u.exec(l);
-      if (m) push(m[1], m[2], p);
+      if (!l) continue;
+      const targets = l.length > 260
+        ? autodraftSentences(l).filter((s) => s.length <= 260)
+        : [l];
+      for (const u of targets) {
+        const m = /^([^:\n]{2,70}?)\s*[:\u2013\u2014-]\s+(.{15,})$/u.exec(u);
+        if (m) push(m[1], m[2], p);
+      }
     }
     // 2) definition sentences: "X is defined as Y", "X refers to Y", …
     const sents = autodraftSentences(text);
@@ -435,7 +448,7 @@ function extractDrafts(pages) {
       if ((m = /^(.{2,70}?)\s+is defined as\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
       else if ((m = /^(.{2,70}?)\s+are defined as\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
       else if ((m = /^(.{2,70}?)\s+refers to\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
-      else if ((m = /^(.{2,70}?)\s+is (?:a|an)\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
+      else if ((m = /^(.{2,70}?)\s+is (a|an)\s+(.{15,})$/i.exec(s))) push(m[1], m[2] + " " + m[3], p);
       else if ((m = /^(.{2,70}?)\s+are\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
       else if ((m = /^(.{2,70}?)\s+is the (?:process|tendency|ability|system|study|branch|theory|principle|response|behavior|change|state|condition)\b\s*(?:by which|of|in which)?\s*(.{15,})$/i.exec(s))) push(m[1], m[2], p);
     }
