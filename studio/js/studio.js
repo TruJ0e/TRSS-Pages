@@ -169,7 +169,10 @@ function pageTitle(p) {
   return p.src ? base + " — " + p.src : base;
 }
 
+let lastPages = []; // pages most recently rendered, for auto-draft
+
 function renderReader(pages) {
+  lastPages = Array.isArray(pages) ? pages : [];
   readerEl.innerHTML = "";
   // Long documents get a jump-to-section dropdown.
   if (pages.length > 3) {
@@ -349,6 +352,231 @@ $("paste").addEventListener("click", async () => {
 $("paste-use").addEventListener("click", () => {
   ingestPastedText($("paste-text").value);
   $("paste-text").value = "";
+});
+
+/* ── auto-draft: text → term/definition candidate cards ──
+ * Heuristic, conservative by design: only high-confidence patterns
+ * become drafts, and nothing is saved until the user approves each
+ * one in the review list. All client-side, zero network. */
+
+/* AUTO-DRAFT PURE BEGIN */
+const AUTODRAFT_CAP = 40;
+const AUTODRAFT_STOP = new Set(("this that these those it its they them their " +
+  "he she we you i the a an one some such what which who how why when where " +
+  "there here something anything nothing everything someone anyone " +
+  "chapter page figure table section lesson module unit slide term definition " +
+  "note example ex tip warning key answer question summary overview objective").split(" "));
+
+function autodraftSentences(text) {
+  const out = [];
+  const re = /[^.!?]+[.!?]+/g;
+  const t = String(text == null ? "" : text).replace(/\s+/g, " ");
+  let m;
+  while ((m = re.exec(t)) !== null && out.length < 4000) out.push(m[0].trim());
+  return out;
+}
+
+function autodraftCleanTerm(t) {
+  return String(t == null ? "" : t)
+    .replace(/\s+/g, " ").trim()
+    .replace(/^[("\u201c\u2018'[]+/, "")
+    .replace(/[)"\u201d\u2019'.,;:!?-]+$/, "");
+}
+
+function autodraftTermOk(term) {
+  if (!term) return false;
+  if (term.length > 70) return false;
+  if (term.split(/\s+/).length > 8) return false;
+  if (/[.!?]/.test(term)) return false;          // sentence fragment, not a term
+  if (/^\d+$/.test(term.replace(/\s/g, ""))) return false; // bare number
+  const first = term.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "");
+  if (AUTODRAFT_STOP.has(first)) return false;   // "chapter 3", "this", ...
+  return true;
+}
+
+function autodraftDefOk(def) {
+  const d = String(def == null ? "" : def).replace(/\s+/g, " ").trim();
+  return d.length >= 15 && d.length <= 500;
+}
+
+/* Extract candidate {term, simple, src} pairs from reader pages.
+ * pages: [{n, text, src?}] — same shape renderReader takes. */
+function extractDrafts(pages) {
+  const drafts = [];
+  const seen = new Set();
+  const srcOf = (p) => {
+    const base = typeof p.n === "number" ? "Page " + p.n : String(p.n);
+    return p.src ? p.src + " · " + base : base;
+  };
+  const push = (term, def, p) => {
+    term = autodraftCleanTerm(term).replace(/^(the|a|an)\s+/i, "");
+    const simple = String(def == null ? "" : def).replace(/\s+/g, " ").trim();
+    if (!autodraftTermOk(term) || !autodraftDefOk(simple)) return;
+    const key = term.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    drafts.push({ term: term, simple: simple, src: srcOf(p) });
+  };
+  for (const p of pages || []) {
+    const text = String((p && p.text) || "").trim();
+    if (!text) continue;
+    // 1) glossary lines: "Term: definition" / "Term — definition"
+    const lines = text.split(/\n/);
+    for (const raw of lines) {
+      const l = raw.trim();
+      if (!l || l.length > 260) continue;
+      let m = /^([^:\n]{2,70}?)\s*[:\u2013\u2014-]\s+(.{15,})$/u.exec(l);
+      if (m) push(m[1], m[2], p);
+    }
+    // 2) definition sentences: "X is defined as Y", "X refers to Y", …
+    const sents = autodraftSentences(text);
+    for (const s of sents) {
+      let m;
+      if ((m = /^(.{2,70}?)\s+is defined as\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
+      else if ((m = /^(.{2,70}?)\s+are defined as\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
+      else if ((m = /^(.{2,70}?)\s+refers to\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
+      else if ((m = /^(.{2,70}?)\s+is (?:a|an)\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
+      else if ((m = /^(.{2,70}?)\s+are\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
+      else if ((m = /^(.{2,70}?)\s+is the (?:process|tendency|ability|system|study|branch|theory|principle|response|behavior|change|state|condition)\b\s*(?:by which|of|in which)?\s*(.{15,})$/i.exec(s))) push(m[1], m[2], p);
+    }
+    if (drafts.length >= AUTODRAFT_CAP) break;
+  }
+  return drafts.slice(0, AUTODRAFT_CAP);
+}
+/* AUTO-DRAFT PURE END */
+
+/* ── auto-draft: review UI ──
+ * The studio finds term–definition pairs in the extracted text and
+ * shows them here for review. Nothing touches the deck until the
+ * user approves: keep (checkbox) + "Add kept to My Cards", edit
+ * (opens the normal card editor), or delete. */
+
+let currentDrafts = [];
+
+$("autodraft").addEventListener("click", async () => {
+  if (!lastPages.length) {
+    log("No text to draft from — process a file or paste text first.");
+    return;
+  }
+  const btn = $("autodraft");
+  btn.disabled = true;
+  try {
+    const existingTerms = new Set(
+      (await getAllCards()).map((c) => String(c.term || "").toLowerCase()));
+    const drafts = extractDrafts(lastPages)
+      .filter((d) => !existingTerms.has(d.term.toLowerCase()));
+    if (!drafts.length) {
+      log("Auto-draft found no new term–definition pairs in this text. " +
+          "Highlight text manually for trickier material.");
+      return;
+    }
+    currentDrafts = drafts;
+    renderDrafts();
+    $("step-drafts").hidden = false;
+    $("step-drafts").scrollIntoView({ behavior: "smooth", block: "start" });
+    log("Drafted " + drafts.length + " card(s) for review — nothing saved yet. " +
+        "Keep the good ones, edit or delete the rest.");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function draftPreset(d) {
+  return {
+    term: d.term,
+    type: "book-term",
+    category: d.src || "General",
+    cue: "Define: " + d.term,
+    simple: d.simple,
+    examples: [(d.src ? d.src + ": " : "") + d.simple.slice(0, 180)],
+    apply: "Explain " + d.term + " in your own words, with one real example.",
+    compare: "",
+  };
+}
+
+function removeDraft(d) {
+  const i = currentDrafts.indexOf(d);
+  if (i >= 0) currentDrafts.splice(i, 1);
+  if (!currentDrafts.length) $("step-drafts").hidden = true;
+  else renderDrafts();
+}
+
+function renderDrafts() {
+  const dl = $("draft-list");
+  $("draft-count").textContent =
+    currentDrafts.length + " draft" + (currentDrafts.length === 1 ? "" : "s");
+  dl.innerHTML = "";
+  currentDrafts.forEach((d) => {
+    const div = document.createElement("div");
+    div.className = "cardrow";
+    div._draft = d;
+    const label = document.createElement("label");
+    label.style.cssText =
+      "display:flex;gap:8px;align-items:flex-start;flex:1;cursor:pointer";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    cb.style.marginTop = "4px";
+    cb.setAttribute("aria-label", "Keep draft: " + d.term);
+    const span = document.createElement("span");
+    const strong = document.createElement("strong");
+    strong.textContent = d.term;
+    const hint = document.createElement("span");
+    hint.className = "hint";
+    hint.textContent = d.simple.length > 140
+      ? d.simple.slice(0, 140) + "…" : d.simple;
+    span.appendChild(strong);
+    span.appendChild(document.createElement("br"));
+    span.appendChild(hint);
+    label.appendChild(cb);
+    label.appendChild(span);
+    div.appendChild(label);
+    const edit = document.createElement("button");
+    edit.textContent = "Edit";
+    edit.addEventListener("click", () => {
+      openEditor(draftPreset(d));
+      removeDraft(d); // it now lives in the editor, not the draft list
+    });
+    const del = document.createElement("button");
+    del.textContent = "Delete";
+    del.className = "danger";
+    del.addEventListener("click", () => removeDraft(d));
+    div.appendChild(edit);
+    div.appendChild(del);
+    dl.appendChild(div);
+  });
+}
+
+$("draft-keep").addEventListener("click", async () => {
+  const dl = $("draft-list");
+  const counters = await getCounters();
+  const seen = new Set();
+  (await getAllCards()).forEach((c) => seen.add(c.id));
+  let added = 0, skipped = 0;
+  for (const row of Array.from(dl.children)) {
+    const cb = row.querySelector('input[type="checkbox"]');
+    if (!cb || !cb.checked || !row._draft) continue;
+    const card = buildCard(draftPreset(row._draft), counters);
+    const problems = validateCard(card, seen);
+    if (problems.length) { skipped++; continue; }
+    seen.add(card.id);
+    await putCard(card);
+    added++;
+  }
+  await saveCounters(counters);
+  currentDrafts = [];
+  dl.innerHTML = "";
+  $("step-drafts").hidden = true;
+  await renderList();
+  log("Added " + added + " drafted card(s) to My Cards" +
+      (skipped ? " (" + skipped + " skipped by validation)" : "") + ".");
+});
+
+$("draft-clear").addEventListener("click", () => {
+  currentDrafts = [];
+  $("draft-list").innerHTML = "";
+  $("step-drafts").hidden = true;
+  log("Drafts discarded — nothing was saved.");
 });
 
 /* ── select text -> offer "Make flashcard" ── */

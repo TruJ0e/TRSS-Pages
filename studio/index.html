@@ -97,8 +97,21 @@
   <section class="panel" id="step-read" hidden>
     <h2>2 · Read &amp; select text</h2>
     <p class="hint">Highlight any term or phrase below, then tap
-    <strong>Make flashcard</strong>.</p>
+    <strong>Make flashcard</strong> — or let the studio draft the cards for you.</p>
+    <div style="margin:10px 0">
+      <button class="primary" id="autodraft">&#10024; Auto-draft flashcards</button>
+      <span class="hint" style="margin-left:8px">Finds term&ndash;definition pairs in the text. You review every draft before anything is saved.</span>
+    </div>
     <div id="reader" aria-label="Extracted document text"></div>
+    <section id="step-drafts" hidden style="margin-top:14px;border-top:1px solid #e3e3e3;padding-top:10px">
+      <h3>Drafted cards <span class="cat" id="draft-count"></span></h3>
+      <p class="hint">Review each draft &mdash; keep the good ones, edit or delete the rest. Nothing is saved until you tap &ldquo;Add kept to My Cards&rdquo;.</p>
+      <div id="draft-list" style="margin-top:8px"></div>
+      <div class="toolbar" style="margin-top:10px">
+        <button class="primary" id="draft-keep">Add kept to My Cards</button>
+        <button id="draft-clear">Discard drafts</button>
+      </div>
+    </section>
   </section>
 
   <section class="panel" id="step-cards">
