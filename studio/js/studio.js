@@ -251,6 +251,46 @@ $("extract").addEventListener("click", async () => {
   }
 });
 
+/* ── paste text directly (no file needed) ── */
+
+function ingestPastedText(text) {
+  const t = (text || "").trim();
+  if (t.length < 10) { log("Pasted text is too short \u2014 copy more material first."); return; }
+  renderReader([{ n: 1, text: t }]);
+  $("step-read").hidden = false;
+  log("Pasted " + t.length.toLocaleString() +
+      " characters. Select any text to make a flashcard.");
+  $("step-read").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+$("paste").addEventListener("click", async () => {
+  const btn = $("paste");
+  btn.disabled = true;
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+      throw new Error("clipboard API unavailable");
+    }
+    const text = await navigator.clipboard.readText();
+    if (!text || !text.trim()) {
+      log("Clipboard is empty \u2014 copy some text first, then tap Paste text.");
+      return;
+    }
+    ingestPastedText(text);
+  } catch (err) {
+    // iOS Safari and other permission denials: fall back to manual paste.
+    $("paste-fallback").hidden = false;
+    log("Clipboard read was blocked \u2014 paste manually in the box below.");
+    $("paste-text").focus();
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("paste-use").addEventListener("click", () => {
+  ingestPastedText($("paste-text").value);
+  $("paste-text").value = "";
+});
+
 /* ── select text -> offer "Make flashcard" ── */
 
 function hideOffer() { offerBtn.hidden = true; }
