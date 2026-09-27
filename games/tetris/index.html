@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Term Drop — TRSS Study Game</title>
+<style>
+  /* Full-viewport, portrait-first stage. The canvas does ALL rendering;
+     this CSS only sizes the stage and kills mobile gesture noise. */
+  html, body {
+    margin: 0; padding: 0;
+    height: 100dvh; width: 100vw;
+    background: #0f172a;
+    overflow: hidden;
+    overscroll-behavior: none;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #wrap {
+    position: relative;
+    margin: 0 auto;
+    width: min(100vw, 520px);   /* portrait-first column; centered on desktop */
+    height: 100dvh;
+  }
+  canvas {
+    display: block;
+    width: 100%; height: 100%;
+    touch-action: none;          /* we handle drag steering ourselves */
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game"></canvas></div>
+<!--
+  Shared TRSS game modules (provided by the games coordinator).
+  These resolve once this folder is copied into the private repo at
+  tools/trss-games/tetris/ alongside tools/trss-games/common/.
+-->
+<script type="module" src="./game.js"></script>
+</body>
+</html>

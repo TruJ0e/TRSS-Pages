@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>TRSS Upload Studio — PDF → your flashcards</title>
+<title>TRSS Upload Studio — anything → your flashcards</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -37,6 +37,11 @@
   #offer { position: absolute; z-index: 50; margin: 0; padding: 8px 16px;
            background: #1a73e8; color: #fff; border: 0; border-radius: 999px;
            box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: 0.9rem; }
+  .pagejump { position: sticky; top: 0; background: #fafafa; padding: 6px 0;
+              margin-bottom: 8px; }
+  .pagejump select { width: 100%; padding: 9px; font-size: 0.9rem;
+                     border: 1px solid #bbb; border-radius: 8px;
+                     font-family: inherit; }
   .cardrow { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
              border-bottom: 1px solid #eee; flex-wrap: wrap; }
   .cardrow .spacer { flex: 1; }
@@ -63,18 +68,23 @@
 </head>
 <body>
   <h1>📥 TRSS Upload Studio</h1>
-  <p class="sub">Drop in a PDF, read it here, select any text to make a
-  flashcard. Everything runs in your browser — your file never leaves this
-  device. Cards export as JSON in the TRSS base-model schema.</p>
+  <p class="sub">Drop in a PDF, photos, a Word doc, slides, an ebook, or a
+  lecture recording — read it here, select any text to make a flashcard.
+  Everything runs in your browser — your file never leaves this device.
+  Cards export as JSON in the TRSS base-model schema.</p>
 
   <section class="panel" id="step-upload">
-    <h2>1 · Load your document</h2>
-    <div class="drop" id="drop">Drop a PDF or .txt file here, or
-      <input type="file" id="file" accept=".pdf,.txt" aria-label="Document file">
+    <h2>1 · Load your material</h2>
+    <div class="drop" id="drop">Drop files here, or
+      <input type="file" id="file" multiple aria-label="Study material files"
+             accept=".pdf,.txt,.md,.markdown,.docx,.pptx,.epub,.png,.jpg,.jpeg,.webp,.gif,.bmp,.mp3,.wav,.m4a,.ogg,.webm,.mp4">
     </div>
-    <button class="primary" id="extract">Extract text</button>
-    <p class="hint">Tip: PDFs with selectable text work best. Scanned-image
-    PDFs (no selectable text) won't extract.</p>
+    <button class="primary" id="extract">Process files</button>
+    <p class="hint">PDF · images (OCR) · Word · PowerPoint · EPUB books ·
+    lecture audio · plain text. Tip: PDFs with selectable text work best —
+    scanned pages work better dropped in as images. OCR reads printed text
+    well; handwriting is best-effort. Lecture transcription runs on-device
+    (first run downloads a ~75MB model, one-time).</p>
     <div id="log" aria-live="polite">Starting…</div>
   </section>
 

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:,">
+<title>TRSS Study Games</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         max-width: 720px; margin: 0 auto; padding: 24px 16px 80px;
+         line-height: 1.5; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: #666; margin: 0 0 24px; }
+  .game-card { display: block; border: 1px solid #ccc; border-radius: 14px;
+               padding: 20px; margin-bottom: 16px; text-decoration: none;
+               color: inherit; }
+  .game-card h2 { margin: 0 0 6px; font-size: 1.25rem; }
+  .game-card p { margin: 0 0 10px; color: #555; }
+  .game-card .cta { color: #1a73e8; font-weight: 600; }
+  .back { display: inline-block; margin-top: 8px; color: #1a73e8; }
+  .note { font-size: 0.85rem; color: #666; margin-top: 16px; }
+</style>
+</head>
+<body>
+  <h1>🎮 TRSS Study Games</h1>
+  <p class="sub">Studying <em>is</em> the game. Both games play every chapter —
+  pick your chapter inside the game. Best scores stay on this device.</p>
+
+  <a class="game-card" href="runner/">
+    <h2>🏃 Term Runner</h2>
+    <p>A definition appears and the world slows down — the definition is read
+    aloud. Swipe into the lane holding the correct term to keep running.
+    Wrong lane? You stumble, see the answer, and keep going. No game over.</p>
+    <span class="cta">Play Term Runner →</span>
+  </a>
+
+  <a class="game-card" href="tetris/">
+    <h2>🧱 Term Drop</h2>
+    <p>Term blocks fall from the sky — steer each one into the bin with its
+    matching definition. Correct drops build your combo; three wrong drops
+    and the run ends. The term is read aloud as it falls.</p>
+    <span class="cta">Play Term Drop →</span>
+  </a>
+
+  <a class="back" href="../">← Back to TRSS</a>
+  <p class="note">Games read the same card data as the chapter study guides,
+  so new chapters become playable automatically. Sound and voice can be muted
+  in-game. Works best with an internet connection on first load (card data
+  and voices); nothing you study leaves the device.</p>
+</body>
+</html>

@@ -16,6 +16,18 @@ import {
   splitExamples,
   CARD_TYPES,
 } from "./studio-core.mjs";
+import {
+  supportedDocExt,
+  extractImage,
+  extractDocx,
+  extractPptx,
+  extractTextFile,
+} from "./studio-ingest-docs.mjs";
+import {
+  supportedMediaExt,
+  extractEpub,
+  transcribeAudio,
+} from "./studio-ingest-media.mjs";
 
 pdfjs.GlobalWorkerOptions.workerSrc =
   "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
@@ -100,17 +112,47 @@ async function extractPdfText(file, onProgress) {
   return { numPages: pdf.numPages, pages };
 }
 
+/* Human-readable page title: extractors use a number ("Page N") or a
+ * string label ("Slide 3", "Chapter: Photosynthesis"). */
+function pageTitle(p) {
+  const base = typeof p.n === "number" ? "Page " + p.n : String(p.n);
+  return p.src ? base + " — " + p.src : base;
+}
+
 function renderReader(pages) {
   readerEl.innerHTML = "";
-  for (const p of pages) {
+  // Long documents get a jump-to-section dropdown.
+  if (pages.length > 3) {
+    const nav = document.createElement("div");
+    nav.className = "pagejump";
+    const sel = document.createElement("select");
+    sel.setAttribute("aria-label", "Jump to section");
+    pages.forEach((p, i) => {
+      const o = document.createElement("option");
+      o.value = String(i);
+      o.textContent = pageTitle(p);
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", () => {
+      const blocks = readerEl.querySelectorAll("[data-page]");
+      const t = blocks[+sel.value];
+      if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    nav.appendChild(sel);
+    readerEl.appendChild(nav);
+  }
+  pages.forEach((p, i) => {
+    const wrap = document.createElement("div");
+    wrap.setAttribute("data-page", String(i));
     const h = document.createElement("h3");
-    h.textContent = "Page " + p.n;
-    readerEl.appendChild(h);
+    h.textContent = pageTitle(p);
+    wrap.appendChild(h);
     const div = document.createElement("div");
     div.className = "page-text";
     div.textContent = p.text;
-    readerEl.appendChild(div);
-  }
+    wrap.appendChild(div);
+    readerEl.appendChild(wrap);
+  });
 }
 
 /* ── file intake ── */
@@ -130,41 +172,82 @@ fileInput.addEventListener("change", () => {
   if (fileInput.files.length) log("Picked: " + fileInput.files[0].name);
 });
 
+/* ── file intake: every supported type funnels to {pages:[{n,text}]} ── */
+
+const INGESTORS = {
+  image: extractImage,
+  docx: extractDocx,
+  pptx: extractPptx,
+  text: extractTextFile,
+  epub: extractEpub,
+  audio: transcribeAudio,
+};
+
 $("extract").addEventListener("click", async () => {
-  const file = fileInput.files[0];
-  if (!file) { log("Choose a PDF first."); return; }
+  const files = Array.from(fileInput.files);
+  if (!files.length) { log("Choose a file first."); return; }
   const btn = $("extract");
   btn.disabled = true;
   logEl.textContent = "Starting…";
   try {
-    const name = file.name.toLowerCase();
-    let pages, numPages;
-    if (name.endsWith(".pdf")) {
-      log("Extracting text from PDF…");
-      const out = await extractPdfText(file, (i, n) => log("…page " + i + "/" + n));
-      pages = out.pages; numPages = out.numPages;
-    } else if (name.endsWith(".txt")) {
-      const text = await file.text();
-      pages = [{ n: 1, text: text.trim() }]; numPages = 1;
-    } else {
-      throw new Error("Unsupported file type — use a .pdf or .txt file.");
+    const hasAudio = files.some(
+      (f) => supportedMediaExt(f.name.toLowerCase()) === "audio");
+    if (hasAudio && files.length > 1) {
+      throw new Error(
+        "Transcribe one audio file at a time — it needs the device's full attention.");
     }
-    const total = pages.reduce((a, p) => a + p.text.length, 0);
+    const prog = (done, total, label) =>
+      log("…" + label + " (" + done + "/" + total + ")");
+    const allPages = [];
+    const labels = [];
+    for (const file of files) {
+      const name = file.name.toLowerCase();
+      let out;
+      if (name.endsWith(".pdf")) {
+        log("Extracting text from PDF: " + file.name);
+        const r = await extractPdfText(file,
+          (i, n) => log("…page " + i + "/" + n));
+        out = { pages: r.pages,
+                label: file.name + " — PDF (" + r.numPages + " pages)" };
+      } else {
+        const kind = supportedDocExt(name) || supportedMediaExt(name);
+        if (!kind || !INGESTORS[kind]) {
+          throw new Error("Unsupported file type: " + file.name +
+            " — see the supported list above.");
+        }
+        if (kind === "audio") {
+          log("Transcribing audio — first run downloads a ~75MB model " +
+              "(one-time, stays on this device).");
+        }
+        if (kind === "image") {
+          log("Running OCR — printed text works best; handwriting is best-effort.");
+        }
+        out = await INGESTORS[kind](file, prog);
+      }
+      out.pages.forEach((p) => allPages.push({
+        n: p.n,
+        text: p.text,
+        src: files.length > 1 ? file.name : undefined,
+      }));
+      labels.push(out.label);
+    }
+    const total = allPages.reduce((a, p) => a + p.text.length, 0);
     if (total < 200) {
       throw new Error(
-        "Only " + total + " characters of text found — this looks like a scanned-image PDF. " +
-        "Try a PDF with selectable text or a .txt file.");
+        "Only " + total + " characters of text found. " +
+        "Scanned-image PDF? Try it as an image file (OCR) instead. " +
+        "Audio with no clear speech? Try a clearer recording.");
     }
-    renderReader(pages);
+    renderReader(allPages);
     $("step-read").hidden = false;
-    log("Done: " + numPages + " page(s), " + total.toLocaleString() +
+    log("Done: " + labels.join(" · ") + " — " + total.toLocaleString() +
         " characters. Select any text to make a flashcard.");
     $("step-read").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
     log("❌ " + (err && err.message ? err.message : err));
   } finally {
     btn.disabled = false;
-    btn.textContent = "Extract text";
+    btn.textContent = "Process files";
   }
 });
 
@@ -362,5 +445,5 @@ $("clear").addEventListener("click", async () => {
   }
   db = await openDb();
   await renderList();
-  log("Ready. Drop a PDF above to start — your file never leaves this device.");
+  log("Ready. Drop a file above to start — your file never leaves this device.");
 })();
