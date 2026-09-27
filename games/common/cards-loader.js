@@ -8,7 +8,7 @@
 
 const SITE_ROOT = new URL("../../", import.meta.url);
 
-const CHAPTERS = {
+export const CHAPTERS = {
   ch7: {
     label: "Chapter 7 — Emotion & Motivation",
     files: ["core-cards.js", "lesson-cards.js", "extra-cards.js"],
