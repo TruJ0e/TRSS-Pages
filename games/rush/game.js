@@ -1,285 +1,208 @@
-// Type Rush — TRSS study game.
-// Definitions fall from the top of the playfield toward a deadline line.
-// Type the matching term (auto-clears on exact case-insensitive match, or Enter).
-//
-// Speed ramp (documented): fall speed *= 1.15 every 10 clears AND += 10px/s
-// every 15 seconds of play. Spawn interval shrinks from 2.6s to a 1.1s floor
-// as clears grow. Max 3 concurrent chips on phone widths, 4 on >=720px.
+/* Type Rush — a meaning drifts down; type the term before it lands.
+ *
+ * Forgiving by design: close spellings count (about one slip per five
+ * letters, with the right spelling shown afterwards), and word suggestions
+ * appear after two letters so players who struggle with spelling can tap.
+ * Relaxed: one meaning at a time, 10 words, and a meaning that lands just
+ * waits. Challenge: up to 3 at once, faster and faster, 3 hearts.
+ */
+import { createApp, makeDeck, h, wait, defOf, say, sfx, editDistance, unlockAudio, powerMeter } from "../common/kit.js?v=3";
 
-import { CHAPTERS, loadChapterCards, shuffle } from '../common/cards-loader.js';
+const ROUND = 10;
+let run = null, raf = 0;
+const norm = (s) => String(s).toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z]/g, "");
 
-const LS_CHAPTER = 'trss-rush-chapter';
-const LS_BEST = 'trss-rush-best';
-const CHAPTER_IDS = ['ch7', 'ch14', 'ch16', 'exam1'];
-const MAX_TERM_LEN = 16;
+const app = createApp({
+  id: "rush", title: "Type Rush", emoji: "⌨️",
+  tagline: "Type the term that matches each falling meaning.",
+  steps: ["A meaning drifts down the screen and is read aloud.",
+          "Type the term. Close spelling still counts.",
+          "Stuck? After 2 letters, tap a suggestion."],
+  modes: { relaxed: "One at a time. It waits for you.", challenge: "Up to 3 at once. 3 hearts." },
+  minCards: 4, demo,
+  onStart: begin,
+  onPause: () => run && (run.frozen = true),
+  onResume: () => { if (run) { run.frozen = false; run.last = performance.now(); } },
+  onQuit: stop,
+});
 
-const $ = (id) => document.getElementById(id);
-const menuEl = $('menu'), gameEl = $('game'), overEl = $('over'), errEl = $('load-error');
-const chapBtnsEl = $('chapbtns'), startBtn = $('startbtn'), menuBestEl = $('menubest');
-const fieldEl = $('field'), deadlineEl = $('deadline');
-const inputEl = $('guess'), focusPill = $('focuspill');
-const scoreEl = $('score'), bestHudEl = $('besthud'), clearedEl = $('cleared'), livesEl = $('lives');
-const restartBtn = $('restartbtn'), restartSpacer = $('restartspacer');
-const againBtn = $('againbtn'), changeBtn = $('changebtn'), retryBtn = $('retrybtn');
+function stop() { cancelAnimationFrame(raf); run = null; window.visualViewport && visualViewport.removeEventListener("resize", fit); }
 
-let chapterId = localStorage.getItem(LS_CHAPTER) || 'ch7';
-if (!CHAPTER_IDS.includes(chapterId)) chapterId = 'ch7';
-let best = parseInt(localStorage.getItem(LS_BEST) || '0', 10) || 0;
-
-// ---------- game state ----------
-let state = 'menu'; // menu | playing | over
-let cards = [];
-let deck = [];
-let items = []; // {card, el, y, speed}
-let rafId = 0, lastT = 0, spawnT = 0, elapsed = 0, lastRampT = 0;
-let score = 0, clears = 0, lives = 3, fallSpeed = 46; // px/s base
-
-// ---------- chapter picker ----------
-function renderChapterButtons() {
-  chapBtnsEl.innerHTML = '';
-  CHAPTER_IDS.forEach((id) => {
-    const b = document.createElement('button');
-    b.className = 'chapbtn' + (id === chapterId ? ' sel' : '');
-    b.textContent = CHAPTERS[id] ? CHAPTERS[id].label : id;
-    b.addEventListener('click', () => {
-      chapterId = id;
-      localStorage.setItem(LS_CHAPTER, chapterId);
-      renderChapterButtons();
-    });
-    chapBtnsEl.appendChild(b);
-  });
+function begin({ cards, mode, focus }) {
+  stop();
+  run = { mode, cards, deck: makeDeck(focus ? [...new Set([...focus, ...cards])] : cards), items: [], n: 0, correct: 0, score: 0,
+          hearts: 3, missed: [], speed: mode === "relaxed" ? 1 / 22 : 1 / 13, spawnT: 0, frozen: false, last: performance.now(), wrongTries: 0 };
+  run.hud = h("div", { class: "hud" });
+  run.field = h("div", { class: "field" }, h("div", { class: "deadline" }));
+  run.input = h("input", { class: "guess", id: "guess", type: "text", autocomplete: "off", autocapitalize: "off", autocorrect: "off",
+    spellcheck: "false", enterkeyhint: "done", placeholder: "Type the term…", "aria-label": "Type the term" });
+  run.sugg = h("div", { class: "sugg", "aria-label": "Suggestions" });
+  run.msg = h("div", { class: "rmsg", role: "status" });
+  const go = h("button", { class: "btn primary gobtn", type: "button", onclick: () => submit(true) }, "Enter");
+  const helpBtn = h("button", { class: "btn ghost gobtn", type: "button", onclick: showMe, title: "Show me the answer" }, "🙈");
+  run.slow = 0;
+  run.power = powerMeter({ max: 3, icon: "🐢", label: "Slow-mo", onUse: () => { run.slow = 8; app.toast("🐢 Everything slows down for 8 seconds!"); run.field.classList.add("slowmo"); } });
+  app.stage.replaceChildren(run.hud, run.power.el, run.field, h("div", { class: "typebar" }, h("div", { class: "inrow" }, run.input, go, helpBtn), run.sugg, run.msg));
+  run.input.addEventListener("input", () => { unlockAudio(); submit(false); paintSugg(); });
+  run.input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(true); } });
+  if (window.visualViewport) visualViewport.addEventListener("resize", fit);
+  fit(); paintHud(); spawn();
+  setTimeout(() => run && run.input.focus({ preventScroll: true }), 200);
+  raf = requestAnimationFrame(loop);
 }
 
-function refreshMenuBest() {
-  menuBestEl.textContent = best > 0 ? `Your best: ${best}` : '';
+/* Keep the playfield sized to what's visible above the phone keyboard. */
+function fit() {
+  if (!run) return;
+  const vh = window.visualViewport ? visualViewport.height : innerHeight;
+  const top = run.field.getBoundingClientRect().top + (window.visualViewport ? visualViewport.pageTop - scrollY : 0);
+  const below = 150;
+  run.field.style.height = Math.max(170, Math.min(520, vh - Math.max(60, top) - below)) + "px";
 }
 
-// ---------- screen switching ----------
-function show(el) {
-  [menuEl, gameEl, overEl, errEl].forEach((s) => { s.hidden = s !== el; });
-  const inGame = el === gameEl;
-  restartBtn.hidden = !inGame;
-  restartSpacer.hidden = inGame; // keep title centered when restart hidden
-  if (inGame) {
-    // game section keeps its inline flex layout from the shell;
-    // the [hidden] rule above handles visibility
-    keepFocus();
-  }
+function paintHud() {
+  const r = run;
+  const kids = r.mode === "relaxed"
+    ? [h("div", { class: "progress" }, h("i", { style: `width:${(r.n / ROUND) * 100}%` })), h("span", { class: "chip" }, h("b", {}, Math.min(r.n + 1, ROUND)), " / " + ROUND)]
+    : [h("span", { class: "chip" }, "❤️".repeat(Math.max(0, r.hearts)) + "🤍".repeat(3 - Math.max(0, r.hearts))), h("span", { class: "chip" }, "✓ ", h("b", {}, r.correct))];
+  kids.push(h("span", { class: "chip" }, "⭐ ", h("b", {}, r.score)), app.coinChip());
+  r.hud.replaceChildren(...kids);
 }
 
-function showError(msg) {
-  $('errmsg').textContent = msg;
-  show(errEl);
+function spawn() {
+  const r = run;
+  const card = r.deck.next();
+  if (r.items.some((i) => i.card.id === card.id)) return;
+  const el = h("div", { class: "fall" }, h("span", { class: "label" }, "Meaning"), h("span", {}, defOf(card)));
+  r.field.append(el);
+  const it = { card, el, y: 0 };
+  r.items.push(it);
+  if (r.items.length === 1) say(defOf(card));
+  r.wrongTries = 0;
 }
 
-// ---------- deck ----------
-function buildDeck() {
-  let pool = cards.filter((c) => c.term && c.term.trim().length <= MAX_TERM_LEN);
-  if (pool.length === 0) pool = cards.slice(); // graceful fallback: long terms allowed
-  deck = shuffle(pool);
-}
-function drawCard() {
-  if (deck.length === 0) buildDeck();
-  return deck.pop();
-}
-
-// ---------- gameplay ----------
-function startGame() {
-  items.forEach((it) => it.el.remove());
-  items = [];
-  score = 0; clears = 0; lives = 3; fallSpeed = 46;
-  elapsed = 0; lastRampT = 0; spawnT = 0;
-  buildDeck();
-  inputEl.value = '';
-  updateHud();
-  state = 'playing';
-  show(gameEl);
-  lastT = performance.now();
-  cancelAnimationFrame(rafId);
-  rafId = requestAnimationFrame(tick);
-}
-
-function updateHud() {
-  scoreEl.textContent = score;
-  bestHudEl.textContent = best;
-  clearedEl.textContent = clears;
-  livesEl.textContent = '♥'.repeat(lives) + '♡'.repeat(Math.max(0, 3 - lives));
-}
-
-function maxActive() {
-  return window.innerWidth >= 720 ? 4 : 3;
-}
-
-function spawnInterval() {
-  return Math.max(1100, 2600 - clears * 40); // ms
-}
-
-function spawnItem() {
-  const card = drawCard();
-  if (!card) return;
-  const el = document.createElement('div');
-  el.className = 'chip';
-  el.textContent = card.simple || card.term; // definition on the chip
-  fieldEl.appendChild(el);
-
-  const fieldW = fieldEl.clientWidth;
-  const chipW = Math.min(el.offsetWidth, fieldW * 0.9);
-  const maxLeft = Math.max(4, fieldW - chipW - 8);
-  const x = 4 + Math.random() * maxLeft;
-  el.style.left = x + 'px';
-
-  items.push({
-    card,
-    el,
-    y: -el.offsetHeight - 4,
-    speed: fallSpeed * (0.9 + Math.random() * 0.2),
-  });
-}
-
-function deadlineY() {
-  return fieldEl.clientHeight - 10;
-}
-
-function tick(now) {
-  if (state !== 'playing') return;
-  const dt = Math.min(0.05, (now - lastT) / 1000);
-  lastT = now;
-  elapsed += dt;
-
-  // time-based ramp: +10px/s every 15s
-  if (elapsed - lastRampT >= 15) {
-    lastRampT = elapsed;
-    fallSpeed += 10;
-  }
-
-  // spawn
-  spawnT += dt * 1000;
-  const topClear = items.every((it) => it.y > 90);
-  if (items.length < maxActive() && spawnT >= spawnInterval() && topClear) {
-    spawnT = 0;
-    spawnItem();
-  }
-
-  const line = deadlineY();
-  for (let i = items.length - 1; i >= 0; i--) {
-    const it = items[i];
-    it.y += it.speed * dt;
-    it.el.style.transform = `translateY(${it.y}px)`;
-    if (it.y + it.el.offsetHeight >= line) {
-      // crossed the deadline: lose a life
-      it.el.remove();
-      items.splice(i, 1);
-      lives -= 1;
-      fieldEl.classList.remove('hit');
-      void fieldEl.offsetWidth; // restart flash animation
-      fieldEl.classList.add('hit');
-      updateHud();
-      if (lives <= 0) { gameOver(); return; }
+function loop(now) {
+  const r = run; if (!r) return;
+  const dt = Math.min(0.05, (now - r.last) / 1000); r.last = now;
+  if (!r.frozen && !document.querySelector(".scrim")) {
+    const H = r.field.clientHeight;
+    const slowF = r.slow > 0 ? 0.35 : 1;
+    if (r.slow > 0) { r.slow -= dt; if (r.slow <= 0) r.field.classList.remove("slowmo"); }
+    for (const it of [...r.items]) {
+      const max = H - it.el.offsetHeight - 14;
+      it.y = Math.min(max, it.y + H * r.speed * slowF * dt);
+      it.el.style.transform = `translateY(${it.y}px)`;
+      if (it.y >= max) {
+        if (r.mode === "relaxed") it.el.classList.add("waiting");
+        else { landed(it); break; }
+      }
+    }
+    if (r.mode === "challenge") {
+      r.spawnT += dt;
+      const maxActive = innerWidth >= 720 ? 3 : 2;
+      const gap = Math.max(2.2, 5 - r.correct * 0.12);
+      if (r.items.length < maxActive && r.spawnT > gap && r.items.every((i) => i.y > i.el.offsetHeight + 20)) { r.spawnT = 0; spawn(); }
+      if (!r.items.length) spawn();
     }
   }
-
-  rafId = requestAnimationFrame(tick);
+  raf = requestAnimationFrame(loop);
 }
 
-function clearItem(it) {
-  const line = deadlineY();
-  const heightBonus = Math.round(60 * Math.max(0, 1 - it.y / line));
-  score += 100 + heightBonus;
-  clears += 1;
-  it.el.remove();
-  items = items.filter((x) => x !== it);
-  // clear-count ramp: *= 1.15 every 10 clears
-  if (clears % 10 === 0) fallSpeed *= 1.15;
-  updateHud();
+function matchItem(text, strict) {
+  const v = norm(text); if (v.length < 2) return null;
+  let best = null;
+  for (const it of run.items) {
+    const t = norm(it.card.term);
+    if (v === t) return { it, exact: true };
+    if (!strict) continue;
+    const allow = run.mode === "relaxed" ? Math.max(1, Math.floor(t.length / 5)) : (t.length >= 6 ? 1 : 0);
+    const d = editDistance(v, t);
+    if (d <= allow && (!best || d < best.d)) best = { it, exact: false, d };
+  }
+  return best;
 }
 
-function tryMatch() {
-  if (state !== 'playing') return;
-  const v = inputEl.value.trim().toLowerCase();
-  if (!v) return;
-  const hit = items.find((it) => (it.card.term || '').trim().toLowerCase() === v);
-  if (hit) {
-    clearItem(hit);
-    inputEl.value = '';
+function submit(strict) {
+  const r = run; if (!r || r.frozen) return;
+  const m = matchItem(r.input.value, strict);
+  if (m) return clear(m.it, m.exact);
+  if (strict && r.input.value.trim()) {
+    r.wrongTries++; sfx.bad();
+    r.input.classList.remove("shake"); void r.input.offsetWidth; r.input.classList.add("shake");
+    r.msg.textContent = r.wrongTries >= 2 ? "Not quite. Try a suggestion, or tap 🙈 to see the answer." : "Not quite — check the spelling and try again.";
   }
 }
 
-function gameOver() {
-  state = 'over';
-  cancelAnimationFrame(rafId);
-  items.forEach((it) => it.el.remove());
-  items = [];
-  const isBest = score > best;
-  if (isBest) {
-    best = score;
-    localStorage.setItem(LS_BEST, String(best));
-  }
-  $('newbest').hidden = !isBest;
-  $('overstats').innerHTML =
-    `Score: <b>${score}</b><br>Best: <b>${best}</b><br>Words cleared: <b>${clears}</b>`;
-  show(overEl);
+async function clear(it, exact) {
+  const r = run;
+  r.items = r.items.filter((x) => x !== it);
+  r.correct++; r.n++;
+  const height = 1 - it.y / Math.max(1, r.field.clientHeight);
+  const pts = 100 + Math.round(60 * Math.max(0, height)) - (exact ? 0 : 20);
+  r.score += pts; r.deck.hit(it.card); r.power.add(1);
+  app.earn(exact ? 3 : 2);
+  const b = it.el.getBoundingClientRect();
+  app.floater(b.left + b.width / 2, b.top + 10, "+" + pts);
+  it.el.classList.add("cleared"); setTimeout(() => it.el.remove(), 400);
+  sfx.good();
+  r.input.value = ""; r.sugg.replaceChildren();
+  r.msg.replaceChildren(exact ? h("span", { class: "okw" }, "✓ " + it.card.term) : h("span", {}, "Close enough! It's spelled ", h("b", { class: "okw" }, it.card.term)));
+  if (r.mode === "challenge" && r.correct % 5 === 0) r.speed *= 1.12;
+  paintHud();
+  if (r.mode === "relaxed") {
+    if (r.n >= ROUND) { await wait(900); return finish(); }
+    await wait(exact ? 500 : 1400);
+    if (run) spawn();
+  } else if (!r.items.length) spawn();
 }
 
-// ---------- input / focus handling (iPhone) ----------
-// Strategy: never steal focus ourselves (clearing doesn't blur the input),
-// and if focus IS lost mid-game (user tapped the field, keyboard dismissed),
-// show a "Tap to focus" pill instead of fighting iOS. Compromise: we cannot
-// programmatically re-open the iOS keyboard without a user tap, so the pill
-// is the affordance. Also the layout is pure flex with 100dvh so the keyboard
-// shrinking the visual viewport just shrinks the playfield — chips keep falling.
-function keepFocus() {
-  if (state === 'playing' && document.activeElement !== inputEl) {
-    inputEl.focus({ preventScroll: true });
-  }
+async function landed(it) {
+  const r = run;
+  r.items = r.items.filter((x) => x !== it);
+  it.el.classList.add("crash"); setTimeout(() => it.el.remove(), 400);
+  r.hearts--; r.n++; r.missed.push(it.card); r.deck.miss(it.card); sfx.bad(); paintHud();
+  r.frozen = true;
+  await app.learn(it.card, { title: "That one landed", note: `${r.hearts} ${r.hearts === 1 ? "heart" : "hearts"} left.` });
+  if (!run) return;
+  r.frozen = false; r.last = performance.now();
+  if (r.hearts <= 0) return finish();
+  r.input.focus({ preventScroll: true });
 }
-inputEl.addEventListener('input', tryMatch);
-inputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); tryMatch(); }
-});
-inputEl.addEventListener('blur', () => {
-  if (state === 'playing') focusPill.hidden = false;
-});
-inputEl.addEventListener('focus', () => {
-  focusPill.hidden = true;
-});
-focusPill.addEventListener('click', () => {
-  inputEl.focus({ preventScroll: true });
-});
-// If the user taps the field (which would dismiss the keyboard), offer refocus.
-fieldEl.addEventListener('touchstart', () => {
-  if (state === 'playing' && document.activeElement !== inputEl) {
-    focusPill.hidden = false;
-  }
-}, { passive: true });
 
-// ---------- buttons ----------
-startBtn.addEventListener('click', async () => {
-  startBtn.disabled = true;
-  startBtn.textContent = 'Loading…';
-  try {
-    cards = await loadChapterCards(chapterId);
-    if (!cards || cards.length === 0) throw new Error('Card list came back empty.');
-    startGame();
-  } catch (err) {
-    showError(`Could not load cards for this chapter (${err && err.message ? err.message : err}). Check your connection and retry.`);
-  } finally {
-    startBtn.disabled = false;
-    startBtn.textContent = 'Start';
-  }
-});
-retryBtn.addEventListener('click', () => show(menuEl));
-restartBtn.addEventListener('click', () => startGame());
-againBtn.addEventListener('click', () => startGame());
-changeBtn.addEventListener('click', () => {
-  state = 'menu';
-  refreshMenuBest();
-  show(menuEl);
-});
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) keepFocus();
-});
+async function showMe() {
+  const r = run; if (!r || !r.items.length) return;
+  const it = r.items.reduce((a, b) => (a.y > b.y ? a : b));
+  r.frozen = true;
+  r.items = r.items.filter((x) => x !== it); it.el.remove();
+  r.n++; r.missed.push(it.card); r.deck.miss(it.card);
+  if (r.mode === "challenge") r.hearts--;
+  paintHud();
+  await app.learn(it.card, { title: "Here's the answer", note: "It will come back later for another try." });
+  if (!run) return;
+  r.frozen = false; r.last = performance.now(); r.input.value = ""; r.msg.textContent = "";
+  if ((r.mode === "relaxed" && r.n >= ROUND) || r.hearts <= 0) return finish();
+  if (!r.items.length) spawn();
+  r.input.focus({ preventScroll: true });
+}
 
-// ---------- init ----------
-renderChapterButtons();
-refreshMenuBest();
-show(menuEl);
+function paintSugg() {
+  const r = run, v = norm(r.input.value);
+  if (v.length < 2) { r.sugg.replaceChildren(); return; }
+  const terms = [...new Set(r.cards.map((c) => c.term))];
+  const scored = terms.map((t) => { const n = norm(t); return { t, s: n.startsWith(v) ? 0 : n.includes(v) ? 1 : editDistance(v, n.slice(0, v.length)) + 1 }; })
+    .filter((x) => x.s <= (v.length >= 4 ? 2 : 1)).sort((a, b) => a.s - b.s || a.t.length - b.t.length).slice(0, r.mode === "relaxed" ? 3 : 2);
+  r.sugg.replaceChildren(...scored.map(({ t }) => h("button", { class: "sg", type: "button",
+    onmousedown: (e) => e.preventDefault(), onclick: () => { r.input.value = t; submit(true); r.input.focus({ preventScroll: true }); } }, t)));
+}
+
+function finish() {
+  const r = run; stop();
+  document.activeElement && document.activeElement.blur();
+  app.results({ score: r.score, correct: r.correct, total: r.n, missed: r.missed });
+}
+
+function demo(el) {
+  el.classList.add("r-demo");
+  el.append(h("div", { class: "rd-card" }, "what starts and guides goal behavior"),
+    h("div", { class: "rd-input" }, h("span", { class: "rd-type" }, "motivation")));
+}

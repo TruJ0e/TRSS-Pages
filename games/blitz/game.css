@@ -1,0 +1,25 @@
+.tf { display: grid; gap: 16px; animation: rise .35s var(--ease) both; }
+.statement { display: grid; gap: 6px; }
+.termword { font-family: var(--display); font-size: 1.5em; color: var(--term); line-height: 1.15; }
+.means { text-align: center; color: var(--muted); font-style: italic; }
+.tfrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; position: sticky; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+.tfbtn { min-height: 84px; border-radius: 20px; border: 3px solid; cursor: pointer; font-weight: 700; font-size: 1.2em;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: transform .1s; }
+.tfbtn .ic { font-size: 1.5em; line-height: 1; }
+.tfbtn.yes { background: var(--good-bg); border-color: var(--good); color: #c9f7dc; box-shadow: 0 6px 0 #0a5a33; }
+.tfbtn.no { background: var(--bad-bg); border-color: var(--bad); color: #ffd3cf; box-shadow: 0 6px 0 #6e2420; }
+.tfbtn:active { transform: translateY(4px); box-shadow: none; }
+.tfbtn:disabled { opacity: .55; }
+.tfbtn.picked-good { opacity: 1 !important; animation: pop .35s; outline: 4px solid var(--good); }
+.tfbtn.picked-bad { opacity: 1 !important; animation: shake .4s; outline: 4px solid var(--bad); }
+.timebar > i { transition: width 1s linear; }
+.timebar.low > i { background: var(--bad); }
+
+.tf-demo { display: grid; place-items: center; gap: 10px; padding: 14px; }
+.td-card { display: grid; text-align: center; gap: 2px; padding: 8px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-size: .85em; }
+.td-card b { color: var(--term); font-family: var(--display); font-size: 1.2em; }
+.td-btns { display: flex; gap: 12px; }
+.td-btns i { font-style: normal; width: 64px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-weight: 700; border: 2px solid; }
+.td-btns .n { border-color: var(--bad); background: var(--bad-bg); }
+.td-btns .y { border-color: var(--good); background: var(--good-bg); animation: tdPress 2.4s infinite; }
+@keyframes tdPress { 0%, 55% { transform: none; box-shadow: none; } 62% { transform: scale(.9); } 70%, 95% { transform: scale(1.08); box-shadow: 0 0 0 6px rgba(52,209,124,.25); } }

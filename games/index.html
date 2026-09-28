@@ -1,83 +1,103 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1524">
 <title>TRSS Study Games</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="common/kit.css?v=3">
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-         max-width: 720px; margin: 0 auto; padding: 24px 16px 80px;
-         line-height: 1.5; }
-  h1 { font-size: 1.6rem; margin: 0 0 4px; }
-  .sub { color: #666; margin: 0 0 24px; }
-  .game-card { display: block; border: 1px solid #ccc; border-radius: 14px;
-               padding: 20px; margin-bottom: 16px; text-decoration: none;
-               color: inherit; }
-  .game-card h2 { margin: 0 0 6px; font-size: 1.25rem; }
-  .game-card p { margin: 0 0 10px; color: #555; }
-  .game-card .cta { color: #1a73e8; font-weight: 600; }
-  .back { display: inline-block; margin-top: 8px; color: #1a73e8; }
-  .note { font-size: 0.85rem; color: #666; margin-top: 16px; }
+  .hub { max-width: 860px; margin: 0 auto; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 20px; }
+  .hub-top { display: flex; align-items: center; gap: 10px; }
+  .hub-top .sp { flex: 1; }
+  .hero-hub { position: relative; border-radius: 28px; overflow: hidden; min-height: 230px; display: grid; align-content: end; padding: 22px;
+    background: linear-gradient(160deg, #1b2b57, #0f1a33 60%); border: 1px solid var(--line); }
+  .hero-hub canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hero-hub::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(10,16,32,.92) 0%, rgba(10,16,32,.7) 45%, transparent 80%); }
+  .hero-hub .copy { position: relative; z-index: 1; display: grid; gap: 6px; padding-top: 70px; }
+  .hero-hub h1 { margin: 0; font-family: var(--display); font-size: clamp(2em, 7vw, 3em); line-height: 1; color: var(--brand); text-wrap: balance; text-shadow: 0 6px 24px rgba(0,0,0,.5); }
+  .hero-hub p { margin: 0; max-width: 40ch; color: #d6def0; }
+  .games { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .gcard { position: relative; display: grid; grid-template-columns: 64px 1fr; gap: 6px 14px; align-items: center; padding: 16px; border-radius: 20px; text-decoration: none; color: var(--text);
+    background: linear-gradient(135deg, var(--c1), var(--surface) 70%); border: 1px solid var(--line); transition: transform .15s var(--ease), border-color .15s; animation: rise .45s var(--ease) both; }
+  .gcard:hover { transform: translateY(-3px); border-color: var(--c2); }
+  .gcard .ico { grid-row: span 2; width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; font-size: 2em; background: rgba(0,0,0,.25); box-shadow: inset 0 0 0 2px var(--c2); }
+  .gcard h2 { margin: 0; font-family: var(--display); font-size: 1.3em; line-height: 1.1; }
+  .gcard p { margin: 0; color: var(--muted); font-size: .88em; line-height: 1.4; }
+  .gcard .tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .gcard .tags span { font-size: .72em; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: rgba(0,0,0,.25); color: var(--c2); }
+  .gcard .best { position: absolute; top: 12px; right: 14px; font-size: .75em; color: #ffd166; font-weight: 700; }
+  .foot { color: var(--muted); font-size: .85em; text-align: center; display: grid; gap: 8px; }
+  .foot a { color: var(--term); }
 </style>
 </head>
 <body>
-  <h1>🎮 TRSS Study Games</h1>
-  <p class="sub">Studying <em>is</em> the game. All seven games play every chapter —
-  pick your chapter inside the game. Best scores stay on this device.</p>
+<div class="hub">
+  <div class="hub-top">
+    <a class="iconbtn" href="../" aria-label="Back to TRSS"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span>TRSS</span></a>
+    <span class="sp"></span>
+    <div class="walletbar" id="wallet"></div>
+  </div>
+  <section class="hero-hub">
+    <canvas id="fx" aria-hidden="true"></canvas>
+    <div class="copy">
+      <h1>Study Games</h1>
+      <p>Play your way through every chapter. Earn coins, level up and unlock new looks. Every game reads aloud and waits for you in Relaxed mode.</p>
+    </div>
+  </section>
+  <div class="games" id="games"></div>
+  <div class="foot">
+    <p>Games use the same cards as your chapter study guides. Progress, coins and settings stay on this device.</p>
+    <p><a href="../">← Back to TRSS</a></p>
+  </div>
+</div>
+<script type="module">
+import { walletInfo, h } from "./common/kit.js?v=3";
+const G = [
+  ["runner", "🏃", "Term Runner", "Dodge barriers, grab coins, and dash through the gate with the right term.", ["Action", "Reading"], "#3a2a10", "#ffb020"],
+  ["hop", "🐸", "Term Hop", "Bounce up the pond, catch flies, then land on the lily pad with the right term.", ["Action", "Reading"], "#0f3a2c", "#6ee7b7"],
+  ["tetris", "🧱", "Term Drop", "Steer the falling block to catch stars, then drop it in the matching meaning.", ["Action", "Reading"], "#0f2c44", "#5cc8ff"],
+  ["match", "🃏", "Memory Match", "Flip cards to pair each term with its meaning. Use Peek when you're stuck.", ["Memory", "Calm"], "#2b1f47", "#c4b5fd"],
+  ["blitz", "⚡", "True or False", "Does the meaning fit the term? Build streaks and power up.", ["Quick", "Reading"], "#3a1f22", "#ff7b72"],
+  ["scramble", "🔤", "Word Scramble", "Rebuild the term letter by letter. Grab golden letters for bonus coins.", ["Spelling", "Calm"], "#2e2a10", "#ffd166"],
+  ["rush", "⌨️", "Type Rush", "Type the term before the meaning lands. Close spelling counts.", ["Typing", "Speed"], "#122a3a", "#7dd3fc"],
+];
+const best = (id) => { try { return Math.max(+JSON.parse(localStorage.getItem(`trss-${id === "tetris" ? "drop" : id}-best-relaxed`) || 0), +JSON.parse(localStorage.getItem(`trss-${id === "tetris" ? "drop" : id}-best-challenge`) || 0)); } catch { return 0; } };
+document.getElementById("games").append(...G.map(([id, ico, name, desc, tags, c1, c2], i) => {
+  const b = best(id);
+  return h("a", { class: "gcard", href: id + "/", style: `--c1:${c1};--c2:${c2};animation-delay:${i * 0.05}s` },
+    h("span", { class: "ico", "aria-hidden": "true" }, ico), h("h2", {}, name), h("p", {}, desc),
+    h("span", { class: "tags" }, tags.map((t) => h("span", {}, t))), b ? h("span", { class: "best" }, "🏆 " + b) : null);
+}));
+const w = walletInfo();
+document.getElementById("wallet").append(h("span", { class: "lvl" }, "Lv ", h("b", {}, w.level)), h("span", { class: "chip coinchip" }, "🪙 ", h("b", {}, w.coins)));
 
-  <a class="game-card" href="runner/">
-    <h2>🏃 Term Runner</h2>
-    <p>A definition appears and the world slows down — the definition is read
-    aloud. Swipe into the lane holding the correct term to keep running.
-    Wrong lane? You stumble, see the answer, and keep going. No game over.</p>
-    <span class="cta">Play Term Runner →</span>
-  </a>
-
-  <a class="game-card" href="tetris/">
-    <h2>🧱 Term Drop</h2>
-    <p>Term blocks fall from the sky — steer each one into the bin with its
-    matching definition. Correct drops build your combo; three wrong drops
-    and the run ends. The term is read aloud as it falls.</p>
-    <span class="cta">Play Term Drop →</span>
-  </a>
-  <a class="game-card" href="hop/">
-    <h2>🐸 Term Hop</h2>
-    <p>Doodle-jump style: a definition shows at the top while platforms carry
-    terms. Steer your bounce and land on the platform holding the matching
-    term. Three lives.</p>
-    <span class="cta">Play Term Hop →</span>
-  </a>
-  <a class="game-card" href="match/">
-    <h2>🃏 Memory Match</h2>
-    <p>Classic concentration: flip tiles to pair six terms with their
-    definitions. Fewer moves and less time means a higher score.</p>
-    <span class="cta">Play Memory Match →</span>
-  </a>
-  <a class="game-card" href="blitz/">
-    <h2>⚡ True/False Blitz</h2>
-    <p>Sixty seconds on the clock. A term and a definition appear — true or
-    false? Correct streaks multiply your score.</p>
-    <span class="cta">Play True/False Blitz →</span>
-  </a>
-  <a class="game-card" href="scramble/">
-    <h2>🔤 Word Scramble</h2>
-    <p>The definition is shown and the term's letters are scrambled. Tap the
-    tiles in order to spell the term — ten rounds, best score wins.</p>
-    <span class="cta">Play Word Scramble →</span>
-  </a>
-  <a class="game-card" href="rush/">
-    <h2>⌨️ Type Rush</h2>
-    <p>Definitions rain down the screen. Type the matching term to clear each
-    one before it crosses the line. Three lives, speed ramps up.</p>
-    <span class="cta">Play Type Rush →</span>
-  </a>
-
-  <a class="back" href="../">← Back to TRSS</a>
-  <p class="note">Games read the same card data as the chapter study guides,
-  so new chapters become playable automatically. Sound and voice can be muted
-  in-game. Works best with an internet connection on first load (card data
-  and voices); nothing you study leaves the device.</p>
+// ambient hero: floating letters and sparks drifting up
+const cv = document.getElementById("fx"), x = cv.getContext("2d");
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let W, H, ps;
+function size() {
+  const d = Math.min(2, devicePixelRatio || 1); W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = W * d; cv.height = H * d; x.setTransform(d, 0, 0, d, 0, 0);
+  ps = Array.from({ length: 28 }, () => mk(true));
+}
+const glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ⭐🪙";
+const mk = (any) => ({ x: Math.random() * W, y: any ? Math.random() * H : H + 20, v: 12 + Math.random() * 26, s: 12 + Math.random() * 18,
+  g: glyphs[(Math.random() * glyphs.length) | 0], r: Math.random() * 6, vr: (Math.random() - .5) * .8, a: .1 + Math.random() * .2 });
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  x.clearRect(0, 0, W, H);
+  for (const p of ps) {
+    if (!reduce) { p.y -= p.v * dt; p.r += p.vr * dt; }
+    if (p.y < -30) Object.assign(p, mk(false));
+    x.save(); x.globalAlpha = p.a; x.translate(p.x, p.y); x.rotate(p.r);
+    x.fillStyle = "#9fb4ff"; x.font = `700 ${p.s}px Fredoka, sans-serif`; x.textAlign = "center"; x.fillText(p.g, 0, 0); x.restore();
+  }
+  if (!reduce) requestAnimationFrame(frame);
+}
+size(); addEventListener("resize", size); requestAnimationFrame(frame);
+</script>
 </body>
 </html>

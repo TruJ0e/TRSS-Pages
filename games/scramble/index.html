@@ -1,77 +1,17 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Word Scramble — TRSS Games</title>
-<style>
-  :root { color-scheme: light; }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body {
-    margin: 0; padding: env(safe-area-inset-top) 16px calc(16px + env(safe-area-inset-bottom));
-    font-family: system-ui, -apple-system, sans-serif;
-    background: #f4f6fb; color: #1a1a1a; min-height: 100vh;
-  }
-  #app { max-width: 560px; margin: 0 auto; }
-  .topbar { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; }
-  .topbar a, .topbar button {
-    font-size: 16px; text-decoration: none; color: #2456d6; background: none;
-    border: none; cursor: pointer; padding: 8px 4px; font-family: inherit;
-  }
-  .scorebar { display: flex; gap: 16px; font-size: 15px; font-weight: 600; padding: 6px 0 12px; }
-  h1 { font-size: 22px; margin: 8px 0; }
-  .def {
-    background: #fff; border: 1px solid #dde3ee; border-radius: 12px;
-    padding: 16px; font-size: 17px; line-height: 1.45; min-height: 90px;
-  }
-  .def .lbl { display: block; font-size: 12px; text-transform: uppercase; color: #6b7280; margin-bottom: 6px; letter-spacing: .06em; }
-  .answer-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 6px; min-height: 56px; }
-  .slot {
-    width: 46px; height: 52px; border-radius: 10px; background: #fff;
-    border: 2px solid #dde3ee; display: flex; align-items: center; justify-content: center;
-    font-size: 24px; font-weight: 700; text-transform: uppercase;
-  }
-  .slot.filled { border-color: #2456d6; }
-  .tiles { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 16px; }
-  .tile {
-    min-width: 52px; min-height: 56px; padding: 8px 12px; border-radius: 12px;
-    background: #2456d6; color: #fff; border: none; font-size: 24px; font-weight: 700;
-    text-transform: uppercase; cursor: pointer; touch-action: manipulation;
-  }
-  .tile.used { visibility: hidden; }
-  .tile:active { transform: scale(.94); }
-  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-  .btn {
-    flex: 1 1 100px; padding: 14px 10px; font-size: 16px; font-weight: 600;
-    border-radius: 12px; border: 1px solid #c9d2e6; background: #fff; color: #1a1a1a;
-    cursor: pointer; font-family: inherit; touch-action: manipulation;
-  }
-  .btn.primary { background: #2456d6; color: #fff; border-color: #2456d6; }
-  .btn.warn { color: #b45309; }
-  .btn:active { transform: scale(.97); }
-  .chapters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 16px; }
-  .chapters .btn.ch { border: 2px solid #c9d2e6; }
-  .chapters .btn.ch.selected { border-color: #2456d6; background: #e8effc; }
-  .msg { min-height: 28px; font-size: 15px; font-weight: 600; margin: 4px 0; }
-  .msg.ok { color: #15803d; } .msg.err { color: #b91c1c; }
-  .flash-correct { animation: flashOk .5s; }
-  @keyframes flashOk { 0% { background: #dcfce7; } 100% { background: #fff; } }
-  .shake { animation: shake .4s; }
-  @keyframes shake { 0%,100% { transform: translateX(0);} 25% { transform: translateX(-8px);} 75% { transform: translateX(8px);} }
-  .results { background: #fff; border: 1px solid #dde3ee; border-radius: 12px; padding: 20px; }
-  .results .row { display: flex; justify-content: space-between; font-size: 17px; padding: 6px 0; }
-  .results .big { font-size: 34px; font-weight: 800; margin: 4px 0 12px; }
-  .error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 12px; padding: 16px; font-size: 16px; }
-</style>
+<meta name="theme-color" content="#0d1524">
+<title>Word Scramble — TRSS Study Games</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../common/kit.css?v=3">
+<link rel="stylesheet" href="game.css?v=3">
 </head>
 <body>
-<div id="app">
-  <div class="topbar">
-    <a href="../">← Games</a>
-    <button id="restartBtn" type="button">↻ Restart</button>
-  </div>
-  <div id="root"></div>
-</div>
-<script type="module" src="./game.js"></script>
+<div id="app"></div>
+<noscript>This game needs JavaScript turned on.</noscript>
+<script type="module" src="game.js?v=3"></script>
 </body>
 </html>

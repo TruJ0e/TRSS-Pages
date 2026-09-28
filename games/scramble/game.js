@@ -1,300 +1,193 @@
-import { CHAPTERS, loadChapterCards, shuffle } from '../common/cards-loader.js';
+/* Word Scramble — spell the term from its letters, one word at a time.
+ *
+ * Built for dyslexic players: each word of the term is scrambled on its own
+ * row (spaces and hyphens stay put), letters are UPPERCASE to avoid b/d/p/q
+ * mix-ups, a right letter locks in green, a wrong letter just bounces back
+ * (nothing you've built is wiped), and hints are free in Relaxed mode.
+ */
+import { createApp, makeDeck, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, powerMeter } from "../common/kit.js?v=3";
 
-const $ = (sel) => document.querySelector(sel);
-const root = $('#root');
-const ROUNDS = 10;
-const MAX_TILE_LETTERS = 14;
-const LS_CHAPTER = 'trss-scramble-chapter';
-const LS_BEST = 'trss-scramble-best';
+let run = null;
+const ok = (t) => /^[A-Za-z][A-Za-z '\-]*$/.test(t) && t.split(/[\s-]+/).length <= 3 &&
+  t.split(/[\s-]+/).every((w) => w.replace(/'/g, "").length <= 12) && t.replace(/[^A-Za-z]/g, "").length <= 22;
 
-let best = Number(localStorage.getItem(LS_BEST) || 0);
+const app = createApp({
+  id: "scramble", title: "Word Scramble", emoji: "🔤",
+  tagline: "Read the meaning, then build the term letter by letter.",
+  steps: ["Read (or listen to) the meaning.",
+          "Tap the letters in order to spell the term.",
+          "Right letters lock in. Stuck? Tap 💡 Hint — it's free."],
+  modes: { relaxed: "8 words. Free hints. Helpful glow.", challenge: "10 words. Hints cost points." },
+  minCards: 4, demo,
+  filter: (cards) => cards.filter((c) => ok(c.term)),
+  onStart: begin, onQuit: () => (run = null),
+});
 
-function lettersOf(term) {
-  return (term || '').toLowerCase().replace(/[^a-z]/g, '');
+function begin({ cards, mode, focus }) {
+  const rounds = mode === "relaxed" ? 8 : 10;
+  const pool = focus ? [...focus.filter((c) => ok(c.term)), ...cards] : cards;
+  run = { mode, rounds, deck: makeDeck([...new Set(pool)]), n: 0, score: 0, correct: 0, mistakes: 0, hints: 0, missed: [] };
+  run.hud = h("div", { class: "hud" });
+  run.body = h("div", { class: "scr" });
+  run.power = powerMeter({ max: 3, icon: "🪄", label: "Magic word", onUse: magic });
+  app.stage.replaceChildren(run.hud, run.power.el, run.body);
+  next();
 }
 
-function el(tag, cls, text) {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
+function paintHud() {
+  const r = run;
+  r.hud.replaceChildren(h("div", { class: "progress" }, h("i", { style: `width:${(r.n / r.rounds) * 100}%` })),
+    h("span", { class: "chip" }, h("b", {}, Math.min(r.n + 1, r.rounds)), " / " + r.rounds),
+    h("span", { class: "chip" }, "⭐ ", h("b", {}, r.score)), app.coinChip());
 }
 
-// ---------- start screen ----------
-function renderStart() {
-  root.innerHTML = '';
-  root.appendChild(el('h1', null, 'Word Scramble'));
-  root.appendChild(el('p', null, 'Read the definition, then tap the tiles in order to spell the term.'));
+function next() {
+  const r = run; if (!r) return;
+  if (r.n >= r.rounds) return finish();
+  const card = r.deck.next();
+  // Split the term into words; keep separators as fixed marks.
+  const parts = card.term.split(/(\s+|-)/).filter((p) => p && !/^\s+$/.test(p));
+  const words = [];
+  for (const p of parts) if (p === "-") words.push({ sep: "-" }); else words.push({ letters: p.replace(/'/g, "").toUpperCase().split("") });
+  const seq = []; // every letter slot in order
+  words.forEach((w, wi) => w.letters && w.letters.forEach((ch, li) => seq.push({ ch, wi, li })));
+  r.q = { card, words, seq, pos: 0, wrongHere: 0, hintsHere: 0, mistakesHere: 0 };
 
-  const saved = localStorage.getItem(LS_CHAPTER) || 'ch7';
-  const wrap = el('div', 'chapters');
-  const keys = ['ch7', 'ch14', 'ch16', 'exam1'].filter((k) => CHAPTERS[k]);
-  let selected = keys.includes(saved) ? saved : keys[0];
-
-  keys.forEach((k) => {
-    const b = el('button', 'btn ch' + (k === selected ? ' selected' : ''), CHAPTERS[k].label);
-    b.type = 'button';
-    b.addEventListener('click', () => {
-      selected = k;
-      wrap.querySelectorAll('.ch').forEach((x) => x.classList.remove('selected'));
-      b.classList.add('selected');
+  const slotsWrap = h("div", { class: "slots", "aria-live": "polite" });
+  words.forEach((w) => {
+    if (w.sep) { slotsWrap.append(h("span", { class: "sep" }, "–")); return; }
+    const g = h("span", { class: "word" });
+    w.slotEls = w.letters.map(() => g.appendChild(h("span", { class: "slot" })));
+    slotsWrap.append(g);
+  });
+  const tray = h("div", { class: "tray" });
+  words.forEach((w, wi) => {
+    if (!w.letters) return;
+    let order = shuffle(w.letters.map((ch, i) => ({ ch, i })));
+    for (let g = 0; g < 10 && w.letters.length > 1 && order.every((o, k) => o.ch === w.letters[k]); g++) order = shuffle(order);
+    const row = h("div", { class: "trow" });
+    w.tiles = order.map((o) => {
+      const t = { ch: o.ch, wi, used: false };
+      t.el = h("button", { class: "ltile", type: "button", "aria-label": "Letter " + o.ch, onclick: () => tap(t) }, o.ch);
+      row.append(t.el); return t;
     });
-    wrap.appendChild(b);
+    tray.append(row);
   });
-  root.appendChild(wrap);
-
-  const start = el('button', 'btn primary', `Start — ${ROUNDS} words`);
-  start.type = 'button';
-  start.addEventListener('click', () => {
-    localStorage.setItem(LS_CHAPTER, selected);
-    renderGame(selected);
-  });
-  root.appendChild(start);
-  root.appendChild(el('p', null, `Best score: ${best}`));
+  // one golden tile per word: place it for bonus coins
+  const all = words.flatMap((w) => w.tiles || []);
+  const gold = all[(Math.random() * all.length) | 0];
+  if (gold) { gold.gold = true; gold.el.classList.add("gold"); }
+  const hintBtn = h("button", { class: "btn ghost", type: "button", onclick: hint }, "💡 Hint" + (r.mode === "challenge" ? " (−30)" : ""));
+  const showBtn = h("button", { class: "btn ghost", type: "button", onclick: reveal }, "🙈 Show me");
+  r.q.msg = h("div", { class: "smsg", role: "status" });
+  r.body.replaceChildren(
+    h("div", { class: "qcard meaning" }, h("div", { class: "label" }, h("span", {}, "Meaning"), sayBtn(defOf(card))), h("div", { class: "big" }, defOf(card)),
+      h("div", { class: "cue" }, `${seq.length} letters · starts with “${seq[0].ch}”`)),
+    slotsWrap, r.q.msg, tray,
+    h("div", { class: "row" }, hintBtn, sayBtn(card.term, "Hear the word"), showBtn));
+  r.q.slotsWrap = slotsWrap;
+  paintSlots(); paintHud();
+  say(defOf(card));
 }
 
-// ---------- error screen ----------
-function renderError(message) {
-  root.innerHTML = '';
-  const box = el('div', 'error', `Couldn't load study cards. ${message} Check your connection and tap Restart to try again.`);
-  root.appendChild(box);
+function paintSlots() {
+  const q = run.q;
+  q.seq.forEach((s, i) => {
+    const el = q.words[s.wi].slotEls[s.li];
+    el.textContent = i < q.pos ? s.ch : "";
+    el.className = "slot" + (i < q.pos ? " filled" : "") + (i === q.pos ? " now" : "");
+  });
 }
 
-// ---------- game ----------
-function renderGame(chapterId) {
-  root.innerHTML = '';
-  const bar = el('div', 'scorebar');
-  const scoreEl = el('span', null, 'Score: 0');
-  const bestEl = el('span', null, `Best: ${best}`);
-  const roundEl = el('span', null, '');
-  bar.append(scoreEl, bestEl, roundEl);
-  root.appendChild(bar);
+function glowNeeded() {
+  const q = run.q, need = q.seq[q.pos];
+  const t = q.words[need.wi].tiles.find((x) => !x.used && x.ch === need.ch);
+  if (t) t.el.classList.add("glow");
+}
 
-  const msg = el('div', 'msg');
-  root.appendChild(msg);
-
-  const defBox = el('div', 'def');
-  const lbl = el('span', 'lbl', 'Definition');
-  const defText = el('span');
-  defBox.append(lbl, defText);
-  root.appendChild(defBox);
-
-  const answerRow = el('div', 'answer-row');
-  root.appendChild(answerRow);
-  const tilesWrap = el('div', 'tiles');
-  root.appendChild(tilesWrap);
-
-  const ctrls = el('div', 'controls');
-  const backBtn = el('button', 'btn', '⌫ Backspace');
-  const clearBtn = el('button', 'btn', 'Clear');
-  const hintBtn = el('button', 'btn warn', '💡 Hint (−25)');
-  const skipBtn = el('button', 'btn warn', 'Skip (−25)');
-  [backBtn, clearBtn, hintBtn, skipBtn].forEach((b) => (b.type = 'button'));
-  ctrls.append(backBtn, clearBtn, hintBtn, skipBtn);
-  root.appendChild(ctrls);
-
-  const state = {
-    words: [],
-    idx: 0,
-    score: 0,
-    solved: 0,
-    skips: 0,
-    hintsUsed: 0,
-    mistakes: 0,
-    target: '',
-    picked: [], // indexes into tile list
-    tiles: [],  // {ch, el, used}
-  };
-
-  function setMsg(text, cls) {
-    msg.textContent = text || '';
-    msg.className = 'msg' + (cls ? ' ' + cls : '');
-  }
-
-  function updateBar() {
-    scoreEl.textContent = `Score: ${state.score}`;
-    bestEl.textContent = `Best: ${best}`;
-    roundEl.textContent = `Word ${Math.min(state.idx + 1, ROUNDS)} / ${ROUNDS}`;
-  }
-
-  function revealTile(i) {
-    const t = state.tiles[i];
-    t.used = true;
-    t.el.classList.add('used');
-  }
-  function returnTile(i) {
-    const t = state.tiles[i];
-    t.used = false;
-    t.el.classList.remove('used');
-  }
-
-  function renderSlots() {
-    answerRow.innerHTML = '';
-    const letters = state.picked.map((i) => state.tiles[i].ch);
-    for (let i = 0; i < state.target.length; i++) {
-      const s = el('div', 'slot' + (i < letters.length ? ' filled' : ''));
-      if (i < letters.length) s.textContent = letters[i];
-      answerRow.appendChild(s);
-    }
-  }
-
-  function nextWord() {
-    state.idx += 1;
-    if (state.idx >= ROUNDS || state.idx >= state.words.length) {
-      renderResults();
-      return;
-    }
-    setupWord();
-  }
-
-  function setupWord() {
-    const card = state.words[state.idx];
-    state.target = lettersOf(card.term);
-    state.picked = [];
-    state.tiles = [];
-
-    defText.textContent = card.simple || '(no definition)';
-    setMsg('');
-
-    // Build tile letters; ensure the scramble isn't accidentally already solved.
-    let chars = shuffle(state.target.split(''));
-    let guard = 0;
-    while (chars.join('') === state.target && state.target.length > 1 && guard++ < 20) {
-      chars = shuffle(state.target.split(''));
-    }
-
-    tilesWrap.innerHTML = '';
-    chars.forEach((ch) => {
-      const t = el('button', 'tile', ch);
-      t.type = 'button';
-      const tile = { ch, el: t, used: false };
-      t.addEventListener('click', () => tapTile(tile));
-      state.tiles.push(tile);
-      tilesWrap.appendChild(t);
-    });
-    renderSlots();
-    updateBar();
-  }
-
-  function tapTile(tile) {
-    if (tile.used || state.picked.length >= state.target.length) return;
-    const idx = state.tiles.indexOf(tile);
-    state.picked.push(idx);
-    revealTile(idx);
-    setMsg('');
-    renderSlots();
-    if (state.picked.length === state.target.length) checkAnswer();
-  }
-
-  function built() {
-    return state.picked.map((i) => state.tiles[i].ch).join('');
-  }
-
-  function checkAnswer() {
-    if (built() === state.target) {
-      state.score += 100;
-      state.solved += 1;
-      setMsg('Correct! +100', 'ok');
-      defBox.classList.remove('flash-correct');
-      void defBox.offsetWidth;
-      defBox.classList.add('flash-correct');
-      updateBar();
-      setTimeout(nextWord, 650);
-    } else {
-      state.mistakes += 1;
-      setMsg('Not quite — try again.', 'err');
-      answerRow.classList.remove('shake');
-      void answerRow.offsetWidth;
-      answerRow.classList.add('shake');
-      setTimeout(() => {
-        state.picked.forEach(returnTile);
-        state.picked = [];
-        renderSlots();
-      }, 450);
-    }
-  }
-
-  backBtn.addEventListener('click', () => {
-    if (!state.picked.length) return;
-    returnTile(state.picked.pop());
-    renderSlots();
-  });
-
-  clearBtn.addEventListener('click', () => {
-    state.picked.forEach(returnTile);
-    state.picked = [];
-    renderSlots();
-    setMsg('');
-  });
-
-  hintBtn.addEventListener('click', () => {
-    if (!state.target || state.picked.length >= state.target.length) return;
-    // find first unused tile matching the next needed letter
-    const need = state.target[state.picked.length];
-    const cand = state.tiles.find((t) => !t.used && t.ch === need);
-    if (!cand) return;
-    tapTile(cand);
-    state.score -= 25;
-    state.hintsUsed += 1;
-    setMsg('Hint used (−25)', 'err');
-    updateBar();
-  });
-
-  skipBtn.addEventListener('click', () => {
-    state.score -= 25;
-    state.skips += 1;
-    setMsg(`Skipped — the word was "${state.target}"`, 'err');
-    updateBar();
-    setTimeout(nextWord, 900);
-  });
-
-  // load cards and start
-  (async () => {
-    try {
-      const cards = await loadChapterCards(chapterId);
-      if (!cards || !cards.length) throw new Error('No cards found for this chapter.');
-      const withLetters = cards.filter((c) => lettersOf(c.term).length >= 2);
-      if (!withLetters.length) throw new Error('No usable terms in this chapter.');
-      const short = withLetters.filter((c) => lettersOf(c.term).length <= MAX_TILE_LETTERS);
-      const pool = short.length >= ROUNDS ? short : withLetters;
-      state.words = shuffle(pool).slice(0, ROUNDS);
-      setupWord();
-    } catch (err) {
-      renderError(err && err.message ? err.message : String(err));
-    }
-  })();
-
-  function renderResults() {
-    if (state.score > best) {
-      best = state.score;
-      localStorage.setItem(LS_BEST, String(best));
-    }
-    root.innerHTML = '';
-    const box = el('div', 'results');
-    box.appendChild(el('h1', null, 'Results'));
-    box.appendChild(el('div', 'big', String(state.score)));
-    const rows = [
-      ['Solved', `${state.solved} / ${ROUNDS}`],
-      ['Skipped', String(state.skips)],
-      ['Mistakes', String(state.mistakes)],
-      ['Hints used', String(state.hintsUsed)],
-      ['Best', String(best)],
-    ];
-    rows.forEach(([k, v]) => {
-      const r = el('div', 'row');
-      r.appendChild(el('span', null, k));
-      const val = el('strong', null, v);
-      r.appendChild(val);
-      box.appendChild(r);
-    });
-    const again = el('button', 'btn primary', '↻ Play Again');
-    again.type = 'button';
-    again.style.marginTop = '14px';
-    again.addEventListener('click', () => renderGame(chapterId));
-    box.appendChild(again);
-    root.appendChild(box);
+async function tap(t) {
+  unlockAudio();
+  const r = run, q = r.q; if (!q || t.used || q.done) return;
+  const need = q.seq[q.pos];
+  if (t.ch === need.ch && t.wi === need.wi) {
+    place(t);
+  } else {
+    q.mistakesHere++; r.mistakes++; q.wrongHere++;
+    t.el.classList.remove("wrong"); void t.el.offsetWidth; t.el.classList.add("wrong");
+    sfx.bad();
+    q.msg.textContent = t.wi !== need.wi ? "That letter is in a different word." : "Not that one — try another letter.";
+    if (r.mode === "relaxed" && q.wrongHere >= 2) glowNeeded();
   }
 }
 
-$('#restartBtn').addEventListener('click', () => renderStart());
-renderStart();
+function place(t) {
+  const r = run, q = r.q;
+  t.used = true; t.el.classList.remove("glow", "wrong"); t.el.classList.add("used"); t.el.disabled = true;
+  if (t.gold && !q.hinting) { const b = t.el.getBoundingClientRect(); app.earn(3, b.left + b.width / 2, b.top); }
+  q.pos++; q.wrongHere = 0; q.msg.textContent = "";
+  sfx.lock();
+  paintSlots();
+  if (q.pos >= q.seq.length) solved();
+}
+
+function hint() {
+  const r = run, q = r.q; if (!q || q.done) return;
+  const need = q.seq[q.pos];
+  const t = q.words[need.wi].tiles.find((x) => !x.used && x.ch === need.ch);
+  if (!t) return;
+  r.hints++; q.hintsHere++;
+  q.hinting = true; place(t); q.hinting = false;
+}
+
+async function solved() {
+  const r = run, q = r.q; q.done = true;
+  const pts = Math.max(20, 100 - q.mistakesHere * 15 - (r.mode === "challenge" ? q.hintsHere * 30 : q.hintsHere * 5));
+  r.score += pts; r.n++;
+  const clean = q.mistakesHere + q.hintsHere <= 2;
+  if (!clean) { r.missed.push(q.card); r.deck.miss(q.card); }
+  else { r.correct++; r.deck.hit(q.card); if (!q.magic) r.power.add(1); app.earn(q.mistakesHere + q.hintsHere === 0 ? 5 : 3); }
+  q.slotsWrap.classList.add("win"); sfx.good();
+  q.msg.innerHTML = ""; q.msg.append(h("b", { class: "okword" }, "✓ " + q.card.term), " +" + pts);
+  say(q.card.term);
+  paintHud();
+  await wait(1300);
+  if (run) next();
+}
+
+function magic() {
+  const r = run, q = r.q; if (!q || q.done) return;
+  q.magic = true;
+  // spell the rest of the current word automatically
+  const wi = q.seq[q.pos].wi;
+  const step = () => { if (!run || q.done || q.pos >= q.seq.length || q.seq[q.pos].wi !== wi) return; hint(); r.hints--; q.hintsHere--; setTimeout(step, 160); };
+  step();
+}
+
+async function reveal() {
+  const r = run, q = r.q; if (!q || q.done) return;
+  q.done = true; r.n++; r.missed.push(q.card); r.deck.miss(q.card);
+  q.pos = q.seq.length; paintSlots();
+  await app.learn(q.card, { title: "Here's the word", note: "It'll come back later so you can try again." });
+  if (run) next();
+}
+
+function finish() {
+  const r = run; run = null;
+  app.results({ score: r.score, correct: r.correct, total: r.n, missed: r.missed, extra: [[r.hints, "hints"]] });
+}
+
+document.addEventListener("keydown", (e) => {
+  if (!run || !run.q || run.q.done || document.querySelector(".scrim") || e.ctrlKey || e.metaKey) return;
+  const k = e.key.toUpperCase();
+  if (/^[A-Z]$/.test(k)) {
+    const q = run.q, need = q.seq[q.pos];
+    const t = q.words[need.wi].tiles.find((x) => !x.used && x.ch === k) || q.words.flatMap((w) => w.tiles || []).find((x) => !x.used && x.ch === k);
+    if (t) tap(t);
+  }
+});
+
+function demo(el) {
+  el.classList.add("s-demo");
+  el.append(h("div", { class: "sd-slots" }, ..."DRIVE".split("").map((c, i) => h("i", { style: `--d:${i * .45}s` }, c))),
+    h("div", { class: "sd-tray" }, ..."VRDEI".split("").map((c) => h("b", {}, c))));
+}

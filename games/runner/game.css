@@ -1,0 +1,21 @@
+.rq { min-height: 96px; display: grid; }
+.waitcard { place-content: center; text-align: center; color: var(--muted); border-style: dashed; }
+.okcard { place-content: center; text-align: center; border-color: var(--good) !important; }
+.okcard .big { color: var(--good); font-family: var(--display); font-size: 1.4em; }
+.roadwrap { position: relative; height: clamp(200px, 32vh, 340px); flex: none; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); }
+.road { display: block; width: 100%; height: 100%; }
+.ra { min-height: 204px; }
+.answer.chosen { border-color: var(--brand); background: #2a2413; }
+
+.run-demo { background: linear-gradient(180deg, #0a1030, #3a2d68 55%, #151d3b 56%); }
+.rd-road { position: absolute; left: 50%; bottom: 0; width: 70%; height: 45%; transform: translateX(-50%); background: #1c2548; clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%); }
+.rd-gate { position: absolute; left: 50%; top: 40%; display: flex; gap: 6px; transform: translateX(-50%) scale(.5); animation: rdGate 3s ease-in infinite; }
+.rd-gate b { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; background: #1f2e4b; border: 2px solid #5cc8ff; font-family: var(--display); }
+.rd-gate b.win { animation: rdWin 3s infinite; }
+.rd-runner { position: absolute; left: 50%; bottom: 10px; width: 16px; height: 34px; margin-left: -8px; border-radius: 8px; background: linear-gradient(#f6c89f 0 30%, #ffb020 30% 70%, #2b3656 70%); animation: rdRun .3s infinite alternate; }
+@keyframes rdGate { 0% { transform: translateX(-50%) scale(.4); top: 38%; opacity: 0; } 20% { opacity: 1; } 80% { transform: translateX(-50%) scale(1.5); top: 60%; opacity: 1; } 100% { transform: translateX(-50%) scale(1.8); top: 70%; opacity: 0; } }
+@keyframes rdWin { 0%, 40% { background: #1f2e4b; } 50%, 100% { background: var(--brand); color: #2a1a00; } }
+@keyframes rdRun { to { transform: translateY(-3px); } }
+.ra .steer button { min-height: 72px; }
+.rd-coin { position: absolute; left: 44%; top: 62%; width: 12px; height: 12px; border-radius: 50%; background: #ffd166; box-shadow: 18px 18px 0 #ffd166, 36px 36px 0 #ffd166; animation: rdGate 3s .6s ease-in infinite; }
+.rd-bar { position: absolute; left: 60%; top: 58%; width: 26px; height: 12px; background: repeating-linear-gradient(90deg, #e5484d 0 5px, #fff 5px 10px); animation: rdGate 3s 1.2s ease-in infinite; }

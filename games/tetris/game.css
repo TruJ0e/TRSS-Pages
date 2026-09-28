@@ -1,0 +1,42 @@
+.sky {
+  position: relative; height: clamp(170px, 30vh, 280px); flex: none;
+  border-radius: 22px; overflow: hidden; border: 1px solid var(--line);
+  background: linear-gradient(180deg, #13244a 0%, #1a2f5c 60%, #203a6b 100%);
+}
+.stars-bg { position: absolute; inset: 0; opacity: .55;
+  background-image: radial-gradient(2px 2px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 70% 20%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 40% 70%, #cfe 50%, transparent 51%), radial-gradient(2px 2px at 85% 60%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 10% 85%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 55% 45%, #fff 50%, transparent 51%);
+  animation: drift 40s linear infinite; }
+@keyframes drift { to { background-position: 0 300px; } }
+.ground { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; background: repeating-linear-gradient(90deg, var(--brand) 0 18px, #b77400 18px 36px); opacity: .8; }
+.tile {
+  position: absolute; left: 50%; top: 12px; width: min(84%, 420px);
+  padding: 12px 16px; border-radius: 16px; text-align: center;
+  background: linear-gradient(180deg, #8fdcff, #36a9e6); color: #04243a;
+  box-shadow: 0 6px 0 #1a6f9e, 0 14px 30px rgba(0,0,0,.45);
+  display: grid; gap: 2px; will-change: transform;
+}
+.tile .tl { font-size: .62em; font-weight: 700; letter-spacing: .14em; opacity: .7; }
+.tile .tt { font-family: var(--display); font-weight: 700; font-size: 1.35em; line-height: 1.15; text-wrap: balance; overflow-wrap: anywhere; }
+.tile.waiting { animation: bob 1.2s ease-in-out infinite; }
+@keyframes bob { 50% { margin-top: -6px; } }
+.tile.crash { animation: shake .4s; background: linear-gradient(180deg, #ffb3ad, #ff7b72); box-shadow: 0 6px 0 #a33; }
+.ask { display: grid; gap: 10px; }
+.ask-label { text-align: center; }
+
+.drop-demo .dd-tile { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 16px; border-radius: 10px;
+  background: linear-gradient(180deg, #8fdcff, #36a9e6); color: #04243a; font-family: var(--display); font-weight: 700; box-shadow: 0 4px 0 #1a6f9e;
+  animation: ddFall 3.2s var(--ease) infinite; }
+.drop-demo .dd-bins { position: absolute; left: 12px; right: 12px; bottom: 12px; display: grid; gap: 6px; }
+.drop-demo .dd-bins i { display: block; height: 14px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); }
+.drop-demo .dd-bins i.win { animation: ddWin 3.2s infinite; }
+@keyframes ddFall { 0% { top: -40px; opacity: 0; } 15% { opacity: 1; } 55% { top: 40px; } 72% { top: 92px; transform: translateX(-50%) scale(.5); opacity: 1; } 78%,100% { top: 92px; opacity: 0; transform: translateX(-50%) scale(.4); } }
+@keyframes ddWin { 0%, 70% { background: var(--surface); border-color: var(--line); } 76%, 95% { background: var(--good-bg); border-color: var(--good); } }
+.sky { touch-action: none; cursor: grab; }
+.tile { width: min(58%, 300px); background: linear-gradient(180deg, var(--ba, #8fdcff), var(--bb, #36a9e6)); }
+.pick { position: absolute; left: 0; top: 0; width: 28px; height: 28px; display: grid; place-items: center; font-style: normal; font-size: 22px; pointer-events: none;
+  filter: drop-shadow(0 2px 6px rgba(255,209,102,.6)); animation: twinkle 1.4s ease-in-out infinite alternate; }
+.pick.spike { color: #ff7b72; font-size: 28px; filter: drop-shadow(0 0 6px rgba(255,80,80,.8)); animation: spin 2.4s linear infinite; }
+.pick.got { opacity: 0; transition: opacity .25s; }
+@keyframes twinkle { to { filter: drop-shadow(0 0 10px rgba(255,209,102,.95)); } }

@@ -1,238 +1,132 @@
-import { CHAPTERS, loadChapterCards, pickDistractors, shuffle } from '../common/cards-loader.js';
+/* True or False — does this meaning belong to this term?
+ *
+ * Relaxed: 10 statements, no clock. Challenge: 60 seconds, streak bonus.
+ * A wrong answer opens the Learn-it card (the clock stops while it's open).
+ */
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, powerMeter } from "../common/kit.js?v=3";
 
-const LS_CHAPTER = 'trss-blitz-chapter';
-const LS_BEST = 'trss-blitz-best';
-const GAME_SECONDS = 60;
-const PTS_CORRECT = 100;
-const PTS_PER_STREAK = 25;
+const ROUND = 10, SECONDS = 60;
+let run = null, timer = 0;
 
-const $ = (id) => document.getElementById(id);
-const screens = { start: $('start-screen'), game: $('game-screen'), over: $('over-screen') };
+const app = createApp({
+  id: "blitz", title: "True or False", emoji: "⚡",
+  tagline: "Does this meaning go with this term? Decide true or false.",
+  steps: ["Read the term and the meaning under it.",
+          "Tap ✓ True if they go together.",
+          "Tap ✗ False if the meaning belongs to a different term."],
+  modes: { relaxed: "10 questions. No clock.", challenge: "60 seconds. Build a streak." },
+  minCards: 4, demo,
+  onStart: begin,
+  onPause: () => run && (run.frozen = true),
+  onResume: () => run && (run.frozen = false),
+  onQuit: stop,
+});
 
-const state = {
-  cards: [],
-  deck: [],        // shuffled queue of remaining card indexes
-  current: null,  // { card, shownTrue }
-  score: 0,
-  streak: 0,
-  answered: 0,
-  correct: 0,
-  secondsLeft: GAME_SECONDS,
-  timerId: null,
-  accepting: true,
-  chapterId: localStorage.getItem(LS_CHAPTER) || 'ch7',
-};
+function stop() { clearInterval(timer); run = null; }
 
-function getBest() {
-  const v = parseInt(localStorage.getItem(LS_BEST) || '0', 10);
-  return Number.isFinite(v) && v > 0 ? v : 0;
-}
-function setBest(v) {
-  localStorage.setItem(LS_BEST, String(v));
-}
-
-function showScreen(name) {
-  for (const k of Object.keys(screens)) screens[k].classList.toggle('active', k === name);
-}
-
-function showError(msg) {
-  const el = $('error-msg');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-function hideError() {
-  $('error-msg').style.display = 'none';
-}
-
-// ---------- start screen ----------
-function buildChapterPicker() {
-  const picker = $('chapter-picker');
-  picker.innerHTML = '';
-  const valid = Object.keys(CHAPTERS);
-  if (!valid.includes(state.chapterId)) state.chapterId = valid[0] || 'ch7';
-  for (const id of valid) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = CHAPTERS[id].label || id;
-    b.dataset.id = id;
-    b.classList.toggle('selected', id === state.chapterId);
-    b.addEventListener('click', () => {
-      state.chapterId = id;
-      localStorage.setItem(LS_CHAPTER, id);
-      picker.querySelectorAll('button').forEach((x) => x.classList.toggle('selected', x.dataset.id === id));
-    });
-    picker.appendChild(b);
-  }
-}
-
-// ---------- game ----------
-function nextCard() {
-  if (state.deck.length === 0) {
-    // reshuffle a fresh deck when exhausted
-    state.deck = shuffle(state.cards.map((_, i) => i));
-  }
-  return state.cards[state.deck.pop()];
-}
-
-function presentQuestion() {
-  const card = nextCard();
-  const shownTrue = Math.random() < 0.5;
-  let defn;
-  if (shownTrue) {
-    defn = card.simple;
-  } else {
-    // guard against a distractor that happens to have identical wording
-    let tries = 0;
-    let d = pickDistractors(state.cards, card.id, 1)[0];
-    while (d && d.simple === card.simple && tries < 5) {
-      d = pickDistractors(state.cards, card.id, 1)[0];
-      tries++;
-    }
-    defn = d ? d.simple : card.simple;
-    // if we fell back to the true definition, the answer is TRUE
-    if (defn === card.simple) return presentQuestion();
-  }
-  state.current = { card, shownTrue: defn === card.simple };
-  $('term').textContent = card.term;
-  $('defn').textContent = defn;
-  const fb = $('feedback');
-  fb.textContent = '';
-  fb.className = '';
-  $('qcard').classList.remove('correct', 'wrong');
-  state.accepting = true;
-}
-
-function updateHud() {
-  $('score').textContent = state.score;
-  $('streak').textContent = '×' + state.streak;
-  $('streak-box').classList.toggle('hot', state.streak >= 3);
-  const t = $('timer');
-  t.textContent = state.secondsLeft;
-  $('timer-box').classList.toggle('warn', state.secondsLeft <= 10);
-}
-
-function answer(playerSaysTrue) {
-  if (!state.accepting || !state.current) return;
-  state.accepting = false;
-  const { card, shownTrue } = state.current;
-  const hit = playerSaysTrue === shownTrue;
-  state.answered++;
-  const cardEl = $('qcard');
-  const fb = $('feedback');
-  if (hit) {
-    state.streak++;
-    state.correct++;
-    state.score += PTS_CORRECT + PTS_PER_STREAK * state.streak;
-    cardEl.classList.add('correct');
-    fb.textContent = `+${PTS_CORRECT + PTS_PER_STREAK * state.streak}`;
-    fb.className = 'good';
-  } else {
-    state.streak = 0;
-    cardEl.classList.add('wrong');
-    fb.textContent = `That was: ${card.term}`;
-    fb.className = 'bad';
-  }
-  updateHud();
-  setTimeout(() => {
-    if (state.secondsLeft > 0) presentQuestion();
-  }, 700);
+function begin({ cards, mode, focus }) {
+  stop();
+  run = { mode, cards, deck: makeDeck(focus ? shuffle([...focus, ...cards]).slice(0, Math.max(ROUND, focus.length)) : cards),
+          n: 0, correct: 0, score: 0, streak: 0, best: 0, missed: [], left: SECONDS, frozen: false, busy: false };
+  run.hud = h("div", { class: "hud" });
+  run.body = h("div", { class: "tf" });
+  run.double = 0; run.freeze = 0;
+  run.power = powerMeter(mode === "challenge"
+    ? { max: 4, icon: "❄️", label: "Freeze 10s", onUse: () => { run.freeze = 10; app.toast("❄️ Clock frozen for 10 seconds!"); paintHud(); } }
+    : { max: 4, icon: "✨", label: "Double ×3", onUse: () => { run.double = 3; app.toast("✨ Next 3 right answers score double!"); paintHud(); } });
+  app.stage.replaceChildren(run.hud, run.power.el, run.body);
+  if (mode === "challenge") timer = setInterval(tick, 1000);
+  paintHud(); next();
 }
 
 function tick() {
-  state.secondsLeft--;
-  if (state.secondsLeft <= 0) {
-    state.secondsLeft = 0;
-    updateHud();
-    endGame();
+  const r = run; if (!r || r.frozen || document.querySelector(".scrim")) return;
+  if (r.freeze > 0) { r.freeze--; paintHud(); return; }
+  r.left--; paintHud();
+  if (r.left <= 0) finish();
+}
+
+function paintHud() {
+  const r = run;
+  const kids = r.mode === "relaxed"
+    ? [h("div", { class: "progress" }, h("i", { style: `width:${(r.n / ROUND) * 100}%` })), h("span", { class: "chip" }, h("b", {}, Math.min(r.n + 1, ROUND)), " / " + ROUND)]
+    : [h("div", { class: "progress timebar" + (r.left <= 10 ? " low" : "") }, h("i", { style: `width:${(r.left / SECONDS) * 100}%` })), h("span", { class: "chip" }, "⏱ ", h("b", {}, r.left + "s"))];
+  kids.push(h("span", { class: "chip" }, "⭐ ", h("b", {}, r.score)), app.coinChip());
+  if (r.freeze > 0) kids.push(h("span", { class: "chip hot" }, "❄️ " + r.freeze));
+  if (r.double > 0) kids.push(h("span", { class: "chip hot" }, "✨×2 · " + r.double));
+  if (r.streak >= 2) kids.push(h("span", { class: "chip hot" }, "🔥 ", h("b", {}, r.streak)));
+  r.hud.replaceChildren(...kids);
+}
+
+function next() {
+  const r = run; if (!r) return;
+  if (r.mode === "relaxed" && r.n >= ROUND) return finish();
+  const card = r.deck.next();
+  let shown = card, isTrue = Math.random() < 0.5;
+  if (!isTrue) {
+    const d = pickDistractors(r.cards, card.id, 4).find((c) => defOf(c) !== defOf(card));
+    if (d) shown = d; else isTrue = true;
+  }
+  r.q = { card, shown, isTrue };
+  const tBtn = h("button", { class: "tfbtn yes", type: "button", onclick: () => answer(true) }, h("span", { class: "ic" }, "✓"), "True");
+  const fBtn = h("button", { class: "tfbtn no", type: "button", onclick: () => answer(false) }, h("span", { class: "ic" }, "✗"), "False");
+  r.btns = { tBtn, fBtn };
+  r.body.replaceChildren(
+    h("div", { class: "statement" },
+      h("div", { class: "qcard term" }, h("div", { class: "label" }, h("span", {}, "Term"), sayBtn(card.term)), h("div", { class: "big termword" }, card.term)),
+      h("div", { class: "means", "aria-hidden": "true" }, "means…"),
+      h("div", { class: "qcard meaning" }, h("div", { class: "label" }, h("span", {}, "Meaning"), sayBtn(defOf(shown))), h("div", { class: "big" }, defOf(shown)))),
+    h("div", { class: "tfrow" }, fBtn, tBtn));
+  say(card.term + ". means: " + defOf(shown));
+}
+
+async function answer(saysTrue) {
+  const r = run; if (!r || r.busy || r.frozen) return;
+  r.busy = true;
+  const ok = saysTrue === r.q.isTrue;
+  const btn = saysTrue ? r.btns.tBtn : r.btns.fBtn;
+  r.btns.tBtn.disabled = r.btns.fBtn.disabled = true;
+  r.n++;
+  if (ok) {
+    r.correct++; r.streak++; r.best = Math.max(r.best, r.streak);
+    let pts = 100 + Math.min(r.streak - 1, 8) * 25;
+    if (r.double > 0) { pts *= 2; r.double--; }
+    r.score += pts; r.deck.hit(r.q.card); r.power.add(1);
+    app.earn(r.streak % 5 === 0 ? 6 : 2);
+    btn.classList.add("picked-good"); sfx.good();
+    const b = btn.getBoundingClientRect(); app.floater(b.left + b.width / 2, b.top, "+" + pts);
+    paintHud(); await wait(550);
   } else {
-    updateHud();
+    r.streak = 0; r.deck.miss(r.q.card); r.missed.push(r.q.card);
+    btn.classList.add("picked-bad"); sfx.bad(); paintHud();
+    await wait(450);
+    const note = r.q.isTrue
+      ? "That meaning really did belong to this term, so the answer was TRUE."
+      : `The meaning shown belongs to "${r.q.shown.term}", so the answer was FALSE.`;
+    await app.learn(r.q.card, { note, title: r.q.isTrue ? "It was true" : "It was false" });
   }
+  if (!run) return;
+  r.busy = false;
+  if (r.mode === "challenge" && r.left <= 0) return finish();
+  if (!run) return;
+  paintHud(); next();
 }
 
-function endGame() {
-  clearInterval(state.timerId);
-  state.timerId = null;
-  $('hud').hidden = true;
-  const prevBest = getBest();
-  const isNewBest = state.score > prevBest;
-  if (isNewBest) setBest(state.score);
-  $('final-score').textContent = state.score;
-  $('final-best').textContent = Math.max(prevBest, state.score);
-  $('final-answered').textContent = state.answered;
-  $('final-accuracy').textContent = state.answered > 0 ? Math.round((state.correct / state.answered) * 100) + '%' : '—';
-  $('new-best').classList.toggle('show', isNewBest && state.score > 0);
-  showScreen('over');
+function finish() {
+  const r = run; stop();
+  app.results({ score: r.score, correct: r.correct, total: r.n, missed: r.missed,
+    extra: [[r.best, "best streak"]] });
 }
 
-function resetGameState() {
-  clearInterval(state.timerId);
-  state.timerId = null;
-  state.score = 0;
-  state.streak = 0;
-  state.answered = 0;
-  state.correct = 0;
-  state.secondsLeft = GAME_SECONDS;
-  state.current = null;
-  state.accepting = true;
-}
-
-async function startGame() {
-  hideError();
-  if (state.cards.length === 0) {
-    try {
-      state.cards = await loadChapterCards(state.chapterId);
-    } catch (err) {
-      showError('Could not load card data for this chapter. Check your connection and try again.');
-      console.error('[blitz] loadChapterCards failed:', err);
-      return;
-    }
-    if (!state.cards || state.cards.length === 0) {
-      showError('No cards found for this chapter. Pick a different chapter.');
-      return;
-    }
-  }
-  resetGameState();
-  state.deck = shuffle(state.cards.map((_, i) => i));
-  $('best-hud').textContent = getBest();
-  $('hud').hidden = false;
-  showScreen('game');
-  updateHud();
-  presentQuestion();
-  state.timerId = setInterval(tick, 1000);
-}
-
-function restart() {
-  // reload cards fresh for the currently selected chapter, then start
-  state.cards = [];
-  buildChapterPicker();
-  showScreen('start');
-  $('hud').hidden = true;
-  resetGameState();
-}
-
-// ---------- wiring ----------
-$('start-btn').addEventListener('click', startGame);
-$('play-again-btn').addEventListener('click', restart);
-$('restart-top').addEventListener('click', restart);
-$('true-btn').addEventListener('click', () => answer(true));
-$('false-btn').addEventListener('click', () => answer(false));
-
-document.addEventListener('keydown', (e) => {
-  if (e.repeat) return;
+document.addEventListener("keydown", (e) => {
+  if (!run || document.querySelector(".scrim")) return;
   const k = e.key.toLowerCase();
-  if (screens.start.classList.contains('active') && k === 'enter') {
-    startGame();
-    return;
-  }
-  if (screens.over.classList.contains('active') && k === 'enter') {
-    restart();
-    return;
-  }
-  if (!screens.game.classList.contains('active')) return;
-  if (k === 't' || k === 'arrowright') answer(true);
-  else if (k === 'f' || k === 'arrowleft') answer(false);
+  if (k === "t" || k === "arrowright") answer(true);
+  if (k === "f" || k === "arrowleft") answer(false);
 });
 
-buildChapterPicker();
-$('best-hud').textContent = getBest();
+function demo(el) {
+  el.classList.add("tf-demo");
+  el.append(h("div", { class: "td-card" }, h("b", {}, "emotion"), h("span", {}, "a body reaction plus a feeling")),
+    h("div", { class: "td-btns" }, h("i", { class: "n" }, "✗"), h("i", { class: "y" }, "✓")));
+}

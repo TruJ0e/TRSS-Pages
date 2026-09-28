@@ -1,261 +1,124 @@
-// Memory Match (concentration) for TRSS study games.
-// No external deps. Imports the shared card loader via ES module.
-import { CHAPTERS, loadChapterCards, shuffle } from '../common/cards-loader.js';
+/* Memory Match — pair each TERM card with its MEANING card.
+ *
+ * Card backs say TERM or MEANING so players know what they're flipping.
+ * A wrong pair stays face-up until the player taps to continue, so there's
+ * always time to read. Relaxed: 4 pairs, no clock. Challenge: 6 pairs + clock.
+ */
+import { createApp, shuffle, h, wait, defOf, say, sfx, stopSpeak, powerMeter } from "../common/kit.js?v=3";
 
-const root = document.getElementById('root');
-const restartBtn = document.getElementById('restart-btn');
+let run = null, clock = 0;
 
-const LS_CHAPTER = 'trss-match-chapter';
-const LS_BEST = 'trss-match-best';
-
-const PAIRS = 6;
-const FLIP_BACK_MS = 800;
-// Score = max(0, 1000 - 25 * moves - 2 * elapsedSeconds)
-const SCORE_BASE = 1000;
-const SCORE_PER_MOVE = 25;
-const SCORE_PER_SEC = 2;
-
-let state = null;
-
-function fmtTime(sec) {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-}
-
-function getBest() {
-  const v = Number(localStorage.getItem(LS_BEST));
-  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
-}
-
-function setBest(v) {
-  localStorage.setItem(LS_BEST, String(v));
-}
-
-function errorBox(msg) {
-  root.innerHTML = '';
-  const d = document.createElement('div');
-  d.className = 'error';
-  d.textContent = msg;
-  root.appendChild(d);
-}
-
-// ---------- start screen ----------
-function renderStart(selected) {
-  root.innerHTML = '';
-  restartBtn.hidden = true;
-
-  const wrap = document.createElement('div');
-  wrap.className = 'start-wrap';
-
-  const p = document.createElement('p');
-  p.textContent = 'Match each term with its definition. Pick a chapter:';
-  wrap.appendChild(p);
-
-  const ch = document.createElement('div');
-  ch.className = 'chapters';
-  for (const key of Object.keys(CHAPTERS)) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = CHAPTERS[key].label || key;
-    b.dataset.chapter = key;
-    b.setAttribute('aria-pressed', key === selected ? 'true' : 'false');
-    b.addEventListener('click', () => {
-      localStorage.setItem(LS_CHAPTER, key);
-      renderStart(key);
-    });
-    ch.appendChild(b);
-  }
-  wrap.appendChild(ch);
-
-  const best = getBest();
-  if (best > 0) {
-    const bi = document.createElement('p');
-    bi.textContent = 'Best score: ' + best;
-    wrap.appendChild(bi);
-  }
-
-  const start = document.createElement('button');
-  start.type = 'button';
-  start.className = 'start-btn';
-  start.textContent = 'Start';
-  start.addEventListener('click', () => startGame(selected, start));
-  wrap.appendChild(start);
-
-  root.appendChild(wrap);
-}
-
-async function startGame(chapterId, startBtnEl) {
-  startBtnEl.disabled = true;
-  startBtnEl.textContent = 'Loading cards…';
-  let cards;
-  try {
-    cards = await loadChapterCards(chapterId);
-  } catch (e) {
-    errorBox('Couldn\u2019t load card data for this chapter. Check your connection and try again.');
-    return;
-  }
-  if (!Array.isArray(cards) || cards.length < PAIRS) {
-    errorBox('Not enough cards in this chapter to play Memory Match (need at least ' + PAIRS + ').');
-    return;
-  }
-  const picked = shuffle(cards).slice(0, PAIRS);
-  const tiles = shuffle(
-    picked.flatMap((c) => [
-      { cardId: c.id, kind: 'term', text: c.term },
-      { cardId: c.id, kind: 'def', text: c.simple },
-    ])
-  ).map((t, i) => ({ ...t, index: i, matched: false, faceUp: false }));
-
-  state = {
-    tiles,
-    first: null,
-    moves: 0,
-    matchedCount: 0,
-    startAt: Date.now(),
-    elapsed: 0,
-    timerId: null,
-    over: false,
-  };
-  renderGame();
-  state.timerId = setInterval(() => {
-    if (!state || state.over) return;
-    state.elapsed = (Date.now() - state.startAt) / 1000;
-    const el = document.getElementById('hud-time');
-    if (el) el.textContent = fmtTime(state.elapsed);
-  }, 500);
-}
-
-// ---------- in-game screen ----------
-function renderGame() {
-  root.innerHTML = '';
-  restartBtn.hidden = false;
-
-  const hud = document.createElement('div');
-  hud.className = 'hud';
-  hud.innerHTML =
-    '<div class="stat"><span class="label">Moves</span><b id="hud-moves">0</b></div>' +
-    '<div class="stat"><span class="label">Time</span><b id="hud-time">00:00</b></div>' +
-    '<div class="stat"><span class="label">Best</span><b>' + getBest() + '</b></div>';
-  root.appendChild(hud);
-
-  const grid = document.createElement('div');
-  grid.className = 'grid';
-  state.tiles.forEach((t) => {
-    const tile = document.createElement('div');
-    tile.className = 'tile';
-    tile.dataset.index = t.index;
-    tile.dataset.kind = t.kind;
-    tile.setAttribute('role', 'button');
-    tile.setAttribute('tabindex', '0');
-    tile.setAttribute('aria-label', 'hidden card');
-    tile.innerHTML =
-      '<div class="tile-inner">' +
-      '<div class="tile-face tile-back">?</div>' +
-      '<div class="tile-face tile-front"><span></span></div>' +
-      '</div>';
-    tile.querySelector('.tile-front span').textContent = t.text;
-    tile.addEventListener('click', () => onTileTap(tile, t));
-    tile.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        onTileTap(tile, t);
-      }
-    });
-    grid.appendChild(tile);
-  });
-  root.appendChild(grid);
-}
-
-function onTileTap(el, t) {
-  if (state.over || t.matched || t.faceUp) return;
-  if (state.first && state.first.lock) return; // evaluating a pair, ignore
-  if (state.first && state.first.tile === t) return; // tapped same tile twice
-
-  t.faceUp = true;
-  el.classList.add('flipped');
-
-  if (!state.first) {
-    state.first = { tile: t, el };
-    return;
-  }
-
-  // Second tile of the pair
-  const first = state.first;
-  state.first = { lock: true };
-  state.moves++;
-  document.getElementById('hud-moves').textContent = state.moves;
-
-  if (first.tile.cardId === t.cardId) {
-    first.tile.matched = true;
-    t.matched = true;
-    first.el.classList.add('matched');
-    el.classList.add('matched');
-    state.matchedCount++;
-    state.first = null;
-    if (state.matchedCount === PAIRS) endGame();
-  } else {
-    setTimeout(() => {
-      first.tile.faceUp = false;
-      t.faceUp = false;
-      first.el.classList.remove('flipped');
-      el.classList.remove('flipped');
-      state.first = null;
-    }, FLIP_BACK_MS);
-  }
-}
-
-function endGame() {
-  state.over = true;
-  clearInterval(state.timerId);
-  state.elapsed = (Date.now() - state.startAt) / 1000;
-  const secs = Math.floor(state.elapsed);
-  const score = Math.max(0, SCORE_BASE - SCORE_PER_MOVE * state.moves - SCORE_PER_SEC * secs);
-  const prevBest = getBest();
-  const isNewBest = score > prevBest;
-  if (isNewBest) setBest(score);
-
-  const panel = document.createElement('div');
-  panel.className = 'win-panel';
-  panel.innerHTML =
-    '<h2>You matched them all!</h2>' +
-    '<p>Moves: <b>' + state.moves + '</b> &nbsp; Time: <b>' + fmtTime(secs) + '</b></p>' +
-    '<p>Score: <b>' + score + '</b></p>' +
-    (isNewBest ? '<div class="new-best">NEW BEST!</div>' : '<p>Best: ' + prevBest + '</p>');
-  const again = document.createElement('button');
-  again.type = 'button';
-  again.className = 'again';
-  again.textContent = 'Play again';
-  again.addEventListener('click', () => {
-    restartBtn.hidden = true;
-    startGame(localStorage.getItem(LS_CHAPTER) || 'ch7', again);
-    again.disabled = true;
-    again.textContent = 'Loading cards…';
-  });
-  panel.appendChild(again);
-  root.appendChild(panel);
-}
-
-// ---------- restart ----------
-restartBtn.addEventListener('click', () => {
-  if (state && state.timerId) clearInterval(state.timerId);
-  state = null;
-  renderStart(localStorage.getItem(LS_CHAPTER) || 'ch7');
+const app = createApp({
+  id: "match", title: "Memory Match", emoji: "🃏",
+  tagline: "Flip two cards. Find each term and its meaning.",
+  steps: ["Blue cards are terms. Green cards are meanings.",
+          "Flip one of each. If they belong together, they stay.",
+          "If not, read them both, then tap to turn them back."],
+  modes: { relaxed: "4 pairs. No clock.", challenge: "6 pairs. Beat the clock." },
+  minCards: 6, demo,
+  onStart: begin,
+  onPause: () => run && (run.frozen = true),
+  onResume: () => run && (run.frozen = false),
+  onQuit: stop,
 });
 
-// ---------- boot ----------
-(function init() {
-  let saved = null;
-  try {
-    saved = localStorage.getItem(LS_CHAPTER);
-  } catch (e) {
-    saved = null;
+function stop() { clearInterval(clock); run = null; }
+
+function begin({ cards, mode, focus }) {
+  stop();
+  const pairs = mode === "relaxed" ? 4 : 6;
+  const picked = shuffle([...(focus || []), ...shuffle(cards)].filter((c, i, a) => a.findIndex((x) => x.id === c.id) === i)).slice(0, pairs);
+  const tiles = shuffle(picked.flatMap((c) => [{ card: c, kind: "term", text: c.term }, { card: c, kind: "meaning", text: defOf(c) }]));
+  run = { mode, pairs, tiles, open: [], wrong: null, found: 0, moves: 0, secs: 0, missed: [], frozen: false };
+
+  run.hud = h("div", { class: "hud" });
+  run.hint = h("p", { class: "mhint", role: "status" }, "Flip a blue term card and a green meaning card.");
+  const grid = h("div", { class: "mgrid" + (pairs === 4 ? " four" : "") });
+  tiles.forEach((t, i) => {
+    t.el = h("button", { class: "mtile " + t.kind, type: "button", "aria-label": `${t.kind === "term" ? "Term" : "Meaning"} card ${i + 1}, face down`, onclick: () => flip(t) },
+      h("span", { class: "inner" },
+        h("span", { class: "face back" }, h("span", { class: "mk" }, t.kind === "term" ? "T" : "M"), h("span", { class: "kind" }, t.kind === "term" ? "TERM" : "MEANING")),
+        h("span", { class: "face front" }, h("span", { class: "kind" }, t.kind === "term" ? "TERM" : "MEANING"), h("span", { class: "txt" }, t.text))));
+    grid.append(t.el);
+  });
+  run.power = powerMeter({ max: 2, icon: "👁", label: "Peek", onUse: peek });
+  run.combo = 0;
+  app.stage.replaceChildren(run.hud, run.power.el, run.hint, grid);
+  clock = setInterval(() => { if (run && !run.frozen) { run.secs++; paintHud(); } }, 1000);
+  paintHud();
+}
+
+function paintHud() {
+  const r = run;
+  const kids = [h("div", { class: "progress" }, h("i", { style: `width:${(r.found / r.pairs) * 100}%` })),
+    h("span", { class: "chip" }, "✓ ", h("b", {}, r.found), " / " + r.pairs),
+    h("span", { class: "chip" }, "Flips ", h("b", {}, r.moves)), app.coinChip()];
+  if (r.mode === "challenge") kids.push(h("span", { class: "chip" }, "⏱ ", h("b", {}, Math.floor(r.secs / 60) + ":" + String(r.secs % 60).padStart(2, "0"))));
+  r.hud.replaceChildren(...kids);
+}
+
+function turnBack() {
+  const r = run;
+  for (const t of r.wrong) { t.el.classList.remove("up", "bad"); t.el.setAttribute("aria-label", `${t.kind} card, face down`); }
+  r.wrong = null; r.open = [];
+  r.hint.textContent = "Try another pair.";
+}
+
+async function flip(t) {
+  const r = run; if (!r || r.frozen || t.done) return;
+  if (r.wrong) { turnBack(); if (t.el.classList.contains("up")) return; }
+  if (r.open.includes(t)) return;
+  if (r.open.length === 1 && r.open[0].kind === t.kind) {
+    r.hint.textContent = t.kind === "term" ? "You have a term open. Now pick a green MEANING card." : "You have a meaning open. Now pick a blue TERM card.";
+    t.el.classList.add("nudge"); setTimeout(() => t.el.classList.remove("nudge"), 400);
+    sfx.tap(); return;
   }
-  const initial = saved && CHAPTERS[saved] ? saved : 'ch7';
-  try {
-    localStorage.setItem(LS_CHAPTER, initial);
-  } catch (e) {
-    // private browsing: game still works, chapter just won't persist
+  sfx.tap();
+  t.el.classList.add("up"); t.el.setAttribute("aria-label", t.kind + ": " + t.text);
+  r.open.push(t);
+  say(t.text);
+  if (r.open.length < 2) { r.hint.textContent = t.kind === "term" ? "Now find its meaning (green card)." : "Now find its term (blue card)."; return; }
+
+  r.moves++; paintHud();
+  const [a, b] = r.open;
+  if (a.card.id === b.card.id) {
+    a.done = b.done = true; r.open = []; r.found++; r.combo++;
+    r.power.add(1);
+    { const bb = b.el.getBoundingClientRect(); app.earn(r.combo >= 2 ? 5 : 3, bb.left + bb.width / 2, bb.top); }
+    await wait(250);
+    a.el.classList.add("good"); b.el.classList.add("good"); sfx.good();
+    r.hint.textContent = `✓ ${a.card.term} — matched!`;
+    paintHud();
+    if (r.found === r.pairs) { await wait(700); finish(); }
+  } else {
+    r.wrong = [a, b]; r.combo = 0;
+    a.el.classList.add("bad"); b.el.classList.add("bad"); sfx.bad();
+    if (!r.missed.includes(a.card)) r.missed.push(a.card);
+    r.hint.textContent = "Not a pair. Read them both, then tap any card to keep going.";
   }
-  renderStart(initial);
-})();
+}
+
+async function peek() {
+  const r = run; if (!r) return;
+  if (r.wrong) turnBack();
+  const hidden = r.tiles.filter((t) => !t.done && !r.open.includes(t));
+  r.frozen = true;
+  hidden.forEach((t) => t.el.classList.add("up", "peek"));
+  r.hint.textContent = "👁 Peek! Remember where they are…";
+  await wait(1800);
+  hidden.forEach((t) => t.el.classList.remove("up", "peek"));
+  if (run) { r.frozen = false; r.hint.textContent = "Now find the pairs!"; }
+}
+
+function finish() {
+  const r = run; stop(); stopSpeak();
+  const extra = Math.max(0, r.moves - r.pairs);
+  const score = r.mode === "challenge" ? Math.max(0, 1500 - extra * 40 - r.secs * 3) : Math.max(0, r.pairs * 150 - extra * 20);
+  app.results({ score, correct: r.pairs, total: r.moves, missed: r.missed.slice(0, 6),
+    extra: [[r.moves, "flips"]], title: "All matched!" });
+}
+
+function demo(el) {
+  el.classList.add("m-demo");
+  el.append(h("i", { class: "d1" }, "drive"), h("i", { class: "d2" }, "an inner push toward a need"), h("i", { class: "d3" }), h("i", { class: "d4" }));
+}
