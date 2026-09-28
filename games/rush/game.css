@@ -31,3 +31,6 @@
 .typebar { grid-template-columns: minmax(0, 1fr); }
 .inrow { min-width: 0; }
 .guess { width: 0; }
+.bank { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.bank .sg { min-height: 52px; border-radius: 14px; text-align: center; line-height: 1.2; padding: 8px 10px; }
+.bank .sg.nope { animation: shake .35s; border-color: var(--bad); color: var(--bad); }

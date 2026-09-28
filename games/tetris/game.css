@@ -1,42 +1,27 @@
-.sky {
-  position: relative; height: clamp(170px, 30vh, 280px); flex: none;
-  border-radius: 22px; overflow: hidden; border: 1px solid var(--line);
-  background: linear-gradient(180deg, #13244a 0%, #1a2f5c 60%, #203a6b 100%);
-}
-.stars-bg { position: absolute; inset: 0; opacity: .55;
-  background-image: radial-gradient(2px 2px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 70% 20%, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 40% 70%, #cfe 50%, transparent 51%), radial-gradient(2px 2px at 85% 60%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 10% 85%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 55% 45%, #fff 50%, transparent 51%);
-  animation: drift 40s linear infinite; }
-@keyframes drift { to { background-position: 0 300px; } }
-.ground { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; background: repeating-linear-gradient(90deg, var(--brand) 0 18px, #b77400 18px 36px); opacity: .8; }
-.tile {
-  position: absolute; left: 50%; top: 12px; width: min(84%, 420px);
-  padding: 12px 16px; border-radius: 16px; text-align: center;
-  background: linear-gradient(180deg, #8fdcff, #36a9e6); color: #04243a;
-  box-shadow: 0 6px 0 #1a6f9e, 0 14px 30px rgba(0,0,0,.45);
-  display: grid; gap: 2px; will-change: transform;
-}
-.tile .tl { font-size: .62em; font-weight: 700; letter-spacing: .14em; opacity: .7; }
-.tile .tt { font-family: var(--display); font-weight: 700; font-size: 1.35em; line-height: 1.15; text-wrap: balance; overflow-wrap: anywhere; }
-.tile.waiting { animation: bob 1.2s ease-in-out infinite; }
-@keyframes bob { 50% { margin-top: -6px; } }
-.tile.crash { animation: shake .4s; background: linear-gradient(180deg, #ffb3ad, #ff7b72); box-shadow: 0 6px 0 #a33; }
-.ask { display: grid; gap: 10px; }
-.ask-label { text-align: center; }
+.mq { display: grid; }
+.waitcard.slim { padding: 8px 12px; font-size: .85em; place-content: center; text-align: center; color: var(--muted); border-style: dashed; }
+.okcard { place-content: center; text-align: center; border-color: var(--good) !important; }
+.okcard .big { color: var(--good); font-family: var(--display); font-size: 1.3em; }
+.minewrap { position: relative; height: clamp(300px, 46vh, 460px); flex: none; border-radius: 22px; overflow: hidden; border: 1px solid #5a3f2b; touch-action: none; }
+.mine { display: block; width: 100%; height: 100%; }
+.signs { position: absolute; inset: 0; pointer-events: none; }
+.sign { position: absolute; top: 0; left: 0; pointer-events: auto; display: grid; gap: 2px; justify-items: center; text-align: center;
+  padding: 6px 6px 8px; border-radius: 12px; border: 2px solid #94a3b8; background: rgba(15,23,42,.92); color: var(--term); cursor: pointer;
+  font-weight: 700; font-size: .82em; line-height: 1.2; box-shadow: 0 6px 16px rgba(0,0,0,.5); overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; animation: fade .3s both; }
+.sign .k { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: #1f2937; color: #fff; font-family: var(--display); }
+.sign.chosen { border-color: var(--brand); background: rgba(42,36,19,.95); }
+.sign.chosen .k { background: var(--brand); color: #2a1a00; }
+.sign.dim { opacity: .55; }
+.sign.good { border-color: var(--good); background: rgba(16,60,38,.95); color: #c9f7dc; }
+.sign.bad { border-color: var(--bad); background: rgba(68,25,26,.95); color: #ffd3cf; animation: shake .4s; }
+.mctrl .steer button { min-height: 60px; }
 
-.drop-demo .dd-tile { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 16px; border-radius: 10px;
-  background: linear-gradient(180deg, #8fdcff, #36a9e6); color: #04243a; font-family: var(--display); font-weight: 700; box-shadow: 0 4px 0 #1a6f9e;
-  animation: ddFall 3.2s var(--ease) infinite; }
-.drop-demo .dd-bins { position: absolute; left: 12px; right: 12px; bottom: 12px; display: grid; gap: 6px; }
-.drop-demo .dd-bins i { display: block; height: 14px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); }
-.drop-demo .dd-bins i.win { animation: ddWin 3.2s infinite; }
-@keyframes ddFall { 0% { top: -40px; opacity: 0; } 15% { opacity: 1; } 55% { top: 40px; } 72% { top: 92px; transform: translateX(-50%) scale(.5); opacity: 1; } 78%,100% { top: 92px; opacity: 0; transform: translateX(-50%) scale(.4); } }
-@keyframes ddWin { 0%, 70% { background: var(--surface); border-color: var(--line); } 76%, 95% { background: var(--good-bg); border-color: var(--good); } }
-.sky { touch-action: none; cursor: grab; }
-.tile { width: min(58%, 300px); background: linear-gradient(180deg, var(--ba, #8fdcff), var(--bb, #36a9e6)); }
-.pick { position: absolute; left: 0; top: 0; width: 28px; height: 28px; display: grid; place-items: center; font-style: normal; font-size: 22px; pointer-events: none;
-  filter: drop-shadow(0 2px 6px rgba(255,209,102,.6)); animation: twinkle 1.4s ease-in-out infinite alternate; }
-.pick.spike { color: #ff7b72; font-size: 28px; filter: drop-shadow(0 0 6px rgba(255,80,80,.8)); animation: spin 2.4s linear infinite; }
-.pick.got { opacity: 0; transition: opacity .25s; }
-@keyframes twinkle { to { filter: drop-shadow(0 0 10px rgba(255,209,102,.95)); } }
+.mine-demo { background: repeating-linear-gradient(180deg, #8a5a3b 0 24px, #6f452b 24px 48px); }
+.mine-demo i { position: absolute; font-style: normal; font-size: 22px; }
+.md-gem { left: 22%; top: 30%; } .md-rock { right: 22%; top: 42%; }
+.md-doors { position: absolute; left: 10%; right: 10%; bottom: 18px; display: flex; justify-content: space-around; background: #374151; border-radius: 8px; padding: 4px; }
+.md-doors b { width: 34px; height: 26px; border-radius: 6px; background: #1f2937; display: grid; place-items: center; font-family: var(--display); }
+.md-doors b.win { animation: rdWin 3s infinite; }
+.md-drill { left: 50%; top: 6px; transform: translateX(-50%) rotate(135deg); animation: mdDig 3s ease-in-out infinite; }
+@keyframes mdDig { 0% { top: 4px; left: 50%; } 30% { top: 34px; left: 28%; } 55% { top: 52px; left: 50%; } 85%, 100% { top: 104px; left: 50%; opacity: .3; } }
+@keyframes rdWin { 0%, 70% { background: #1f2937; } 78%, 100% { background: var(--good); color: #042; } }

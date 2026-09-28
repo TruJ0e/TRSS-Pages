@@ -19,3 +19,9 @@
 .ra .steer button { min-height: 72px; }
 .rd-coin { position: absolute; left: 44%; top: 62%; width: 12px; height: 12px; border-radius: 50%; background: #ffd166; box-shadow: 18px 18px 0 #ffd166, 36px 36px 0 #ffd166; animation: rdGate 3s .6s ease-in infinite; }
 .rd-bar { position: absolute; left: 60%; top: 58%; width: 26px; height: 12px; background: repeating-linear-gradient(90deg, #e5484d 0 5px, #fff 5px 10px); animation: rdGate 3s 1.2s ease-in infinite; }
+.roadwrap { height: clamp(300px, 46vh, 480px); touch-action: none; }
+.rq { min-height: 0; }
+.waitcard.slim { padding: 8px 12px; font-size: .85em; }
+.pad4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.pad4 button { min-height: 68px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); font-size: 1.5em; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+.pad4 button:active { background: var(--surface2); border-color: var(--brand); transform: scale(.96); }

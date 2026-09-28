@@ -5,7 +5,7 @@
  * mix-ups, a right letter locks in green, a wrong letter just bounces back
  * (nothing you've built is wiped), and hints are free in Relaxed mode.
  */
-import { createApp, makeDeck, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, powerMeter } from "../common/kit.js?v=4";
+import { createApp, makeDeck, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, powerMeter } from "../common/kit.js?v=5";
 
 let run = null;
 const ok = (t) => /^[A-Za-z][A-Za-z '\-]*$/.test(t) && t.split(/[\s-]+/).length <= 3 &&
@@ -82,12 +82,20 @@ function next() {
   r.q.msg = h("div", { class: "smsg", role: "status" });
   r.body.replaceChildren(
     h("div", { class: "qcard meaning" }, h("div", { class: "label" }, h("span", {}, "Meaning"), sayBtn(defOf(card))), h("div", { class: "big" }, defOf(card)),
-      h("div", { class: "cue" }, `${seq.length} letters · starts with “${seq[0].ch}”`)),
+      h("div", { class: "cue" }, `${seq.length} letters · the first one is done for you`)),
     slotsWrap, r.q.msg, tray,
     h("div", { class: "row" }, hintBtn, sayBtn(card.term, "Hear the word"), showBtn));
   r.q.slotsWrap = slotsWrap;
+  // the first letter starts in place so every word has a foothold
+  { const f = words[seq[0].wi].tiles.find((x) => x.ch === seq[0].ch); if (f) { q0(f); } }
   paintSlots(); paintHud();
   say(defOf(card));
+}
+
+function q0(t) {
+  const q = run.q;
+  t.used = true; t.el.classList.add("used"); t.el.disabled = true; if (t.gold) { t.gold = false; t.el.classList.remove("gold"); }
+  q.pos = 1;
 }
 
 function paintSlots() {

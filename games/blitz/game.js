@@ -3,7 +3,7 @@
  * Relaxed: 10 statements, no clock. Challenge: 60 seconds, streak bonus.
  * A wrong answer opens the Learn-it card (the clock stops while it's open).
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, powerMeter } from "../common/kit.js?v=4";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, powerMeter } from "../common/kit.js?v=5";
 
 const ROUND = 10, SECONDS = 60;
 let run = null, timer = 0;
@@ -77,7 +77,7 @@ function next() {
       h("div", { class: "means", "aria-hidden": "true" }, "means…"),
       h("div", { class: "qcard meaning" }, h("div", { class: "label" }, h("span", {}, "Meaning"), sayBtn(defOf(shown))), h("div", { class: "big" }, defOf(shown)))),
     h("div", { class: "tfrow" }, fBtn, tBtn));
-  say(card.term + ". means: " + defOf(shown));
+  say([card.term, "means", defOf(shown)]);
 }
 
 async function answer(saysTrue) {

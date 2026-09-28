@@ -4,16 +4,16 @@
  * A wrong pair stays face-up until the player taps to continue, so there's
  * always time to read. Relaxed: 4 pairs, no clock. Challenge: 6 pairs + clock.
  */
-import { createApp, shuffle, h, wait, defOf, say, sfx, stopSpeak, powerMeter } from "../common/kit.js?v=4";
+import { createApp, shuffle, h, wait, defOf, say, sfx, stopSpeak, powerMeter } from "../common/kit.js?v=5";
 
 let run = null, clock = 0;
 
 const app = createApp({
   id: "match", title: "Memory Match", emoji: "🃏",
-  tagline: "Flip two cards. Find each term and its meaning.",
+  tagline: "Munch the monster is hungry! Feed it matching pairs.",
   steps: ["Blue cards are terms. Green cards are meanings.",
-          "Flip one of each. If they belong together, they stay.",
-          "If not, read them both, then tap to turn them back."],
+          "Flip one of each. A matching pair gets fed to Munch!",
+          "Find the ✨ golden pair for bonus coins. Keep a combo going to make Munch dance."],
   modes: { relaxed: "4 pairs. No clock.", challenge: "6 pairs. Beat the clock." },
   minCards: 6, demo,
   onStart: begin,
@@ -43,7 +43,12 @@ function begin({ cards, mode, focus }) {
   });
   run.power = powerMeter({ max: 2, icon: "👁", label: "Peek", onUse: peek });
   run.combo = 0;
-  app.stage.replaceChildren(run.hud, run.power.el, run.hint, grid);
+  run.munch = h("div", { class: "munch", "aria-hidden": "true" },
+    h("div", { class: "mbody" }, h("i", { class: "eye l" }), h("i", { class: "eye r" }), h("i", { class: "mouth" }), h("i", { class: "belly" })),
+    h("div", { class: "bubble" }, "I'm hungry!"));
+  const gold = tiles[(Math.random() * tiles.length) | 0].card.id;
+  tiles.forEach((t) => { if (t.card.id === gold) { t.gold = true; t.el.classList.add("gold"); } });
+  app.stage.replaceChildren(run.hud, run.munch, run.power.el, run.hint, grid);
   clock = setInterval(() => { if (run && !run.frozen) { run.secs++; paintHud(); } }, 1000);
   paintHud();
 }
@@ -87,15 +92,41 @@ async function flip(t) {
     { const bb = b.el.getBoundingClientRect(); app.earn(r.combo >= 2 ? 5 : 3, bb.left + bb.width / 2, bb.top); }
     await wait(250);
     a.el.classList.add("good"); b.el.classList.add("good"); sfx.good();
+    feed(a, b);
     r.hint.textContent = `✓ ${a.card.term} — matched!`;
     paintHud();
     if (r.found === r.pairs) { await wait(700); finish(); }
   } else {
     r.wrong = [a, b]; r.combo = 0;
     a.el.classList.add("bad"); b.el.classList.add("bad"); sfx.bad();
+    mood("sad", ["Hmm, not a pair…", "Those don't go together!", "Blech, try again!"][(Math.random() * 3) | 0]);
     if (!r.missed.includes(a.card)) r.missed.push(a.card);
     r.hint.textContent = "Not a pair. Read them both, then tap any card to keep going.";
   }
+}
+
+function mood(m, text) {
+  const r = run; if (!r) return;
+  const el = r.munch; el.classList.remove("happy", "sad", "chomp", "dance"); void el.offsetWidth; el.classList.add(m);
+  if (text) el.querySelector(".bubble").textContent = text;
+}
+function feed(a, b) {
+  const r = run, mouth = r.munch.querySelector(".mouth").getBoundingClientRect();
+  for (const t of [a, b]) {
+    const from = t.el.getBoundingClientRect();
+    const ghost = h("div", { class: "ghostcard " + t.kind }, t.kind === "term" ? t.text : "✓");
+    Object.assign(ghost.style, { left: from.left + "px", top: from.top + "px", width: from.width + "px", height: from.height + "px" });
+    document.body.append(ghost);
+    ghost.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${mouth.left + mouth.width / 2 - from.left - from.width / 2}px, ${mouth.top - from.top - from.height / 2}px) scale(.1) rotate(200deg)`, opacity: .6 }],
+      { duration: 650, easing: "cubic-bezier(.5,0,.7,.4)", fill: "forwards" }).finished.then(() => ghost.remove());
+  }
+  setTimeout(() => {
+    if (!run) return;
+    const lines = r.combo >= 3 ? ["🔥 Combo! Yum yum!", "I LOVE this!", "More more more!"] : ["Yum!", "Delicious!", "Tasty term!", "Mmm, " + a.card.term + "!"];
+    mood(r.combo >= 3 ? "dance" : "chomp", lines[(Math.random() * lines.length) | 0]);
+    r.munch.style.setProperty("--grow", 1 + r.found * 0.06);
+    if (a.gold) { const m = r.munch.getBoundingClientRect(); app.earn(8, m.left + m.width / 2, m.top); app.toast("✨ Golden pair! +8 coins"); }
+  }, 600);
 }
 
 async function peek() {
@@ -111,7 +142,12 @@ async function peek() {
 }
 
 function finish() {
-  const r = run; stop(); stopSpeak();
+  const r = run;
+  mood("dance", "BURP! 😋 Thanks for the feast!"); sfx.win();
+  setTimeout(() => finishNow(r), 1300);
+}
+function finishNow(r) {
+  if (run !== r) return; stop(); stopSpeak();
   const extra = Math.max(0, r.moves - r.pairs);
   const score = r.mode === "challenge" ? Math.max(0, 1500 - extra * 40 - r.secs * 3) : Math.max(0, r.pairs * 150 - extra * 20);
   app.results({ score, correct: r.pairs, total: r.moves, missed: r.missed.slice(0, 6),

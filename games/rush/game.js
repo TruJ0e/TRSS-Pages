@@ -6,7 +6,7 @@
  * Relaxed: one meaning at a time, 10 words, and a meaning that lands just
  * waits. Challenge: up to 3 at once, faster and faster, 3 hearts.
  */
-import { createApp, makeDeck, h, wait, defOf, say, sfx, editDistance, unlockAudio, powerMeter } from "../common/kit.js?v=4";
+import { createApp, makeDeck, h, wait, defOf, say, sfx, editDistance, unlockAudio, powerMeter, shuffle, pickDistractors } from "../common/kit.js?v=5";
 
 const ROUND = 10;
 let run = null, raf = 0;
@@ -16,8 +16,8 @@ const app = createApp({
   id: "rush", title: "Type Rush", emoji: "⌨️",
   tagline: "Type the term that matches each falling meaning.",
   steps: ["A meaning drifts down the screen and is read aloud.",
-          "Type the term. Close spelling still counts.",
-          "Stuck? After 2 letters, tap a suggestion."],
+          "Tap the matching term in the word bank, or type it.",
+          "Close spelling still counts when you type."],
   modes: { relaxed: "One at a time. It waits for you.", challenge: "Up to 3 at once. 3 hearts." },
   minCards: 4, demo,
   onStart: begin,
@@ -36,14 +36,14 @@ function begin({ cards, mode, focus }) {
   run.field = h("div", { class: "field" }, h("div", { class: "deadline" }));
   run.input = h("input", { class: "guess", id: "guess", type: "text", autocomplete: "off", autocapitalize: "off", autocorrect: "off",
     spellcheck: "false", enterkeyhint: "done", placeholder: "Type the term…", "aria-label": "Type the term" });
-  run.sugg = h("div", { class: "sugg", "aria-label": "Suggestions" });
+  run.sugg = h("div", { class: "sugg bank", role: "group", "aria-label": "Word bank" });
   run.msg = h("div", { class: "rmsg", role: "status" });
   const go = h("button", { class: "btn primary gobtn", type: "button", onclick: () => submit(true) }, "Enter");
   const helpBtn = h("button", { class: "btn ghost gobtn", type: "button", onclick: showMe, title: "Show me the answer" }, "🙈");
   run.slow = 0;
   run.power = powerMeter({ max: 3, icon: "🐢", label: "Slow-mo", onUse: () => { run.slow = 8; app.toast("🐢 Everything slows down for 8 seconds!"); run.field.classList.add("slowmo"); } });
   app.stage.replaceChildren(run.hud, run.power.el, run.field, h("div", { class: "typebar" }, h("div", { class: "inrow" }, run.input, go, helpBtn), run.sugg, run.msg));
-  run.input.addEventListener("input", () => { unlockAudio(); submit(false); paintSugg(); });
+  run.input.addEventListener("input", () => { unlockAudio(); submit(false); });
   run.input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(true); } });
   if (window.visualViewport) visualViewport.addEventListener("resize", fit);
   fit(); paintHud(); spawn();
@@ -77,6 +77,7 @@ function spawn() {
   r.field.append(el);
   const it = { card, el, y: 0 };
   r.items.push(it);
+  paintBank();
   if (r.items.length === 1) say(defOf(card));
   r.wrongTries = 0;
 }
@@ -145,7 +146,7 @@ async function clear(it, exact) {
   app.floater(b.left + b.width / 2, b.top + 10, "+" + pts);
   it.el.classList.add("cleared"); setTimeout(() => it.el.remove(), 400);
   sfx.good();
-  r.input.value = ""; r.sugg.replaceChildren();
+  r.input.value = ""; paintBank();
   r.msg.replaceChildren(exact ? h("span", { class: "okw" }, "✓ " + it.card.term) : h("span", {}, "Close enough! It's spelled ", h("b", { class: "okw" }, it.card.term)));
   if (r.mode === "challenge" && r.correct % 5 === 0) r.speed *= 1.12;
   paintHud();
@@ -159,7 +160,7 @@ async function clear(it, exact) {
 async function landed(it) {
   const r = run;
   r.items = r.items.filter((x) => x !== it);
-  it.el.classList.add("crash"); setTimeout(() => it.el.remove(), 400);
+  it.el.classList.add("crash"); setTimeout(() => it.el.remove(), 400); paintBank();
   r.hearts--; r.n++; r.missed.push(it.card); r.deck.miss(it.card); sfx.bad(); paintHud();
   r.frozen = true;
   await app.learn(it.card, { title: "That one landed", note: `${r.hearts} ${r.hearts === 1 ? "heart" : "hearts"} left.` });
@@ -173,7 +174,7 @@ async function showMe() {
   const r = run; if (!r || !r.items.length) return;
   const it = r.items.reduce((a, b) => (a.y > b.y ? a : b));
   r.frozen = true;
-  r.items = r.items.filter((x) => x !== it); it.el.remove();
+  r.items = r.items.filter((x) => x !== it); it.el.remove(); paintBank();
   r.n++; r.missed.push(it.card); r.deck.miss(it.card);
   if (r.mode === "challenge") r.hearts--;
   paintHud();
@@ -183,6 +184,25 @@ async function showMe() {
   if ((r.mode === "relaxed" && r.n >= ROUND) || r.hearts <= 0) return finish();
   if (!r.items.length) spawn();
   r.input.focus({ preventScroll: true });
+}
+
+/* Word bank: always 5 terms, including the answer for every falling meaning. */
+function paintBank() {
+  const r = run; if (!r) return;
+  const need = r.items.map((i) => i.card);
+  const keep = (r.bankCards || []).filter((c) => need.includes(c) || Math.random() < 0.5);
+  let pool = [...new Set([...need, ...keep])];
+  if (pool.length < 5) pool = pool.concat(pickDistractors(r.cards, need[0] ? need[0].id : "", 12).filter((c) => !pool.some((p) => p.term === c.term)).slice(0, 5 - pool.length));
+  r.bankCards = shuffle(pool.slice(0, Math.max(5, need.length)));
+  r.sugg.replaceChildren(...r.bankCards.map((c) => h("button", { class: "sg", type: "button",
+    onmousedown: (e) => e.preventDefault(),
+    onclick: (e) => {
+      unlockAudio();
+      const hit = r.items.find((i) => i.card.term === c.term);
+      if (hit) return clear(hit, true);
+      const b = e.currentTarget; r.wrongTries++; sfx.bad(); b.classList.add("nope"); setTimeout(() => b.classList.remove("nope"), 400);
+      r.msg.textContent = "That word doesn't match a falling meaning. Try another.";
+    } }, c.term)));
 }
 
 function paintSugg() {

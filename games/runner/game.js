@@ -1,24 +1,32 @@
-/* Term Runner — an endless runner with study gates.
+/* Term Runner — a Subway-Surfers-style runner with study gates.
  *
- * Between gates it's a real runner: switch lanes (swipe, tap the road's
- * left/right side, ◀ ▶ buttons or arrow keys) to dodge barriers, collect
- * coin trails and grab ⚡ magnet power-ups. Every so often a gate with lanes
- * A / B / C appears; the meaning is shown above and the three terms as big
- * buttons below. Tap the right term and your runner takes that lane.
- * Relaxed: 10 gates, the runner waits at each gate, barriers only cost coins.
- * Challenge: gates keep coming, speed climbs, barriers and wrong gates cost hearts.
+ * Controls: swipe ← → to change lanes, swipe ↑ to jump, swipe ↓ to slide.
+ * Also the four on-screen buttons and the arrow keys / WASD / space.
+ * Obstacles: hurdles (jump), overhead bars (slide), trains (change lane).
+ * Pickups: coin lines and arcs, 🧲 magnet, ✖2 double coins, 🛡 shield.
+ * Every so often a gate spans the track with lanes A / B / C; the meaning is
+ * shown above and the terms as buttons below — tap one and the runner takes
+ * that lane through the gate.
+ * Relaxed: 10 gates, the runner stops before each gate and waits, crashes
+ * only cost coins. Challenge: faster, endless, crashes and wrong gates cost hearts.
+ *
+ * Rendering is a real perspective projection (world x/y/z -> screen) so
+ * everything scales, overlaps and fogs correctly.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion } from "../common/kit.js?v=4";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion } from "../common/kit.js?v=5";
 
 const ROUND = 10;
+const LANE = 2.2;                  // lane width in world units
+const CAM_H = 3.4, CAM_BACK = 4.6; // camera height / distance behind the runner
+const FAR = 90;                    // draw distance
 let run = null, raf = 0;
 
 const app = createApp({
   id: "runner", title: "Term Runner", emoji: "🏃",
-  tagline: "Dodge, collect coins, and run through the gate with the right term.",
-  steps: ["Swipe or tap left/right to change lanes. Dodge the ⛔ barriers and grab 🪙 coins.",
-          "When a gate appears, read the meaning at the top.",
-          "Tap the matching term. Your runner dashes into that lane."],
+  tagline: "Jump, slide and dodge down the tracks — then dash through the gate with the right term.",
+  steps: ["Swipe ← → to switch lanes, ↑ to jump hurdles, ↓ to slide under bars. Trains? Change lanes!",
+          "Grab 🪙 coins and power-ups: 🧲 magnet, ✖2 double coins, 🛡 shield.",
+          "At each gate, read the meaning and tap the matching term."],
   modes: { relaxed: "10 gates. Runner waits at each gate.", challenge: "Faster and faster. 3 hearts." },
   minCards: 4, demo,
   onStart: begin,
@@ -27,55 +35,33 @@ const app = createApp({
   onQuit: stop,
 });
 
-function stop() { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); window.removeEventListener("keydown", onKey); run = null; }
+function stop() {
+  cancelAnimationFrame(raf);
+  window.removeEventListener("resize", resize); window.removeEventListener("keydown", onKey);
+  run = null;
+}
 
+/* ================================================================== setup */
 function begin({ cards, mode, focus }) {
   stop();
-  const canvas = h("canvas", { class: "road", "aria-label": "Road. Tap left or right side to change lanes." });
-  const sk = app.skin("runner");
-  run = { mode, cards, deck: makeDeck(focus ? [...new Set([...focus, ...cards])] : cards), canvas, ctx: canvas.getContext("2d"), sk,
-          n: 0, correct: 0, score: 0, streak: 0, hearts: 3, shield: mode === "challenge" && app.has("boost-shield"), missed: [], frozen: false, last: performance.now(),
-          dist: 0, lane: 1, px: 0, lean: 0, stumble: 0, shake: 0, particles: [], objs: [], gate: null, nextGateIn: 7, spawnIn: 1, t: 0, magnet: 0, dodged: 0,
-          pace: 1, gateS: 7.5 };
+  const canvas = h("canvas", { class: "road", "aria-label": "Track. Swipe to move: left, right, up to jump, down to slide." });
+  run = {
+    mode, cards, deck: makeDeck(focus ? [...new Set([...focus, ...cards])] : cards), canvas, ctx: canvas.getContext("2d"),
+    sk: app.skin("runner"), n: 0, correct: 0, score: 0, streak: 0, hearts: 3, missed: [], frozen: false, last: performance.now(),
+    shield: mode === "challenge" && app.has("boost-shield"), magnetT: 0, doubleT: 0, invuln: 0,
+    dist: 0, speed: 0, t: 0, laneF: 0, lane: 0, y: 0, vy: 0, slideT: 0, stumble: 0, shake: 0,
+    objs: [], parts: [], spawnZ: 26, gate: null, nextGateAt: mode === "relaxed" ? 110 : 150, dodged: 0,
+  };
   run.hud = h("div", { class: "hud" });
   run.q = h("div", { class: "rq" });
   run.a = h("div", { class: "ra" });
   run.wrap = h("div", { class: "roadwrap" }, canvas);
   app.stage.replaceChildren(run.hud, run.q, run.wrap, run.a);
-  bindRoad(canvas);
+  bindTouch(canvas);
   window.addEventListener("resize", resize);
   window.addEventListener("keydown", onKey);
   resize(); paintHud(); showRunning();
-  run.px = laneX(1, 0);
   raf = requestAnimationFrame(loop);
-}
-
-function showRunning() {
-  const r = run; if (!r) return;
-  r.q.replaceChildren(h("div", { class: "qcard waitcard" }, h("div", { class: "big" }, "Dodge ⛔ · Grab 🪙 · Gate coming!")));
-  const mv = (d) => h("button", { type: "button", "aria-label": d < 0 ? "Move left" : "Move right", onpointerdown: (e) => { e.preventDefault(); move(d); } }, d < 0 ? "◀" : "▶");
-  r.a.replaceChildren(h("div", { class: "steer" }, mv(-1), mv(1)));
-}
-
-function move(d) {
-  const r = run; if (!r || r.frozen || (r.gate && r.gate.picked < 0)) return;
-  const n = Math.max(0, Math.min(2, r.lane + d));
-  if (n !== r.lane) { r.lane = n; sfx.tap(); }
-}
-function onKey(e) {
-  if (!run || document.querySelector(".scrim")) return;
-  if (run.gate) return;               // during a gate, A/B/C keys pick answers (answerList)
-  if (e.key === "ArrowLeft" || e.key === "a") move(-1);
-  if (e.key === "ArrowRight" || e.key === "d") move(1);
-}
-function bindRoad(cv) {
-  let sx = 0, sy = 0;
-  cv.addEventListener("pointerdown", (e) => { sx = e.clientX; sy = e.clientY; });
-  cv.addEventListener("pointerup", (e) => {
-    const dx = e.clientX - sx, dy = e.clientY - sy;
-    if (Math.abs(dx) > 24 && Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1);
-    else { const b = cv.getBoundingClientRect(); move(e.clientX - b.left < b.width / 2 ? -1 : 1); }
-  });
 }
 
 function resize() {
@@ -84,138 +70,149 @@ function resize() {
   r.W = r.wrap.clientWidth; r.H = r.wrap.clientHeight;
   r.canvas.width = r.W * dpr; r.canvas.height = r.H * dpr;
   r.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  r.horizon = r.H * 0.26; r.playerY = r.H * 0.9; r.spread = Math.min(r.W * 0.3, 170);
-  r.stars = Array.from({ length: 60 }, () => ({ x: Math.random() * r.W, y: Math.random() * r.horizon, s: Math.random() * 1.6 + .4, p: Math.random() * 6 }));
+  r.horizon = r.H * 0.25;
+  r.F = r.W * 1.05;
+  r.sky = null;
 }
-const scaleAt = (t) => 1 - 0.7 * t;
-const depthY = (t) => run.playerY - (run.playerY - run.horizon) * t;
-const laneX = (l, t) => run.W / 2 + (l - 1) * run.spread * scaleAt(t);
 
+/* ================================================================ controls */
+function showRunning() {
+  const r = run; if (!r) return;
+  r.q.replaceChildren(h("div", { class: "qcard waitcard slim" }, h("div", {}, "⬅ ➡ switch · ⬆ jump · ⬇ slide · a gate is coming!")));
+  const b = (dir, label, aria) => h("button", { type: "button", "aria-label": aria, onpointerdown: (e) => { e.preventDefault(); act(dir); } }, label);
+  r.a.replaceChildren(h("div", { class: "pad4" }, b("left", "◀", "Move left"), b("up", "▲", "Jump"), b("down", "▼", "Slide"), b("right", "▶", "Move right")));
+}
+function act(dir) {
+  const r = run; if (!r || r.frozen) return;
+  if (r.gate && r.gate.picked < 0 && (dir === "left" || dir === "right")) return;   // at a gate, answering picks the lane
+  if (dir === "left" && r.lane > -1) { r.lane--; sfx.tap(); }
+  else if (dir === "right" && r.lane < 1) { r.lane++; sfx.tap(); }
+  else if (dir === "up" && r.y <= 0.001) { r.vy = 9.2; r.slideT = 0; sfx.jump(); }
+  else if (dir === "down") { if (r.y > 0.05) r.vy = -14; r.slideT = 0.75; sfx.whoosh(); }
+}
+function onKey(e) {
+  if (!run || document.querySelector(".scrim")) return;
+  const k = e.key;
+  if (run.gate && run.gate.picked < 0 && /^[abc123]$/i.test(k)) return;
+  if (k === "ArrowLeft" || k === "a") act("left");
+  else if (k === "ArrowRight" || k === "d") act("right");
+  else if (k === "ArrowUp" || k === "w" || k === " ") { e.preventDefault(); act("up"); }
+  else if (k === "ArrowDown" || k === "s") { e.preventDefault(); act("down"); }
+}
+function bindTouch(cv) {
+  let sx = 0, sy = 0;
+  cv.addEventListener("pointerdown", (e) => { sx = e.clientX; sy = e.clientY; });
+  cv.addEventListener("pointerup", (e) => {
+    const dx = e.clientX - sx, dy = e.clientY - sy, ax = Math.abs(dx), ay = Math.abs(dy);
+    if (Math.max(ax, ay) < 18) { const b = cv.getBoundingClientRect(); const x = (e.clientX - b.left) / b.width; act(x < 0.33 ? "left" : x > 0.67 ? "right" : "up"); return; }
+    if (ax > ay) act(dx > 0 ? "right" : "left"); else act(dy < 0 ? "up" : "down");
+  });
+}
+
+/* ==================================================================== HUD */
 function paintHud() {
   const r = run;
   const kids = r.mode === "relaxed"
     ? [h("span", { class: "chip" }, "🚪 ", h("b", {}, Math.min(r.n + 1, ROUND)), " / " + ROUND)]
-    : [h("span", { class: "chip" }, "❤️".repeat(Math.max(0, r.hearts)) + "🤍".repeat(3 - Math.max(0, r.hearts)) + (r.shield ? " 🛡" : ""))];
+    : [h("span", { class: "chip" }, "❤️".repeat(Math.max(0, r.hearts)) + "🤍".repeat(3 - Math.max(0, r.hearts)))];
   kids.push(app.coinChip(), h("span", { class: "chip" }, "⭐ ", h("b", {}, r.score)));
   if (r.streak >= 2) kids.push(h("span", { class: "chip hot" }, "🔥 ", h("b", {}, r.streak)));
-  if (r.magnet > 0) kids.push(h("span", { class: "chip hot" }, "🧲"));
+  const pw = [];
+  if (r.magnetT > 0) pw.push("🧲"); if (r.doubleT > 0) pw.push("✖2"); if (r.shield) pw.push("🛡");
+  if (pw.length) kids.push(h("span", { class: "chip hot" }, pw.join(" ")));
   r.hud.replaceChildren(...kids);
 }
 
-/* ------------------------------------------------------------ road objects */
-function spawnPattern() {
-  const r = run, lanes = [0, 1, 2];
-  const roll = Math.random();
-  if (roll < 0.45) {                                  // coin trail in one lane
-    const l = lanes[(Math.random() * 3) | 0];
-    for (let i = 0; i < 5; i++) r.objs.push({ kind: "coin", lane: l, t: 1 + i * 0.07 });
-  } else if (roll < 0.85) {                           // barrier(s) + coins in a free lane
-    const free = (Math.random() * 3) | 0;
-    const blocks = lanes.filter((l) => l !== free);
-    const count = r.mode === "challenge" && r.dist > 250 && Math.random() < 0.5 ? 2 : 1;
-    shuffle(blocks).slice(0, count).forEach((l) => r.objs.push({ kind: "bar", lane: l, t: 1 }));
-    for (let i = 0; i < 3; i++) r.objs.push({ kind: "coin", lane: free, t: 1.02 + i * 0.07 });
-  } else {                                            // power-up
-    r.objs.push({ kind: "mag", lane: (Math.random() * 3) | 0, t: 1 });
-  }
-}
-
-function hitObjects(dt, speed) {
+/* ================================================================= spawning */
+const PATTERNS_EASY = [
+  ["low", null, null], [null, "high", null], [null, null, "train"], ["train", null, null],
+  [null, "low", null], ["high", null, null], [null, null, "low"], [null, "train", null],
+];
+const PATTERNS_HARD = [
+  ["low", "low", "low"], ["high", "high", "high"], ["train", "train", null], [null, "train", "train"],
+  ["train", "low", "train"], ["high", "train", "low"], ["low", "high", "train"], ["train", null, "train"],
+];
+function spawnRow(z) {
   const r = run;
-  for (const o of r.objs) {
-    o.t -= dt * speed / 3.2;
-    if (r.magnet > 0 && o.kind === "coin" && o.t < 0.35) o.lane += (r.lane - o.lane) * Math.min(1, dt * 8);
-    if (!o.done && o.t < 0.035 && o.t > -0.04 && Math.abs(o.lane - r.lane) < 0.5) {
-      o.done = true;
-      const b = r.wrap.getBoundingClientRect();
-      if (o.kind === "coin") { app.earn(1); burst(laneX(r.lane, 0), r.playerY - 50, "#ffd166", 6); r.score += 5; }
-      else if (o.kind === "mag") { r.magnet = 8; sfx.power(); app.floater(b.left + r.px, b.top + r.playerY - 100, "🧲 Magnet!", "#c4b5fd"); paintHud(); }
-      else if (o.kind === "bar") { crash(); if (!run) return; }
-    }
-    if (o.kind === "bar" && !o.done && !o.passed && o.t < -0.04) { o.passed = true; r.dodged++; }
+  const hard = r.mode === "challenge" && r.dist > 120;
+  const pool = hard && Math.random() < 0.6 ? PATTERNS_HARD : PATTERNS_EASY;
+  const pat = pool[(Math.random() * pool.length) | 0];
+  pat.forEach((kind, i) => {
+    const lane = i - 1;
+    if (kind === "train") r.objs.push({ kind, lane, z, len: 7 + Math.random() * 7, hue: (Math.random() * 3) | 0 });
+    else if (kind) r.objs.push({ kind, lane, z, len: 0.5 });
+  });
+  const free = pat.map((k, i) => (k ? null : i - 1)).filter((x) => x !== null);
+  const low = pat.findIndex((k) => k === "low");
+  if (low >= 0 && Math.random() < 0.6) {
+    for (let i = 0; i < 5; i++) r.objs.push({ kind: "coin", lane: low - 1, z: z - 2.4 + i * 1.2, y: 0.7 + Math.sin((i / 4) * Math.PI) * 1.6 });
+  } else if (free.length) {
+    const l = free[(Math.random() * free.length) | 0];
+    for (let i = 0; i < 6; i++) r.objs.push({ kind: "coin", lane: l, z: z + i * 1.4, y: 0.7 });
   }
-  r.objs = r.objs.filter((o) => o.t > -0.1 && !(o.done && o.kind !== "bar"));
-}
-
-function crash() {
-  const r = run;
-  r.stumble = 1; r.shake = 12; r.streak = 0; sfx.hurt();
-  burst(r.px, r.playerY - 40, "#ff7b72", 18);
-  const b = r.wrap.getBoundingClientRect();
-  if (r.mode === "challenge") {
-    if (r.shield) { r.shield = false; app.floater(b.left + r.px, b.top + r.playerY - 100, "🛡 Saved!", "#93c5fd"); }
-    else { r.hearts--; app.floater(b.left + r.px, b.top + r.playerY - 100, "💥 Ouch!", "#ff7b72"); }
-    paintHud();
-    if (r.hearts <= 0) finish();
-  } else {
-    const lose = Math.min(app.coins, 3);
-    if (lose) app.earn(-lose);
-    app.floater(b.left + r.px, b.top + r.playerY - 100, lose ? `💥 −${lose} 🪙` : "💥 Bump!", "#ff7b72");
-    r.pace = 0.5;
+  if (Math.random() < 0.12) {
+    const l = free.length ? free[0] : 0;
+    r.objs.push({ kind: ["magnet", "double", "shieldp"][(Math.random() * 3) | 0], lane: l, z: z + 10, y: 0.9 });
   }
 }
 
-/* ------------------------------------------------------------------ gates */
+/* ==================================================================== gates */
 function openGate() {
   const r = run;
   const card = r.deck.next();
   const opts = shuffle([card, ...pickDistractors(r.cards, card.id, 2)]);
-  r.gate = { card, opts, correct: opts.indexOf(card), t: 1, picked: -1 };
+  r.gate = { card, opts, correct: opts.indexOf(card), z: 40, picked: -1 };
   r.q.replaceChildren(h("div", { class: "qcard meaning" }, h("div", { class: "label" }, h("span", {}, "🚪 Which term means…"), sayBtn(defOf(card))), h("div", { class: "big" }, defOf(card))));
   r.a.replaceChildren(answerList(opts.map((c, i) => ({ label: c.term, i })), { kind: "term", onPick: (o, btn, btns) => choose(o.i, btn, btns) }));
   sfx.whoosh();
   say(defOf(card));
 }
-
 function choose(i, btn, btns) {
   const r = run, g = r.gate; if (!g || g.picked >= 0 || r.frozen) return;
   g.picked = i; g.btns = btns; g.btn = btn;
   btns.forEach((b, k) => { b.disabled = true; if (k !== i) b.classList.add("dim"); });
   btn.classList.add("chosen");
-  if (i !== r.lane) { r.lane = i; sfx.whoosh(); }
+  r.lane = i - 1; r.slideT = 0;
+  sfx.whoosh();
 }
-
 async function resolveGate() {
   const r = run, g = r.gate;
+  r.gate = null;
   const ok = g.picked === g.correct;
   r.n++;
   if (ok) {
     r.correct++; r.streak++; r.deck.hit(g.card);
     const pts = 100 + Math.min(r.streak - 1, 5) * 25; r.score += pts;
     g.btn.classList.remove("chosen"); g.btn.classList.add("good");
-    burst(laneX(g.correct, 0.05), depthY(0.05) - 60, "#34d17c", 30); sfx.good();
-    const b = r.wrap.getBoundingClientRect(); app.floater(b.left + r.px, b.top + r.playerY - 90, "+" + pts);
+    burst(r.laneF * LANE, 1.5, 1.5, "#34d17c", 40); sfx.good();
+    const b = r.wrap.getBoundingClientRect(); app.floater(b.left + b.width / 2, b.top + b.height * 0.55, "+" + pts);
     app.earn(5 + Math.min(r.streak, 5));
-    r.gate = null; paintHud();
+    paintHud();
     r.q.replaceChildren(h("div", { class: "qcard term okcard" }, h("div", { class: "big" }, "✓ ", g.card.term)));
-    if (r.mode === "challenge") r.gateS = Math.max(4.5, r.gateS - 0.2);
   } else {
-    r.streak = 0; r.stumble = 1; r.shake = 12; sfx.bad();
+    r.streak = 0; r.stumble = 1; r.shake = 14; sfx.bad();
     if (r.mode === "challenge") { if (r.shield) r.shield = false; else r.hearts--; }
     r.missed.push(g.card); r.deck.miss(g.card);
     if (g.btns) g.btns.forEach((b, k) => { if (k === g.correct) { b.classList.remove("dim"); b.classList.add("good"); } if (k === g.picked) { b.classList.remove("chosen"); b.classList.add("bad"); } });
-    burst(laneX(r.lane, 0.05), depthY(0.05) - 60, "#ff7b72", 20);
-    r.gate = null; paintHud();
+    burst(r.laneF * LANE, 1.2, 1, "#ff7b72", 26);
+    paintHud();
     r.frozen = true;
-    await wait(600);
+    await wait(550);
     await app.learn(g.card, { chosen: g.picked >= 0 ? g.opts[g.picked].term : null, title: g.picked < 0 ? "Time's up — here it is" : undefined,
       note: r.mode === "challenge" ? `${r.hearts} ${r.hearts === 1 ? "heart" : "hearts"} left.` : null });
     if (!run) return;
     r.frozen = false; r.last = performance.now();
   }
-  r.nextGateIn = r.mode === "relaxed" ? 9 + Math.random() * 3 : Math.max(6, 11 - r.n * 0.3);
+  r.nextGateAt = r.dist + (r.mode === "relaxed" ? 100 + Math.random() * 20 : Math.max(100, 160 - r.n * 4));
+  r.spawnZ = 22;
   if ((r.mode === "relaxed" && r.n >= ROUND) || r.hearts <= 0) { await wait(ok ? 800 : 0); return finish(); }
   setTimeout(() => { if (run && !run.gate) showRunning(); }, ok ? 900 : 0);
 }
 
-function burst(x, y, c, n) {
-  for (let i = 0; i < n; i++) run.particles.push({ x, y, vx: (Math.random() - .5) * 340, vy: -80 - Math.random() * 240, life: .6 + Math.random() * .5, c });
-}
-
-/* ------------------------------------------------------------------- loop */
+/* =================================================================== update */
 function loop(now) {
   const r = run; if (!r) return;
-  const dt = Math.min(0.05, (now - r.last) / 1000); r.last = now;
+  const dt = Math.min(0.04, (now - r.last) / 1000); r.last = now;
   if (!r.frozen) update(dt);
   if (run) draw();
   raf = requestAnimationFrame(loop);
@@ -223,123 +220,296 @@ function loop(now) {
 
 function update(dt) {
   const r = run; r.t += dt;
-  r.pace = Math.min(1, r.pace + dt * 0.6);
-  const base = r.mode === "challenge" ? Math.min(1.9, 1 + r.dist / 900) : Math.min(1.35, 1 + r.dist / 1500);
-  let speed = base * r.pace;
+  const base = r.mode === "challenge" ? Math.min(19, 11 + r.dist / 160) : Math.min(12.5, 9 + r.dist / 400);
+  let target = base * (r.stumble > 0 ? 0.55 : 1);
   const g = r.gate;
   if (g) {
-    if (g.picked >= 0) g.t -= dt / 0.9;
-    else if (r.mode === "relaxed") { if (g.t > 0.32) g.t -= dt / 3; else speed = 0.06; }
-    else { g.t -= dt / r.gateS; speed *= 0.5; }
-    if (g.t <= 0) { g.t = 0; resolveGate(); }
-  } else if (r.mode === "challenge" || r.n < ROUND) {
-    r.nextGateIn -= dt;
-    // clear the road before a gate so questions never overlap dodging
-    if (r.nextGateIn <= 0 && !r.objs.some((o) => o.kind === "bar" && o.t > 0)) openGate();
-    r.spawnIn -= dt * speed;
-    if (r.spawnIn <= 0 && r.nextGateIn > 2.5) { spawnPattern(); r.spawnIn = r.mode === "challenge" ? Math.max(0.9, 1.8 - r.dist / 800) : 2.1; }
+    if (g.picked < 0) target = r.mode === "relaxed" ? (g.z > 9 ? base : Math.max(0, (g.z - 5) * 2)) : base * 0.6;
+    else target = base * 1.4;
   }
-  if (r.magnet > 0) { r.magnet -= dt; if (r.magnet <= 0) paintHud(); }
-  hitObjects(dt, speed);
-  if (!run) return;
-  r.dist += dt * 7 * speed; r.speed = speed;
-  const tx = laneX(r.lane, 0);
-  r.px += (tx - r.px) * Math.min(1, dt * 12);
-  r.lean += (Math.max(-.3, Math.min(.3, (tx - r.px) * 0.005)) - r.lean) * Math.min(1, dt * 8);
-  r.stumble = Math.max(0, r.stumble - dt * 1.4); r.shake = Math.max(0, r.shake - dt * 26);
-  for (const p of r.particles) { p.life -= dt; p.vy += 800 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
-  r.particles = r.particles.filter((p) => p.life > 0);
+  r.speed += (target - r.speed) * Math.min(1, dt * 3);
+  const dz = r.speed * dt;
+  r.dist += dz; r.score += Math.round(dz * 0.4);
+
+  if (!g && (r.mode === "challenge" || r.n < ROUND) && r.dist >= r.nextGateAt && !r.objs.some((o) => /low|high|train/.test(o.kind) && o.z > 0 && o.z < 45)) openGate();
+  if (r.gate) {
+    r.gate.z -= dz;
+    if (r.gate.z <= 0) { resolveGate(); if (!run) return; }
+  } else {
+    r.spawnZ -= dz;
+    if (r.spawnZ <= 0) {
+      if (r.dist + FAR < r.nextGateAt - 12) spawnRow(FAR);
+      r.spawnZ = r.mode === "challenge" ? Math.max(11, 20 - r.dist / 150) : 22;
+    }
+  }
+
+  r.laneF += (r.lane - r.laneF) * Math.min(1, dt * 14);
+  r.vy -= 28 * dt; r.y = Math.max(0, r.y + r.vy * dt); if (r.y === 0 && r.vy < 0) r.vy = 0;
+  r.slideT = Math.max(0, r.slideT - dt);
+  r.stumble = Math.max(0, r.stumble - dt * 1.2); r.shake = Math.max(0, r.shake - dt * 30); r.invuln = Math.max(0, r.invuln - dt);
+  const hadPw = r.magnetT > 0 || r.doubleT > 0;
+  r.magnetT = Math.max(0, r.magnetT - dt); r.doubleT = Math.max(0, r.doubleT - dt);
+  if (hadPw && r.magnetT === 0 && r.doubleT === 0) paintHud();
+
+  const px = r.laneF;
+  for (const o of r.objs) {
+    o.z -= dz;
+    if (o.done) continue;
+    if (o.kind === "coin" && r.magnetT > 0 && o.z < 14 && o.z > -1) { o.lane += (px - o.lane) * Math.min(1, dt * 7); o.y += (r.y + 1 - o.y) * Math.min(1, dt * 5); }
+    const sameLane = Math.abs(o.lane - px) < 0.45;
+    const zHit = o.z < 0.6 && o.z + (o.len || 0.5) > -0.6;
+    if (!sameLane || !zHit) { if (o.z + (o.len || 0) < -0.6 && !o.passed && /low|high|train/.test(o.kind)) { o.passed = true; r.dodged++; } continue; }
+    if (o.kind === "coin") { if (Math.abs((o.y || 0.7) - (r.y + 0.8)) < 1.3) { o.done = true; app.earn(r.doubleT > 0 ? 2 : 1); burst(o.lane * LANE, o.y, o.z, "#ffd166", 5); } }
+    else if (o.kind === "magnet") { o.done = true; r.magnetT = 10; pw("🧲 Magnet!"); }
+    else if (o.kind === "double") { o.done = true; r.doubleT = 12; pw("✖2 Double coins!"); }
+    else if (o.kind === "shieldp") { o.done = true; r.shield = true; pw("🛡 Shield!"); }
+    else if (r.invuln <= 0) {
+      const hit = o.kind === "train" || (o.kind === "low" && r.y < 0.9) || (o.kind === "high" && r.slideT <= 0);
+      if (hit) { o.done = true; crash(o.kind); if (!run) return; }
+    }
+  }
+  r.objs = r.objs.filter((o) => o.z + (o.len || 0) > -4 && !(o.done && !/low|high|train/.test(o.kind)));
+  for (const p of r.parts) { p.life -= dt; p.vy -= 18 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt - dz; }
+  r.parts = r.parts.filter((p) => p.life > 0);
 }
 
-/* ------------------------------------------------------------------- draw */
+function pw(text) { const r = run; sfx.power(); const b = r.wrap.getBoundingClientRect(); app.floater(b.left + b.width / 2, b.top + b.height * 0.45, text, "#c4b5fd"); paintHud(); }
+
+function crash(kind) {
+  const r = run;
+  r.stumble = 1; r.shake = 16; r.streak = 0; r.invuln = 1.3; r.speed *= 0.4; sfx.hurt();
+  burst(r.laneF * LANE, 1, 0.5, "#ff7b72", 22);
+  const b = r.wrap.getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height * 0.5;
+  const tip = kind === "low" ? "Jump ⬆" : kind === "high" ? "Slide ⬇" : "Switch lanes";
+  if (r.mode === "challenge") {
+    if (r.shield) { r.shield = false; app.floater(x, y, "🛡 Saved!", "#93c5fd"); }
+    else { r.hearts--; app.floater(x, y, "💥 " + tip + "!", "#ff7b72"); }
+    paintHud();
+    if (r.hearts <= 0) finish();
+  } else {
+    const lose = Math.min(app.coins, 3); if (lose) app.earn(-lose);
+    app.floater(x, y, "💥 " + tip + (lose ? ` −${lose}🪙` : "!"), "#ff7b72");
+    paintHud();
+  }
+}
+function burst(x, y, z, c, n) {
+  for (let i = 0; i < n; i++) run.parts.push({ x, y, z, vx: (Math.random() - .5) * 6, vy: 2 + Math.random() * 5, vz: (Math.random() - .5) * 4, life: .5 + Math.random() * .5, c });
+}
+
+/* ===================================================================== draw */
+function P(x, y, z) {
+  const r = run, d = z + CAM_BACK;
+  if (d < 0.3) return null;
+  const s = r.F / d;
+  return { x: r.W / 2 + (x - r.laneF * LANE * 0.35) * s, y: r.horizon + (CAM_H - y) * s * 0.62, s };
+}
+const fogA = (z) => Math.max(0, Math.min(1, (z - 25) / (FAR - 25)));
+
 function draw() {
   const r = run, c = r.ctx, W = r.W, H = r.H;
   c.save();
-  if (r.shake > .3 && !reducedMotion()) c.translate((Math.random() - .5) * r.shake, (Math.random() - .5) * r.shake);
-  const sky = c.createLinearGradient(0, 0, 0, r.horizon * 1.1);
-  sky.addColorStop(0, "#070b21"); sky.addColorStop(.6, "#1b2a57"); sky.addColorStop(.9, "#4a3070"); sky.addColorStop(1, "#b0584a");
-  c.fillStyle = sky; c.fillRect(0, 0, W, r.horizon + 4);
-  for (const s of r.stars) { c.globalAlpha = .35 + .3 * Math.sin(r.t * 2 + s.p); c.fillStyle = "#e3ecff"; c.fillRect(s.x, s.y, s.s, s.s); }
+  if (r.shake > .4 && !reducedMotion()) c.translate((Math.random() - .5) * r.shake, (Math.random() - .5) * r.shake);
+  drawSky();
+  drawGround();
+  const items = [];
+  for (const o of r.objs) if (!(o.done && !/low|high|train/.test(o.kind)) && o.z < FAR && o.z + (o.len || 0) > -3) items.push({ z: o.z, f: () => drawObj(o) });
+  if (r.gate) items.push({ z: r.gate.z, f: () => drawGate(r.gate) });
+  items.push({ z: 0.01, f: drawRunner });
+  items.sort((a, b) => b.z - a.z).forEach((i) => i.f());
+  for (const p of r.parts) { const q = P(p.x, p.y, p.z); if (!q) continue; c.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); c.fillStyle = p.c; c.fillRect(q.x - q.s * .06, q.y - q.s * .06, q.s * .12, q.s * .12); }
   c.globalAlpha = 1;
-  c.fillStyle = "#ffcf7a"; c.beginPath(); c.arc(W * .78, r.horizon - 6, 18, Math.PI, 0); c.fill();
-  ridge(r.horizon + 3, H * .07, .012, r.dist * .03, "#2a2160");
-  ridge(r.horizon + 2, H * .1, .007, r.dist * .06, "#1a1644");
-  const gr = c.createLinearGradient(0, r.horizon, 0, H); gr.addColorStop(0, "#1c2548"); gr.addColorStop(1, "#0a0f24");
-  c.fillStyle = gr; c.fillRect(0, r.horizon, W, H - r.horizon);
-  // roadside posts flowing past
-  for (let i = 0; i < 6; i++) {
-    const t = ((i / 6) - (r.dist * 0.02) % (1 / 6) + 1) % 1, s = scaleAt(t);
-    c.fillStyle = "rgba(255,176,32,.5)";
-    for (const d of [-.85, 2.85]) c.fillRect(laneX(d, t) - 2 * s, depthY(t) - 26 * s, 4 * s, 26 * s);
+  if (r.speed > 13 && !reducedMotion()) {
+    c.strokeStyle = "rgba(255,255,255,.08)"; c.lineWidth = 2;
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + r.t, x0 = W / 2 + Math.cos(a) * W * .45, y0 = r.horizon + Math.sin(a) * H * .5; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x0 + Math.cos(a) * 40, y0 + Math.sin(a) * 40); c.stroke(); }
   }
-  c.fillStyle = "#151d3b"; c.beginPath();
-  c.moveTo(laneX(-.6, 0), depthY(0)); c.lineTo(laneX(-.6, 1), depthY(1)); c.lineTo(laneX(2.6, 1), depthY(1)); c.lineTo(laneX(2.6, 0), depthY(0)); c.fill();
-  c.lineWidth = 3; c.setLineDash([16, 16]); c.lineDashOffset = -((r.dist * 40) % 32); c.strokeStyle = "rgba(160,180,240,.35)";
-  for (const d of [.5, 1.5]) { c.beginPath(); c.moveTo(laneX(d, 0), depthY(0)); c.lineTo(laneX(d, 1), depthY(1)); c.stroke(); }
-  c.setLineDash([]); c.lineWidth = 4; c.strokeStyle = "rgba(255,176,32,.45)";
-  for (const d of [-.6, 2.6]) { c.beginPath(); c.moveTo(laneX(d, 0), depthY(0)); c.lineTo(laneX(d, 1), depthY(1)); c.stroke(); }
-  c.textAlign = "center"; c.textBaseline = "middle";
-  if (r.gate) {
-    c.font = "700 20px Fredoka, sans-serif";
-    for (let l = 0; l < 3; l++) { c.fillStyle = l === r.lane ? "rgba(255,176,32,.9)" : "rgba(160,180,240,.35)"; c.fillText("ABC"[l], laneX(l, .12), depthY(.12)); }
-  }
-  // objects far-to-near
-  for (const o of [...r.objs].sort((a, b) => b.t - a.t)) { if (o.t > 1 || o.t < -0.05 || (o.done && o.kind !== "bar")) continue; drawObj(o); }
-  if (r.gate) drawGate(r.gate);
-  for (const p of r.particles) { c.globalAlpha = Math.max(0, Math.min(1, p.life)); c.fillStyle = p.c; c.fillRect(p.x - 4, p.y - 3, 8, 6); }
-  c.globalAlpha = 1;
-  drawRunner();
+  const v = c.createRadialGradient(W / 2, H * .55, H * .3, W / 2, H * .55, H * .9);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.45)");
+  c.fillStyle = v; c.fillRect(0, 0, W, H);
   c.restore();
 }
-function drawObj(o) {
-  const r = run, c = r.ctx, t = Math.max(o.t, 0), s = scaleAt(t), x = laneX(o.lane, t), y = depthY(t);
-  if (o.kind === "coin") {
-    const w = 11 * s * Math.abs(Math.cos(r.t * 5 + o.t * 20)) + 2 * s;
-    c.fillStyle = "#ffd166"; c.strokeStyle = "#b77400"; c.lineWidth = 2 * s;
-    c.beginPath(); c.ellipse(x, y - 22 * s, w, 12 * s, 0, 0, 6.29); c.fill(); c.stroke();
-  } else if (o.kind === "bar") {
-    const bw = r.spread * s * 0.8, bh = 34 * s;
-    c.fillStyle = o.done ? "#6b2a2a" : "#e5484d"; c.fillRect(x - bw / 2, y - bh, bw, bh);
-    c.fillStyle = "#fff"; for (let i = 0; i < 4; i++) c.fillRect(x - bw / 2 + (i * 2 + .5) * bw / 8, y - bh + 4 * s, bw / 8, bh - 8 * s);
-    c.fillStyle = "#2b3656"; c.fillRect(x - bw / 2 + 4 * s, y - 3 * s, 6 * s, 6 * s); c.fillRect(x + bw / 2 - 10 * s, y - 3 * s, 6 * s, 6 * s);
-  } else {
-    c.fillStyle = "#a78bfa"; c.beginPath(); c.arc(x, y - 24 * s, 15 * s, 0, 6.29); c.fill();
-    c.font = `${Math.round(18 * s)}px sans-serif`; c.fillText("🧲", x, y - 23 * s);
+
+function drawSky() {
+  const r = run, c = r.ctx, W = r.W;
+  const g = c.createLinearGradient(0, 0, 0, r.horizon + 10);
+  g.addColorStop(0, "#0b1030"); g.addColorStop(.55, "#2b2a6b"); g.addColorStop(.85, "#b4577a"); g.addColorStop(1, "#ffb36b");
+  c.fillStyle = g; c.fillRect(0, 0, W, r.horizon + 10);
+  c.fillStyle = "rgba(255,230,190,.9)"; c.beginPath(); c.arc(W * .74, r.horizon - 24, 26, 0, 6.29); c.fill();
+  c.fillStyle = "rgba(255,200,150,.18)"; c.beginPath(); c.arc(W * .74, r.horizon - 24, 44, 0, 6.29); c.fill();
+  if (!r.sky) {
+    r.sky = Array.from({ length: 3 }, (_, layer) => {
+      const bs = []; let x = -20;
+      while (x < W * 2 + 40) { const w = 18 + Math.random() * 36; bs.push({ x, w, h: (20 + Math.random() * 60) * (1 - layer * .25) }); x += w + 2; }
+      return bs;
+    });
   }
+  const cols = ["#2a1f55", "#221a47", "#1a1438"];
+  r.sky.forEach((bs, layer) => {
+    const off = (r.dist * (0.4 + layer * 0.35)) % (W * 2);
+    for (const b of bs) {
+      let x = b.x - off; if (x + b.w < 0) x += W * 2;
+      c.fillStyle = cols[layer];
+      c.fillRect(x, r.horizon - b.h - layer * 4, b.w, b.h + 12);
+      if (layer === 2) {
+        c.fillStyle = "rgba(255,210,120,.35)";
+        for (let wy = r.horizon - b.h + 6; wy < r.horizon - 6; wy += 9) for (let wx = x + 4; wx < x + b.w - 4; wx += 8) if (((wx - x) * 7 + wy * 3 | 0) % 5 === 0) c.fillRect(wx, wy, 3, 4);
+      }
+    }
+  });
 }
-function ridge(y0, amp, f, ph, col) {
-  const r = run, c = r.ctx; c.fillStyle = col; c.beginPath(); c.moveTo(-4, r.H);
-  for (let x = -4; x <= r.W + 8; x += 10) c.lineTo(x, y0 - (Math.sin(x * f + ph) * .55 + Math.sin(x * f * 2.7 + ph * 1.7) * .3 + .85) * amp);
-  c.lineTo(r.W + 4, r.H); c.fill();
-}
-function drawGate(g) {
-  const r = run, c = r.ctx, t = Math.max(g.t, .001), y = depthY(t), s = scaleAt(t);
-  const x0 = laneX(-.6, t), x1 = laneX(2.6, t), hgt = 110 * s;
-  c.fillStyle = `rgba(34,211,238,${.14 + .06 * Math.sin(r.t * 6)})`; c.fillRect(x0, y - hgt, x1 - x0, hgt);
-  c.fillStyle = "#22d3ee"; c.fillRect(x0 - 4 * s, y - hgt, 8 * s, hgt); c.fillRect(x1 - 4 * s, y - hgt, 8 * s, hgt); c.fillRect(x0, y - hgt, x1 - x0, 8 * s);
-  for (let l = 0; l < 3; l++) {
-    const cx = laneX(l, t), bw = 46 * s, by = y - hgt * .62, sel = g.picked === l;
-    c.fillStyle = sel ? "#ffb020" : "#1f2e4b"; c.strokeStyle = sel ? "#ffd98a" : "#5cc8ff"; c.lineWidth = 3 * s;
-    c.beginPath(); c.roundRect ? c.roundRect(cx - bw / 2, by - bw / 2, bw, bw, 10 * s) : c.rect(cx - bw / 2, by - bw / 2, bw, bw); c.fill(); c.stroke();
-    c.fillStyle = sel ? "#2a1a00" : "#fff"; c.font = `700 ${Math.round(28 * s)}px Fredoka, sans-serif`; c.fillText("ABC"[l], cx, by + 1);
+
+function quad(a, b, cc, d, fill) { const c = run.ctx; if (!a || !b || !cc || !d) return; c.fillStyle = fill; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.lineTo(cc.x, cc.y); c.lineTo(d.x, d.y); c.closePath(); c.fill(); }
+
+function drawGround() {
+  const r = run, c = r.ctx, W = r.W, H = r.H;
+  const gg = c.createLinearGradient(0, r.horizon, 0, H); gg.addColorStop(0, "#3a3050"); gg.addColorStop(1, "#1b1628");
+  c.fillStyle = gg; c.fillRect(0, r.horizon, W, H - r.horizon);
+  const edge = LANE * 1.75;
+  quad(P(-edge - 1, 0, -4.2), P(edge + 1, 0, -4.2), P(edge + 1, 0, FAR), P(-edge - 1, 0, FAR), "#4a4056");
+  const step = 1.6, off = r.dist % step;
+  for (let z = FAR - off; z > -4.4; z -= step) {
+    const f = fogA(z);
+    for (let l = -1; l <= 1; l++) {
+      const x0 = l * LANE - LANE * .42, x1 = l * LANE + LANE * .42;
+      quad(P(x0, 0, z), P(x1, 0, z), P(x1, 0, z + .45), P(x0, 0, z + .45), `rgba(${110 - f * 40},${80 - f * 20},60,${1 - f * .6})`);
+    }
   }
-}
-function drawRunner() {
-  const r = run, c = r.ctx, s = Math.min(1.1, r.H / 380), ph = r.dist * 1.6;
-  const sw = Math.sin(ph), sw2 = Math.sin(ph + Math.PI);
-  c.save(); c.translate(r.px, r.playerY);
-  c.rotate(r.stumble > 0 ? Math.sin(r.t * 34) * .22 * r.stumble : r.lean * .7);
   c.lineCap = "round";
-  if (r.magnet > 0) { c.strokeStyle = `rgba(167,139,250,${.35 + .2 * Math.sin(r.t * 8)})`; c.lineWidth = 3; c.beginPath(); c.arc(0, -40 * s, 42 * s, 0, 6.29); c.stroke(); }
-  if (r.shield) { c.strokeStyle = "rgba(147,197,253,.5)"; c.lineWidth = 2; c.beginPath(); c.arc(0, -40 * s, 36 * s, 0, 6.29); c.stroke(); }
-  c.fillStyle = "rgba(0,0,0,.35)"; c.beginPath(); c.ellipse(0, 4 * s, 24 * s, 7 * s, 0, 0, 6.29); c.fill();
-  const limb = (a, b, x, y, w, col) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(a, b); c.lineTo(x, y); c.stroke(); };
-  const hip = -32 * s, sh = -56 * s, lx = r.lean * 34 * s;
-  limb(0, hip, sw * 16 * s, -2 * s, 10 * s, "#2b3656"); limb(0, hip, sw2 * 16 * s, -2 * s, 10 * s, "#222b47");
-  limb(r.lean * 20 * s, hip, lx, sh, 14 * s, r.sk.a);
-  limb(lx, sh + 4 * s, lx + sw2 * 14 * s, sh + 20 * s, 8 * s, "#f6c89f"); limb(lx, sh + 4 * s, lx + sw * 14 * s, sh + 20 * s, 8 * s, "#eab183");
-  c.fillStyle = "#f6c89f"; c.beginPath(); c.arc(r.lean * 40 * s, sh - 12 * s, 11 * s, 0, 6.29); c.fill();
-  c.strokeStyle = r.sk.b; c.lineWidth = 4 * s; c.beginPath(); c.arc(r.lean * 40 * s, sh - 12 * s, 11 * s, Math.PI * 1.08, Math.PI * 1.92); c.stroke();
+  for (let l = -1; l <= 1; l++) for (const s of [-.28, .28]) {
+    const a = P(l * LANE + s * LANE, .12, -4.2), b = P(l * LANE + s * LANE, .12, FAR);
+    if (!a || !b) continue;
+    const gr = c.createLinearGradient(a.x, a.y, b.x, b.y); gr.addColorStop(0, "#d9dde8"); gr.addColorStop(1, "rgba(160,160,190,.2)");
+    c.strokeStyle = gr; c.lineWidth = Math.min(5, Math.max(1, a.s * .04)); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+  }
+  for (const side of [-1, 1]) {
+    const x = side * (edge + 1.2);
+    quad(P(x, 0, -4.2), P(x, 2.6, -4.2), P(x, 2.6, FAR), P(x, 0, FAR), side < 0 ? "#2b2440" : "#302848");
+    const ls = 12, lo = r.dist % ls;
+    for (let z = FAR - lo; z > -2; z -= ls) {
+      const top = P(x - side * .1, 3.4, z), bot = P(x - side * .1, 0, z);
+      if (!top || !bot) continue;
+      c.strokeStyle = "rgba(20,16,30,.9)"; c.lineWidth = Math.max(1, top.s * .08); c.beginPath(); c.moveTo(bot.x, bot.y); c.lineTo(top.x, top.y); c.stroke();
+      c.fillStyle = `rgba(255,214,140,${.9 - fogA(z) * .7})`; c.beginPath(); c.arc(top.x, top.y, Math.max(1.5, top.s * .14), 0, 6.29); c.fill();
+      c.fillStyle = `rgba(255,214,140,${Math.max(0, .12 - fogA(z) * .1)})`; c.beginPath(); c.arc(top.x, top.y, Math.max(3, top.s * .6), 0, 6.29); c.fill();
+    }
+  }
+  const fg = c.createLinearGradient(0, r.horizon - 4, 0, r.horizon + H * .18);
+  fg.addColorStop(0, "rgba(255,170,130,.55)"); fg.addColorStop(1, "rgba(255,170,130,0)");
+  c.fillStyle = fg; c.fillRect(0, r.horizon - 4, W, H * .18 + 4);
+}
+
+function box(x, y0, y1, z0, z1, w, front, side, top) {
+  const hw = w / 2;
+  const f = [P(x - hw, y0, z0), P(x + hw, y0, z0), P(x + hw, y1, z0), P(x - hw, y1, z0)];
+  if (f.some((p) => !p)) return f;
+  const b = [P(x - hw, y0, z1), P(x + hw, y0, z1), P(x + hw, y1, z1), P(x - hw, y1, z1)];
+  if (b.every(Boolean)) {
+    quad(f[3], f[2], b[2], b[3], top);
+    const camX = run.laneF * LANE * .35;
+    if (x - hw > camX) quad(f[0], f[3], b[3], b[0], side); else if (x + hw < camX) quad(f[1], f[2], b[2], b[1], side);
+  }
+  quad(f[0], f[1], f[2], f[3], front);
+  return f;
+}
+
+function drawObj(o) {
+  const r = run, c = r.ctx, x = o.lane * LANE, fa = fogA(Math.max(0, o.z));
+  c.globalAlpha = 1 - fa * .85;
+  if (o.kind === "train") {
+    const cols = [["#e5484d", "#a3282c", "#f58a8d"], ["#3b82f6", "#1d4ed8", "#93c5fd"], ["#f59e0b", "#b45309", "#fcd34d"]][o.hue];
+    const f = box(x, 0.15, 3.1, Math.max(o.z, -2.5), o.z + o.len, LANE * .92, cols[0], cols[1], cols[2]);
+    if (f[0] && o.z > -2.5) {
+      const s = f[0].s, w = f[2].x - f[3].x;
+      c.fillStyle = "#1e2a44"; c.fillRect(f[3].x + w * .15, f[3].y + s * .35, w * .7, s * .8);
+      c.fillStyle = "rgba(160,220,255,.35)"; c.fillRect(f[3].x + w * .18, f[3].y + s * .38, w * .25, s * .3);
+      c.fillStyle = "#fff6c2"; for (const k of [.2, .8]) { c.beginPath(); c.arc(f[0].x + (f[1].x - f[0].x) * k, f[0].y - s * .5, s * .13, 0, 6.29); c.fill(); }
+    }
+  } else if (o.kind === "low") {
+    const f = box(x, 0, 0.95, o.z, o.z + .25, LANE * .9, "#f3f4f6", "#9ca3af", "#e5e7eb");
+    if (f[0]) {
+      const s = f[0].s, w = f[2].x - f[3].x, hgt = f[0].y - f[3].y;
+      c.fillStyle = "#e5484d"; for (let i = 0; i < 4; i++) c.fillRect(f[3].x + w * (i / 4 + .06), f[3].y, w * .12, hgt * .55);
+      c.fillStyle = "#6b7280"; c.fillRect(f[0].x, f[3].y + hgt * .5, s * .08, hgt * .5); c.fillRect(f[1].x - s * .08, f[3].y + hgt * .5, s * .08, hgt * .5);
+    }
+  } else if (o.kind === "high") {
+    for (const sx of [-.45, .45]) box(x + sx * LANE, 0, 2.3, o.z, o.z + .15, .14, "#374151", "#1f2937", "#4b5563");
+    const f = box(x, 1.45, 2.3, o.z, o.z + .2, LANE * .95, "#facc15", "#a16207", "#fde68a");
+    if (f[0]) { const s = f[0].s; c.fillStyle = "#1f2937"; c.font = `800 ${Math.max(8, s * .42)}px Fredoka, sans-serif`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("⬇ SLIDE", (f[0].x + f[1].x) / 2, (f[0].y + f[3].y) / 2); }
+  } else {
+    const q = P(x, o.y || .7, o.z); if (!q) { c.globalAlpha = 1; return; }
+    const rad = q.s * .32;
+    if (o.kind === "coin") {
+      const w = rad * Math.abs(Math.cos(r.t * 6 + o.z));
+      c.fillStyle = "#ffd166"; c.strokeStyle = "#b77400"; c.lineWidth = Math.max(1, rad * .18);
+      c.beginPath(); c.ellipse(q.x, q.y, Math.max(1, w), rad, 0, 0, 6.29); c.fill(); c.stroke();
+    } else {
+      c.fillStyle = "rgba(167,139,250,.35)"; c.beginPath(); c.arc(q.x, q.y, rad * 1.8, 0, 6.29); c.fill();
+      c.fillStyle = "#7c3aed"; c.beginPath(); c.arc(q.x, q.y, rad * 1.2, 0, 6.29); c.fill();
+      c.font = `${Math.max(8, rad * 1.5)}px sans-serif`; c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillStyle = "#fff"; c.fillText(o.kind === "magnet" ? "🧲" : o.kind === "double" ? "✖2" : "🛡", q.x, q.y + 1);
+    }
+  }
+  c.globalAlpha = 1;
+}
+
+function drawGate(g) {
+  const r = run, c = r.ctx, z = Math.max(g.z, -0.5), fa = fogA(z);
+  c.globalAlpha = 1 - fa * .7;
+  const edge = LANE * 1.6;
+  for (const sx of [-edge, edge]) box(sx, 0, 4.2, z, z + .3, .35, "#22d3ee", "#0e7490", "#67e8f9");
+  box(0, 3.8, 4.4, z, z + .3, edge * 2 + .35, "#22d3ee", "#0e7490", "#67e8f9");
+  for (let l = -1; l <= 1; l++) {
+    const a = P(l * LANE - LANE * .45, 0, z), b = P(l * LANE + LANE * .45, 3.7, z), lb = P(l * LANE, 2.7, z);
+    if (!a || !b || !lb) continue;
+    const sel = g.picked === l + 1, s = lb.s;
+    c.fillStyle = sel ? "rgba(255,176,32,.35)" : `rgba(34,211,238,${.12 + .06 * Math.sin(r.t * 5 + l)})`;
+    c.fillRect(a.x, b.y, b.x - a.x, a.y - b.y);
+    c.fillStyle = sel ? "#ffb020" : "#0f1a33"; c.strokeStyle = sel ? "#ffe0a3" : "#67e8f9"; c.lineWidth = Math.max(1.5, s * .06);
+    c.beginPath(); c.roundRect ? c.roundRect(lb.x - s * .55, lb.y - s * .55, s * 1.1, s * 1.1, s * .2) : c.rect(lb.x - s * .55, lb.y - s * .55, s * 1.1, s * 1.1); c.fill(); c.stroke();
+    c.fillStyle = sel ? "#2a1a00" : "#fff"; c.font = `800 ${Math.max(9, s * .8)}px Fredoka, sans-serif`; c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText("ABC"[l + 1], lb.x, lb.y + 1);
+  }
+  c.globalAlpha = 1;
+}
+
+function drawRunner() {
+  const r = run, c = r.ctx;
+  const base = P(r.laneF * LANE, r.y, 0), ground = P(r.laneF * LANE, 0, 0);
+  if (!base) return;
+  const s = base.s * 0.72, ph = r.dist * 1.25;
+  const sliding = r.slideT > 0, air = r.y > 0.05;
+  c.fillStyle = `rgba(0,0,0,${.4 - Math.min(.25, r.y * .08)})`; c.beginPath(); c.ellipse(ground.x, ground.y, s * .45, s * .12, 0, 0, 6.29); c.fill();
+  if (r.invuln > 0 && Math.floor(r.t * 14) % 2 === 0) return;
+  c.save(); c.translate(base.x, base.y);
+  if (r.stumble > 0) c.rotate(Math.sin(r.t * 30) * .2 * r.stumble);
+  c.lineCap = "round"; c.lineJoin = "round";
+  const skin = "#f2c29b", pants = "#26314f", shoe = "#f8fafc";
+  const limb = (pts, w, col) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.stroke(); };
+  const U = s * .5;
+  if (sliding) {
+    limb([0, -U * .35, U * .9, -U * .15, U * 1.4, -U * .1], U * .32, pants);
+    limb([0, -U * .4, -U * .75, -U * .95], U * .5, r.sk.a);
+    c.fillStyle = skin; c.beginPath(); c.arc(-U * .95, -U * 1.15, U * .3, 0, 6.29); c.fill();
+    c.fillStyle = r.sk.b; c.beginPath(); c.arc(-U * .95, -U * 1.2, U * .31, Math.PI, 0); c.fill();
+    limb([-U * .5, -U * .8, U * .1, -U * 1.1], U * .2, skin);
+  } else {
+    const run1 = air ? .9 : Math.sin(ph), run2 = air ? -.6 : Math.sin(ph + Math.PI);
+    const hip = -U * 1.05, sh = -U * 2.0;
+    const leg = (k, col) => {
+      const kx = k * U * .35, ky = hip + U * .5 - Math.max(0, k) * U * .25, fx = k * U * .45 - (air ? U * .1 : 0), fy = -U * .05 - Math.max(0, -k) * U * .25;
+      limb([0, hip, kx, ky, fx, fy], U * .3, col);
+      c.fillStyle = shoe; c.beginPath(); c.ellipse(fx + U * .05, fy, U * .2, U * .1, 0, 0, 6.29); c.fill();
+    };
+    leg(run2, "#1f2942"); leg(run1, pants);
+    limb([0, hip, 0, sh], U * .62, r.sk.a);
+    limb([0, sh + U * .15, run1 * U * .5, sh + U * .55, run1 * U * .6, sh + U * .95], U * .2, skin);
+    limb([0, sh + U * .15, run2 * U * .5, sh + U * .55, run2 * U * .65, sh + U * .9], U * .22, skin);
+    c.fillStyle = skin; c.beginPath(); c.arc(0, sh - U * .42, U * .34, 0, 6.29); c.fill();
+    c.fillStyle = r.sk.b; c.beginPath(); c.arc(0, sh - U * .48, U * .35, Math.PI * 1.02, Math.PI * 1.98); c.fill();
+    c.fillRect(-U * .05, sh - U * .55, U * .5, U * .1);
+    c.fillStyle = "rgba(0,0,0,.25)"; c.fillRect(-U * .31, hip - U * .1, U * .62, U * .18);
+  }
+  if (r.shield) { c.strokeStyle = `rgba(147,197,253,${.5 + .2 * Math.sin(r.t * 6)})`; c.lineWidth = 3; c.beginPath(); c.ellipse(0, -U * 1.1, U * 1.1, U * 1.5, 0, 0, 6.29); c.stroke(); }
+  if (r.magnetT > 0) { c.strokeStyle = `rgba(167,139,250,${.45 + .2 * Math.sin(r.t * 8)})`; c.lineWidth = 2; c.beginPath(); c.arc(0, -U * 1.1, U * 1.7, 0, 6.29); c.stroke(); }
   c.restore();
 }
 

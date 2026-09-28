@@ -35,3 +35,28 @@
 .mtile .inner { position: relative; inset: auto; display: grid; min-height: 132px; }
 .mtile .face { position: relative; inset: auto; grid-area: 1 / 1; min-height: 132px; }
 .mtile .front { overflow: visible; }
+/* Munch the monster */
+.munch { --grow: 1; display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 104px; }
+.munch .mbody { position: relative; width: 84px; height: 76px; border-radius: 50% 50% 44% 44%; transform: scale(var(--grow)); transition: transform .5s var(--ease);
+  background: radial-gradient(ellipse at 40% 30%, #c4b5fd, #7c3aed 70%); box-shadow: 0 10px 20px rgba(0,0,0,.4), inset 0 -6px 0 rgba(0,0,0,.18); }
+.munch .eye { position: absolute; top: 16px; width: 18px; height: 20px; border-radius: 50%; background: #fff; }
+.munch .eye::after { content: ""; position: absolute; left: 5px; top: 6px; width: 8px; height: 9px; border-radius: 50%; background: #1e1b4b; }
+.munch .eye.l { left: 18px; } .munch .eye.r { right: 18px; }
+.munch .mouth { position: absolute; left: 50%; bottom: 14px; width: 36px; height: 16px; margin-left: -18px; background: #2e1065; border-radius: 0 0 20px 20px; transition: height .15s; }
+.munch .mouth::before { content: ""; position: absolute; left: 6px; top: 0; width: 7px; height: 6px; background: #fff; clip-path: polygon(0 0, 100% 0, 50% 100%); box-shadow: 16px 0 0 #fff; }
+.munch .belly { position: absolute; left: 50%; bottom: -4px; width: 40px; height: 10px; margin-left: -20px; border-radius: 50%; background: rgba(255,255,255,.18); }
+.munch .bubble { position: relative; max-width: 200px; padding: 8px 12px; border-radius: 14px; background: var(--surface2); border: 1px solid var(--line); font-weight: 600; font-size: .9em; }
+.munch .bubble::before { content: ""; position: absolute; left: -7px; top: 50%; margin-top: -6px; border: 6px solid transparent; border-right-color: var(--line); border-left: 0; }
+.munch.chomp .mouth { animation: chomp .5s 2; }
+.munch.chomp .mbody, .munch.happy .mbody { animation: bounce .6s; }
+.munch.sad .mbody { animation: shake .45s; filter: saturate(.6); }
+.munch.sad .mouth { height: 6px; border-radius: 20px 20px 0 0; bottom: 18px; }
+.munch.dance .mbody { animation: dance .5s 4; }
+@keyframes chomp { 50% { height: 26px; } }
+@keyframes bounce { 40% { transform: scale(var(--grow)) translateY(-10px) scaleY(1.05); } }
+@keyframes dance { 25% { transform: scale(var(--grow)) rotate(-10deg) translateY(-6px); } 75% { transform: scale(var(--grow)) rotate(10deg) translateY(-6px); } }
+.ghostcard { position: fixed; z-index: 70; pointer-events: none; border-radius: 16px; display: grid; place-items: center; padding: 8px; font-weight: 700; text-align: center;
+  background: var(--term-bg); border: 2px solid var(--term); color: var(--term); }
+.ghostcard.meaning { background: var(--meaning-bg); border-color: var(--meaning); color: var(--meaning); }
+.mtile.gold .back { box-shadow: inset 0 0 0 3px #ffd166, 0 0 14px rgba(255,209,102,.45); }
+.mtile.gold .back::after { content: "✨"; position: absolute; top: 8px; right: 10px; }

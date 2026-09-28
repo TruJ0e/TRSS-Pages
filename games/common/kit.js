@@ -21,8 +21,13 @@ const store = {
 
 /* ---------------------------------------------------------------- settings */
 const DEFAULTS = { size: "m", font: "lexend", spacing: "normal", contrast: "normal", motion: "auto",
-                   voice: true, rate: 0.9, sound: true, mode: "relaxed", chapter: "ch7" };
+                   autoRead: true, voiceKind: "woman", speed: "normal", voiceVol: 0.9, sfxVol: 0.6, muted: false,
+                   mode: "relaxed", chapter: "ch7" };
 export const settings = Object.assign({}, DEFAULTS, store.get("trss-games-settings", {}));
+// migrate the first-release keys
+if (typeof settings.voice === "boolean") { settings.autoRead = settings.voice; delete settings.voice; }
+if (typeof settings.sound === "boolean") { if (!settings.sound) settings.sfxVol = 0; delete settings.sound; }
+delete settings.rate;
 function applySettings() {
   const h = document.documentElement;
   h.dataset.size = settings.size;
@@ -37,26 +42,70 @@ export const reducedMotion = () => settings.motion === "reduce" ||
 applySettings();
 
 /* ------------------------------------------------------------------ speech */
-let voice = null;
-function pickVoice() {
-  if (!("speechSynthesis" in window)) return;
-  const vs = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
-  const pref = [/natural/i, /google us english/i, /samantha/i, /aria/i, /jenny/i, /zira/i, /en-us/i];
-  for (const re of pref) { const v = vs.find((x) => re.test(x.name) || re.test(x.lang)); if (v) { voice = v; return; } }
-  voice = vs[0] || null;
+/* Natural recorded voices first: every card term and meaning is pre-recorded
+   in two neural voices (woman / man) under ../audio/<voice>/<hash>.mp3,
+   listed in ../audio/manifest.json. Anything not recorded falls back to the
+   device's best matching built-in voice. */
+const SPEEDS = { slow: 0.9, normal: 1.1, fast: 1.3 };
+const AUDIO_BASE = new URL("../audio/", import.meta.url);
+let manifest = null;
+fetch(new URL("manifest.json", AUDIO_BASE)).then((r) => (r.ok ? r.json() : null)).then((m) => (manifest = m)).catch(() => {});
+
+let sysVoices = [];
+function loadVoices() { if ("speechSynthesis" in window) sysVoices = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang)); }
+if ("speechSynthesis" in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+const FEMALE = [/ava/i, /emma/i, /aria/i, /jenny/i, /samantha/i, /allison/i, /zira/i, /susan/i, /karen/i, /moira/i, /tessa/i, /female/i, /google us english/i];
+const MALE = [/andrew/i, /brian/i, /guy/i, /christopher/i, /davis/i, /daniel/i, /alex\b/i, /aaron/i, /david/i, /mark/i, /fred/i, /male/i, /google uk english male/i];
+function sysVoice() {
+  const want = settings.voiceKind === "man" ? MALE : FEMALE;
+  const rank = (v) => (/natural|neural|premium|enhanced/i.test(v.name) ? 0 : /google|microsoft/i.test(v.name) ? 1 : 2);
+  for (const re of want) {
+    const hits = sysVoices.filter((v) => re.test(v.name)).sort((a, b) => rank(a) - rank(b));
+    if (hits.length) return hits[0];
+  }
+  return sysVoices.sort((a, b) => rank(a) - rank(b))[0] || null;
 }
-if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-export const canSpeak = () => "speechSynthesis" in window;
-export function stopSpeak() { if (canSpeak()) speechSynthesis.cancel(); }
-/** Speak text. force=true speaks even when auto-voice is off (the 🔊 buttons). */
-export function say(text, force = false) {
-  if (!canSpeak() || !text || (!settings.voice && !force)) return;
-  speechSynthesis.cancel();
-  const parts = String(text).match(/[^.!?;]+[.!?;]*/g) || [String(text)];
-  for (const p of parts) {
-    const u = new SpeechSynthesisUtterance(p.trim());
-    u.rate = settings.rate; if (voice) u.voice = voice;
+
+let speakToken = 0, curAudio = null;
+export const canSpeak = () => true;
+export function stopSpeak() {
+  speakToken++;
+  if (curAudio) { try { curAudio.pause(); } catch {} curAudio = null; }
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+}
+function playPart(text, token) {
+  return new Promise((resolve) => {
+    if (token !== speakToken) return resolve();
+    const k = manifest && manifest.texts[text.trim()];
+    if (k) {
+      const a = new Audio(new URL(`${settings.voiceKind === "man" ? "man" : "woman"}/${k}.mp3`, AUDIO_BASE));
+      a.playbackRate = SPEEDS[settings.speed] || 1.1; a.preservesPitch = true;
+      a.volume = Math.max(0, Math.min(1, settings.voiceVol));
+      curAudio = a;
+      a.onended = a.onerror = () => resolve();
+      a.play().catch(() => resolve());
+      return;
+    }
+    if (!("speechSynthesis" in window)) return resolve();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = sysVoice(); if (v) u.voice = v;
+    u.rate = (SPEEDS[settings.speed] || 1.1) * 0.95; u.volume = Math.max(0, Math.min(1, settings.voiceVol));
+    u.onend = u.onerror = () => resolve();
     speechSynthesis.speak(u);
+    setTimeout(resolve, 12000);   // never hang the queue on a stuck engine
+  });
+}
+/** Speak text or a list of texts in order. force=true plays even when auto-read is off (🔊 buttons). */
+export async function say(text, force = false) {
+  if (!text || settings.muted || settings.voiceVol <= 0 || (!settings.autoRead && !force)) return;
+  stopSpeak();
+  const token = speakToken;
+  const parts = Array.isArray(text) ? text : [text];
+  for (const p of parts) {
+    if (!p) continue;
+    // recorded? play whole; otherwise split long text into sentences for the fallback engine
+    const pieces = manifest && manifest.texts[String(p).trim()] ? [String(p)] : (String(p).match(/[^.!?;]+[.!?;]*/g) || [String(p)]);
+    for (const piece of pieces) { if (token !== speakToken) return; await playPart(piece.trim(), token); }
   }
 }
 
@@ -69,7 +118,8 @@ export function unlockAudio() {
   } catch { /* silent */ }
 }
 function tone(f, dur, { type = "sine", vol = 0.12, delay = 0, slide = 0 } = {}) {
-  if (!settings.sound || !actx) return;
+  if (settings.muted || settings.sfxVol <= 0 || !actx) return;
+  vol *= settings.sfxVol * 1.6;
   try {
     const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
     o.type = type; o.frequency.setValueAtTime(f, t);
@@ -97,6 +147,7 @@ export const icon = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
   pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>',
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
+  muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4V5z" fill="currentColor"/><path d="M16 9l5 6M21 9l-5 6"/></svg>',
   speaker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4V5z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/></svg>',
 };
 
@@ -116,7 +167,7 @@ export function h(tag, attrs = {}, ...kids) {
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 export const defOf = (c) => (c && (c.simple || c.cue)) || "";
 export function sayBtn(text, label = "Listen") {
-  return h("button", { class: "say", type: "button", "aria-label": label + ": " + text,
+  return h("button", { class: "say", type: "button", "aria-label": label + ": " + [].concat(text).join(". "),
     onclick: (e) => { e.stopPropagation(); unlockAudio(); say(text, true); } },
     h("span", { html: icon.speaker }), label);
 }
@@ -220,9 +271,12 @@ export function createApp(cfg) {
   root.className = "app";
   const pauseBtn = h("button", { class: "iconbtn", type: "button", "aria-label": "Pause", hidden: true, html: icon.pause, onclick: () => pause() });
   const setBtn = h("button", { class: "iconbtn", type: "button", "aria-label": "Settings", html: icon.gear, onclick: () => openSettings() });
+  const muteBtn = h("button", { class: "iconbtn", type: "button", onclick: () => { settings.muted = !settings.muted; saveSettings(); if (settings.muted) stopSpeak(); else { unlockAudio(); sfx.tap(); } paintMute(); } });
+  function paintMute() { muteBtn.innerHTML = settings.muted ? icon.muted : icon.speaker; muteBtn.setAttribute("aria-label", settings.muted ? "Unmute sound" : "Mute sound"); muteBtn.setAttribute("aria-pressed", String(settings.muted)); }
+  paintMute();
   const bar = h("header", { class: "topbar" },
     h("a", { class: "iconbtn", href: "../", "aria-label": "Back to all games", html: icon.back + '<span>Games</span>' }),
-    h("div", { class: "title" }, cfg.title), pauseBtn, setBtn);
+    h("div", { class: "title" }, cfg.title), pauseBtn, muteBtn, setBtn);
   const stage = h("main", { class: "stage", id: "stage" });
   root.replaceChildren(bar, stage);
   document.title = cfg.title + " — TRSS Study Games";
@@ -349,9 +403,16 @@ export function createApp(cfg) {
     const group = (label, key, opts) => {
       const row = h("div", { class: "opts" });
       const paint = () => row.replaceChildren(...opts.map(([v, t]) => h("button", { class: "opt", type: "button", "aria-pressed": String(settings[key] === v),
-        onclick: () => { settings[key] = v; saveSettings(); sfx.tap(); paint(); if (key === "rate") say("This is how fast I will read.", true); } }, t)));
+        onclick: () => { settings[key] = v; saveSettings(); sfx.tap(); paint(); paintMute(); if (key === "speed" || key === "voiceKind") say(["emotion", "a body reaction plus a feeling"], true); } }, t)));
       paint();
       return h("div", { class: "set-group" }, h("div", { class: "label" }, label), row);
+    };
+    const slider = (label, key) => {
+      const out = h("b", {}, Math.round(settings[key] * 100) + "%");
+      const inp = h("input", { type: "range", min: "0", max: "1", step: "0.05", value: String(settings[key]), id: "set-" + key, "aria-label": label });
+      inp.addEventListener("input", () => { settings[key] = +inp.value; out.textContent = Math.round(settings[key] * 100) + "%"; saveSettings(); });
+      inp.addEventListener("change", () => { if (key === "voiceVol") say("This is how loud I will read.", true); else sfx.good(); });
+      return h("div", { class: "set-group" }, h("div", { class: "label" }, label, " · ", out), inp);
     };
     const done = () => { close(); if (wasPlaying) { paused = false; cfg.onResume && cfg.onResume(); } if (after) after(); };
     const close = sheet([
@@ -360,9 +421,12 @@ export function createApp(cfg) {
       group("Text size", "size", [["s", "A"], ["m", "A+"], ["l", "A++"], ["xl", "A+++"]]),
       group("Font", "font", [["lexend", "Lexend"], ["atkinson", "Hyperlegible"], ["system", "Standard"]]),
       group("Letter spacing", "spacing", [["normal", "Normal"], ["wide", "Wide"]]),
-      group("Read aloud automatically", "voice", [[true, "🔊 On"], [false, "Off"]]),
-      group("Reading speed", "rate", [[0.7, "Slow"], [0.9, "Normal"], [1.1, "Fast"]]),
-      group("Sound effects", "sound", [[true, "On"], [false, "Off"]]),
+      group("Voice", "voiceKind", [["woman", "👩 Woman"], ["man", "👨 Man"]]),
+      group("Reading speed", "speed", [["slow", "Slow"], ["normal", "Normal"], ["fast", "Fast"]]),
+      group("Read aloud automatically", "autoRead", [[true, "🔊 On"], [false, "Only when I tap"]]),
+      slider("Voice volume", "voiceVol"),
+      slider("Sound effects volume", "sfxVol"),
+      group("Mute everything", "muted", [[false, "Sound on"], [true, "🔇 Muted"]]),
       group("Contrast", "contrast", [["normal", "Normal"], ["high", "High"]]),
       group("Motion", "motion", [["auto", "Auto"], ["reduce", "Less motion"], ["full", "Full"]]),
       h("div", { class: "sheet-actions" }, h("button", { class: "btn primary block", onclick: done }, "Done")),
@@ -417,11 +481,11 @@ export function createApp(cfg) {
         card.cue && card.cue !== def ? h("div", { class: "fact" }, h("div", { class: "label" }, "Memory hook"), h("div", { class: "v" }, card.cue)) : null,
         card.examples && card.examples[0] ? h("div", { class: "fact muted" }, h("div", { class: "label" }, "Example"), h("div", { class: "v" }, card.examples[0])) : null,
         note ? h("p", { style: "margin:0;color:var(--muted)" }, note) : null,
-        h("div", { class: "row sheet-actions" }, sayBtn(card.term + ". " + def, "Read it to me"),
+        h("div", { class: "row sheet-actions" }, sayBtn([card.term, def], "Read it to me"),
           h("button", { class: "btn primary", style: "flex:1 1 160px", onclick: () => { close(); stopSpeak(); resolve(); } }, button || "Got it  →")),
       ];
       const close = sheet(kids, null);
-      if (!correct) say(card.term + ". " + def);
+      if (!correct) say([card.term, def]);
     });
   }
 
@@ -455,7 +519,7 @@ export function createApp(cfg) {
           : [h("div", { class: "stat" }, h("b", {}, uniqueMissed.length), h("span", {}, "to practise"))])),
       uniqueMissed.length ? h("div", { class: "label" }, "Practise these") : null,
       uniqueMissed.length ? h("div", { class: "review-list" }, uniqueMissed.map((c) =>
-        h("div", { class: "review-item" }, h("span", { class: "t" }, c.term), sayBtn(c.term + ". " + defOf(c), "Listen"), h("span", { class: "m" }, defOf(c))))) : null,
+        h("div", { class: "review-item" }, h("span", { class: "t" }, c.term), sayBtn([c.term, defOf(c)], "Listen"), h("span", { class: "m" }, defOf(c))))) : null,
       h("div", { class: "row" },
         h("button", { class: "btn primary", onclick: () => start() }, "↻  Play again"),
         h("button", { class: "btn ghost", onclick: () => openShop() }, "🛍  Shop"),
