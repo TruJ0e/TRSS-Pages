@@ -7,7 +7,7 @@
 .signs { position: absolute; inset: 0; pointer-events: none; }
 .sign { position: absolute; top: 0; left: 0; pointer-events: auto; display: grid; gap: 2px; justify-items: center; text-align: center;
   padding: 6px 6px 8px; border-radius: 12px; border: 2px solid #94a3b8; background: rgba(15,23,42,.92); color: var(--term); cursor: pointer;
-  font-weight: 700; font-size: .82em; line-height: 1.2; box-shadow: 0 6px 16px rgba(0,0,0,.5); overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; animation: fade .3s both; }
+  font-weight: 700; font-size: .8em; line-height: 1.2; box-shadow: 0 6px 16px rgba(0,0,0,.5); overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; animation: fade .3s both; }
 .sign .k { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: #1f2937; color: #fff; font-family: var(--display); }
 .sign.chosen { border-color: var(--brand); background: rgba(42,36,19,.95); }
 .sign.chosen .k { background: var(--brand); color: #2a1a00; }
@@ -25,3 +25,11 @@
 .md-drill { left: 50%; top: 6px; transform: translateX(-50%) rotate(135deg); animation: mdDig 3s ease-in-out infinite; }
 @keyframes mdDig { 0% { top: 4px; left: 50%; } 30% { top: 34px; left: 28%; } 55% { top: 52px; left: 50%; } 85%, 100% { top: 104px; left: 50%; opacity: .3; } }
 @keyframes rdWin { 0%, 70% { background: #1f2937; } 78%, 100% { background: var(--good); color: #042; } }
+.minewrap { height: clamp(320px, 50vh, 500px); }
+.mctrl.steer { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mctrl.steer button { min-height: 64px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); font-size: 1.6em; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+.mctrl.steer button:active { background: var(--surface2); border-color: var(--brand); transform: scale(.97); }
+.chip.fuel i { display: inline-block; width: 54px; height: 10px; border-radius: 9px; background: linear-gradient(90deg, #22c55e var(--f), rgba(255,255,255,.12) var(--f)); }
+.chip.fuel.low { border-color: var(--bad); animation: pop 1s infinite; }
+.chip.fuel.low i { background: linear-gradient(90deg, #ef4444 var(--f), rgba(255,255,255,.12) var(--f)); }
+.mctrl.steer.nudge button { border-color: #a78bfa; animation: pop .8s infinite; }
