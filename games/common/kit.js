@@ -67,6 +67,26 @@ function sysVoice() {
 }
 
 let speakToken = 0, curAudio = null;
+/* iOS only lets audio play from an element that was first started inside a
+   tap. One shared element is "blessed" on the first tap and reused for every
+   clip, so the first question never waits for permission. */
+const SILENT = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTRUoAWgBgkOAGbZHBgG1OF6zM82DWbZaUmMBptgQhGjsyYqc9ae9XFz280948NMBWInljyzsNRFLPWdnZGWrddDsjK1unuSrVN9jJsK8KuQtQCtMBjCEtImISdNKJOopIpBFpNSMbIHCSRpRR5iakjTiyzLhchUUBwCgyKiweBv/7UsQbg8isVNoMPMjAAAA0gAAABEVFGmgqK////9bP/6XCykxBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+let voiceEl = null;
+function blessAudio() {
+  if (voiceEl) return;
+  try { voiceEl = new Audio(); voiceEl.src = SILENT; const p = voiceEl.play(); if (p) p.catch(() => {}); } catch { voiceEl = null; }
+}
+const warmed = new Set();
+/** Fetch upcoming clips ahead of time so they start instantly. */
+export function preloadSay(texts) {
+  if (!manifest) return;
+  for (const t of [].concat(texts)) {
+    const k = t && manifest.texts[String(t).trim()]; if (!k) continue;
+    const url = String(new URL(`${settings.voiceKind === "man" ? "man" : "woman"}/${k}.mp3`, AUDIO_BASE));
+    if (warmed.has(url)) continue; warmed.add(url);
+    fetch(url).catch(() => {});
+  }
+}
 export const canSpeak = () => true;
 export function stopSpeak() {
   speakToken++;
@@ -78,11 +98,12 @@ function playPart(text, token) {
     if (token !== speakToken) return resolve();
     const k = manifest && manifest.texts[text.trim()];
     if (k) {
-      const a = new Audio(new URL(`${settings.voiceKind === "man" ? "man" : "woman"}/${k}.mp3`, AUDIO_BASE));
+      const a = voiceEl || new Audio();
+      a.src = String(new URL(`${settings.voiceKind === "man" ? "man" : "woman"}/${k}.mp3`, AUDIO_BASE));
       a.playbackRate = SPEEDS[settings.speed] || 1.1; a.preservesPitch = true;
       a.volume = Math.max(0, Math.min(1, settings.voiceVol));
       curAudio = a;
-      a.onended = a.onerror = () => resolve();
+      a.onended = a.onerror = () => { a.onended = a.onerror = null; resolve(); };
       a.play().catch(() => resolve());
       return;
     }
@@ -112,6 +133,7 @@ export async function say(text, force = false) {
 /* -------------------------------------------------------------------- sound */
 let actx = null;
 export function unlockAudio() {
+  blessAudio();
   try {
     if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) actx = new AC(); }
     if (actx && actx.state === "suspended") actx.resume();
@@ -199,6 +221,8 @@ export function makeDeck(cards) {
       if (!queue.length) queue = shuffle(cards);
       if (queue.length > 1 && queue[0] === last) queue.push(queue.shift());
       last = queue.shift();
+      preloadSay([last.term, defOf(last)]);
+      if (queue[0]) preloadSay([queue[0].term, defOf(queue[0])]);
       return last;
     },
     hit(c) { const r = review[c.id] || (review[c.id] = { miss: 0, hit: 0 }); r.hit++; store.set(REVIEW_KEY, review); },

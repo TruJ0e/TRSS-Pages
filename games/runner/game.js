@@ -475,42 +475,110 @@ function drawRunner() {
   const r = run, c = r.ctx;
   const base = P(r.laneF * LANE, r.y, 0), ground = P(r.laneF * LANE, 0, 0);
   if (!base) return;
-  const s = base.s * 0.72, ph = r.dist * 1.25;
+  const U = base.s * 0.36;                       // body unit (~ head height)
+  const ph = r.dist * 1.25;
   const sliding = r.slideT > 0, air = r.y > 0.05;
-  c.fillStyle = `rgba(0,0,0,${.4 - Math.min(.25, r.y * .08)})`; c.beginPath(); c.ellipse(ground.x, ground.y, s * .45, s * .12, 0, 0, 6.29); c.fill();
+  // soft shadow shrinks as the runner rises
+  const sh = 1 - Math.min(.6, r.y * .15);
+  c.fillStyle = `rgba(0,0,0,${.38 * sh})`; c.beginPath(); c.ellipse(ground.x, ground.y, U * 1.3 * sh, U * .32 * sh, 0, 0, 6.29); c.fill();
   if (r.invuln > 0 && Math.floor(r.t * 14) % 2 === 0) return;
   c.save(); c.translate(base.x, base.y);
-  if (r.stumble > 0) c.rotate(Math.sin(r.t * 30) * .2 * r.stumble);
+  const lean = (r.lane - r.laneF) * -0.35;       // bank into lane changes
+  c.rotate(r.stumble > 0 ? Math.sin(r.t * 30) * .2 * r.stumble : lean);
   c.lineCap = "round"; c.lineJoin = "round";
-  const skin = "#f2c29b", pants = "#26314f", shoe = "#f8fafc";
-  const limb = (pts, w, col) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.stroke(); };
-  const U = s * .5;
+  const skin = "#e9b48f", skinD = "#c98f6a", pants = "#27324f", pantsD = "#1b2440", shoe = "#f8fafc", sole = "#ef4444", hair = "#3b2a20";
+  const hoodie = r.sk.a, trim = r.sk.b;
+  const bob = sliding || air ? 0 : Math.abs(Math.sin(ph)) * U * .12;
+
+  const seg = (x0, y0, x1, y1, w0, w1, col) => {   // tapered limb segment
+    const a = Math.atan2(y1 - y0, x1 - x0) + Math.PI / 2, cx = Math.cos(a), sy = Math.sin(a);
+    c.fillStyle = col; c.beginPath();
+    c.moveTo(x0 + cx * w0 / 2, y0 + sy * w0 / 2); c.lineTo(x1 + cx * w1 / 2, y1 + sy * w1 / 2);
+    c.lineTo(x1 - cx * w1 / 2, y1 - sy * w1 / 2); c.lineTo(x0 - cx * w0 / 2, y0 - sy * w0 / 2); c.closePath(); c.fill();
+    c.beginPath(); c.arc(x1, y1, w1 / 2, 0, 6.29); c.fill();
+  };
+  const shoeAt = (x, y, tilt) => {
+    c.save(); c.translate(x, y); c.rotate(tilt);
+    c.fillStyle = shoe; c.beginPath(); c.ellipse(0, 0, U * .32, U * .17, 0, 0, 6.29); c.fill();
+    c.fillStyle = sole; c.fillRect(-U * .32, U * .06, U * .64, U * .08);
+    c.restore();
+  };
+  // leg: thigh + shin with a bent knee. k = stride phase (-1..1)
+  const leg = (k, col, colD) => {
+    let hipX = k * U * .08, hipY = -U * 2.05 + bob;
+    let kneeX, kneeY, footX, footY;
+    if (air) { kneeX = hipX + k * U * .25; kneeY = hipY + U * .55; footX = hipX + k * U * .05; footY = hipY + U * 1.0; }
+    else {
+      const lift = Math.max(0, -Math.cos(ph + (k > 0 ? 0 : Math.PI)));
+      kneeX = hipX + k * U * .18; kneeY = hipY + U * .95 - lift * U * .35;
+      footX = hipX + k * U * .12; footY = -lift * U * .55 + (1 - lift) * 0;
+    }
+    seg(hipX, hipY, kneeX, kneeY, U * .5, U * .4, col);
+    seg(kneeX, kneeY, footX, footY - U * .12, U * .4, U * .3, colD);
+    shoeAt(footX, footY - U * .05, k * .15);
+  };
+
   if (sliding) {
-    limb([0, -U * .35, U * .9, -U * .15, U * 1.4, -U * .1], U * .32, pants);
-    limb([0, -U * .4, -U * .75, -U * .95], U * .5, r.sk.a);
-    c.fillStyle = skin; c.beginPath(); c.arc(-U * .95, -U * 1.15, U * .3, 0, 6.29); c.fill();
-    c.fillStyle = r.sk.b; c.beginPath(); c.arc(-U * .95, -U * 1.2, U * .31, Math.PI, 0); c.fill();
-    limb([-U * .5, -U * .8, U * .1, -U * 1.1], U * .2, skin);
-  } else {
-    const run1 = air ? .9 : Math.sin(ph), run2 = air ? -.6 : Math.sin(ph + Math.PI);
-    const hip = -U * 1.05, sh = -U * 2.0;
-    const leg = (k, col) => {
-      const kx = k * U * .35, ky = hip + U * .5 - Math.max(0, k) * U * .25, fx = k * U * .45 - (air ? U * .1 : 0), fy = -U * .05 - Math.max(0, -k) * U * .25;
-      limb([0, hip, kx, ky, fx, fy], U * .3, col);
-      c.fillStyle = shoe; c.beginPath(); c.ellipse(fx + U * .05, fy, U * .2, U * .1, 0, 0, 6.29); c.fill();
-    };
-    leg(run2, "#1f2942"); leg(run1, pants);
-    limb([0, hip, 0, sh], U * .62, r.sk.a);
-    limb([0, sh + U * .15, run1 * U * .5, sh + U * .55, run1 * U * .6, sh + U * .95], U * .2, skin);
-    limb([0, sh + U * .15, run2 * U * .5, sh + U * .55, run2 * U * .65, sh + U * .9], U * .22, skin);
-    c.fillStyle = skin; c.beginPath(); c.arc(0, sh - U * .42, U * .34, 0, 6.29); c.fill();
-    c.fillStyle = r.sk.b; c.beginPath(); c.arc(0, sh - U * .48, U * .35, Math.PI * 1.02, Math.PI * 1.98); c.fill();
-    c.fillRect(-U * .05, sh - U * .55, U * .5, U * .1);
-    c.fillStyle = "rgba(0,0,0,.25)"; c.fillRect(-U * .31, hip - U * .1, U * .62, U * .18);
+    // knee-slide: torso leaning back, legs forward and low
+    seg(0, -U * .55, U * 1.1, -U * .3, U * .5, U * .4, pants);
+    seg(U * 1.1, -U * .3, U * 1.7, -U * .15, U * .4, U * .3, pantsD); shoeAt(U * 1.85, -U * .12, .1);
+    c.save(); c.translate(-U * .1, -U * .7); c.rotate(-1.0);
+    drawTorso(0, 0); c.restore();
+    c.fillStyle = skin; c.beginPath(); c.arc(-U * 1.25, -U * 1.35, U * .42, 0, 6.29); c.fill();
+    c.fillStyle = hair; c.beginPath(); c.arc(-U * 1.25, -U * 1.4, U * .43, Math.PI * .9, Math.PI * 2.1); c.fill();
+    c.fillStyle = trim; c.beginPath(); c.ellipse(-U * 1.25, -U * 1.62, U * .45, U * .2, -1, 0, 6.29); c.fill();
+    c.restore();
+    return;
   }
-  if (r.shield) { c.strokeStyle = `rgba(147,197,253,${.5 + .2 * Math.sin(r.t * 6)})`; c.lineWidth = 3; c.beginPath(); c.ellipse(0, -U * 1.1, U * 1.1, U * 1.5, 0, 0, 6.29); c.stroke(); }
-  if (r.magnetT > 0) { c.strokeStyle = `rgba(167,139,250,${.45 + .2 * Math.sin(r.t * 8)})`; c.lineWidth = 2; c.beginPath(); c.arc(0, -U * 1.1, U * 1.7, 0, 6.29); c.stroke(); }
+  const s1 = air ? .9 : Math.sin(ph), s2 = -s1;
+  // back leg, back arm, torso, front arm, front leg, head
+  leg(s2, pantsD, "#141b33");
+  const shY = -U * 3.55 + bob;
+  arm(-1, s1);
+  c.save(); c.translate(0, bob); drawTorso(0, -U * 2.15); c.restore();
+  leg(s1, pants, pantsD);
+  arm(1, s2);
+  // head seen from behind: hair, ears, backwards cap
+  const hy = shY - U * .55;
+  c.fillStyle = skinD; c.beginPath(); c.ellipse(-U * .44, hy + U * .05, U * .1, U * .16, 0, 0, 6.29); c.ellipse(U * .44, hy + U * .05, U * .1, U * .16, 0, 0, 6.29); c.fill();
+  c.fillStyle = skin; c.beginPath(); c.ellipse(0, hy + U * .28, U * .2, U * .16, 0, 0, 6.29); c.fill();   // neck
+  const hg = c.createRadialGradient(-U * .15, hy - U * .15, U * .05, 0, hy, U * .5);
+  hg.addColorStop(0, "#5a4033"); hg.addColorStop(1, hair);
+  c.fillStyle = hg; c.beginPath(); c.ellipse(0, hy, U * .46, U * .5, 0, 0, 6.29); c.fill();
+  c.fillStyle = trim; c.beginPath(); c.ellipse(0, hy - U * .22, U * .48, U * .32, 0, Math.PI, 0); c.fill();   // cap crown
+  c.fillRect(-U * .48, hy - U * .24, U * .96, U * .1);
+  c.fillStyle = "rgba(0,0,0,.25)"; c.beginPath(); c.ellipse(0, hy - U * .05, U * .3, U * .1, 0, 0, Math.PI); c.fill();  // snap strap
+  c.fillStyle = trim; c.beginPath(); c.ellipse(0, hy + U * .02, U * .22, U * .08, 0, 0, 6.29); c.fill();              // backwards brim
+  if (r.shield) { c.strokeStyle = `rgba(147,197,253,${.5 + .2 * Math.sin(r.t * 6)})`; c.lineWidth = 3; c.beginPath(); c.ellipse(0, -U * 2.2, U * 1.6, U * 2.6, 0, 0, 6.29); c.stroke(); }
+  if (r.magnetT > 0) { c.strokeStyle = `rgba(167,139,250,${.45 + .2 * Math.sin(r.t * 8)})`; c.lineWidth = 2; c.beginPath(); c.arc(0, -U * 2.2, U * 2.6, 0, 6.29); c.stroke(); }
   c.restore();
+
+  function arm(side, k) {
+    const sx = side * U * .62, sy = shY + U * .35;
+    const ex = sx + side * U * .18 + (air ? side * U * .2 : 0), ey = sy + U * .55 + (air ? -U * .7 : k * U * .1);
+    const hx = ex + (air ? side * U * .1 : k * U * .15), hy2 = ey + (air ? -U * .45 : U * .5 - Math.abs(k) * U * .15);
+    seg(sx, sy, ex, ey, U * .34, U * .28, side < 0 ? "#b86f00" : hoodie);
+    seg(ex, ey, hx, hy2, U * .28, U * .22, side < 0 ? skinD : skin);
+  }
+  function drawTorso(x, y) {
+    // hoodie body with shading, hood lump and backpack
+    const tg = c.createLinearGradient(x - U * .8, 0, x + U * .8, 0);
+    tg.addColorStop(0, shade(hoodie, -.25)); tg.addColorStop(.5, hoodie); tg.addColorStop(1, shade(hoodie, -.3));
+    c.fillStyle = tg; c.beginPath();
+    c.moveTo(x - U * .7, y); c.quadraticCurveTo(x - U * .82, y - U * .9, x - U * .6, y - U * 1.45);
+    c.quadraticCurveTo(x, y - U * 1.62, x + U * .6, y - U * 1.45); c.quadraticCurveTo(x + U * .82, y - U * .9, x + U * .7, y);
+    c.quadraticCurveTo(x, y + U * .12, x - U * .7, y); c.fill();
+    c.fillStyle = shade(hoodie, -.15); c.beginPath(); c.ellipse(x, y - U * 1.38, U * .42, U * .2, 0, 0, 6.29); c.fill();   // hood
+    c.fillStyle = shade(trim, -.1); c.beginPath();                                                                      // backpack
+    c.roundRect ? c.roundRect(x - U * .45, y - U * 1.2, U * .9, U * .95, U * .2) : c.rect(x - U * .45, y - U * 1.2, U * .9, U * .95); c.fill();
+    c.fillStyle = shade(trim, .25); c.fillRect(x - U * .3, y - U * .8, U * .6, U * .08);
+    c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(x - U * .06, y - U * 1.1, U * .12, U * .25);
+    c.fillStyle = shade(hoodie, -.35); c.fillRect(x - U * .7, y - U * .1, U * 1.4, U * .12);                         // waistband
+  }
+}
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16), f = (v) => Math.max(0, Math.min(255, Math.round(v + (amt > 0 ? (255 - v) * amt : v * amt))));
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
 }
 
 function finish() {
