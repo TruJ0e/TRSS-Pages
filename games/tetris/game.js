@@ -6,7 +6,7 @@
  * Every meaning is shown in full (no truncation) as a big tap target.
  */
 import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx,
-         answerList, reducedMotion } from "../common/kit.js?v=3";
+         answerList, reducedMotion } from "../common/kit.js?v=4";
 
 const ROUND = 10;
 let run = null, raf = 0;

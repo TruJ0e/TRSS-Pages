@@ -6,7 +6,7 @@
  * Relaxed: one meaning at a time, 10 words, and a meaning that lands just
  * waits. Challenge: up to 3 at once, faster and faster, 3 hearts.
  */
-import { createApp, makeDeck, h, wait, defOf, say, sfx, editDistance, unlockAudio, powerMeter } from "../common/kit.js?v=3";
+import { createApp, makeDeck, h, wait, defOf, say, sfx, editDistance, unlockAudio, powerMeter } from "../common/kit.js?v=4";
 
 const ROUND = 10;
 let run = null, raf = 0;

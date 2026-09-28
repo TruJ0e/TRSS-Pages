@@ -282,3 +282,8 @@ html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-mo
 .powbtn { min-height: 48px; padding: 6px 14px; border-radius: 14px; border: 2px solid #a78bfa; background: #2a1f4d; color: #e9d5ff; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .powbtn:disabled { opacity: .4; border-color: var(--line); background: var(--surface); color: var(--muted); }
 .powbtn.ready { animation: pop 1s infinite; }
+/* compact HUD: chips on one line, progress as a thin full-width bar under them */
+.hud { gap: 8px; }
+.hud > .progress { order: 9; flex: 1 1 100%; height: 6px; }
+.hud .chip { padding: 5px 10px; }
+@media (max-width: 420px) { .topbar a.iconbtn span { display: none; } .topbar .title { font-size: 1em; } }

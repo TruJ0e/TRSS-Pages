@@ -8,7 +8,7 @@
  * Relaxed: 10 gates, the runner waits at each gate, barriers only cost coins.
  * Challenge: gates keep coming, speed climbs, barriers and wrong gates cost hearts.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion } from "../common/kit.js?v=3";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion } from "../common/kit.js?v=4";
 
 const ROUND = 10;
 let run = null, raf = 0;

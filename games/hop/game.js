@@ -8,7 +8,7 @@
  * Relaxed: 10 perches, falling in just costs a couple of coins.
  * Challenge: falls and wrong pads cost hearts, climbs get longer and trickier.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, reducedMotion, steerPad } from "../common/kit.js?v=3";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, reducedMotion, steerPad } from "../common/kit.js?v=4";
 
 const ROUND = 10;
 let run = null, raf = 0;

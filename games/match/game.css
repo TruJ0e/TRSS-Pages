@@ -31,3 +31,7 @@
 .m-demo .d1 { animation: mdFlip 3s infinite; } .m-demo .d2 { animation: mdFlip 3s .5s infinite; }
 @keyframes mdFlip { 0%, 15% { color: transparent; transform: rotateY(0); } 25%, 80% { color: var(--text); transform: rotateY(360deg); border-color: var(--good); } 100% { color: transparent; } }
 .mtile.peek .front { border-color: #a78bfa; }
+/* faces share one grid cell so the tile grows to fit the longest meaning */
+.mtile .inner { position: relative; inset: auto; display: grid; min-height: 132px; }
+.mtile .face { position: relative; inset: auto; grid-area: 1 / 1; min-height: 132px; }
+.mtile .front { overflow: visible; }

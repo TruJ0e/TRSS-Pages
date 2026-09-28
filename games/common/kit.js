@@ -337,7 +337,7 @@ export function createApp(cfg) {
     const key = (e) => { if (e.key === "Escape" && onDismiss) { e.stopPropagation(); onDismiss(); } };
     document.addEventListener("keydown", key, true);
     document.body.append(scrim);
-    const f = box.querySelector("button"); if (f) setTimeout(() => f.focus({ preventScroll: true }), 50);
+    const f = box.querySelector(".btn.primary") || box.querySelector("button"); if (f) setTimeout(() => f.focus({ preventScroll: true }), 50);
     return () => { document.removeEventListener("keydown", key, true); scrim.remove(); };
   }
   app.sheet = sheet;

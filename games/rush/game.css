@@ -28,3 +28,6 @@
 @keyframes rdFall { 0% { transform: translateY(-10px); opacity: 0; } 10% { opacity: 1; } 70% { transform: translateY(22px); opacity: 1; border-color: var(--meaning); } 78%, 100% { transform: translateY(22px) scale(1.1); opacity: 0; } }
 @keyframes rdType { 0%, 20% { width: 0; } 65%, 100% { width: 10ch; } }
 .field.slowmo { box-shadow: inset 0 0 0 3px #a78bfa, inset 0 0 40px rgba(167,139,250,.35); }
+.typebar { grid-template-columns: minmax(0, 1fr); }
+.inrow { min-width: 0; }
+.guess { width: 0; }
