@@ -13,7 +13,7 @@
  * Rendering is a real perspective projection (world x/y/z -> screen) so
  * everything scales, overlaps and fogs correctly.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion } from "../common/kit.js?v=5";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion } from "../common/kit.js?v=6";
 
 const ROUND = 10;
 const LANE = 2.2;                  // lane width in world units
