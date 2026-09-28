@@ -8,7 +8,7 @@
  * Relaxed: 10 perches, falling in just costs a couple of coins.
  * Challenge: falls and wrong pads cost hearts, climbs get longer and trickier.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, reducedMotion, steerPad } from "../common/kit.js?v=8";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, reducedMotion, steerPad, fx, skin } from "../common/kit.js?v=9";
 
 const ROUND = 10;
 let run = null, raf = 0;
@@ -30,7 +30,7 @@ const app = createApp({
 function stop() { cancelAnimationFrame(raf); if (run && run.steer) run.steer.destroy(); window.removeEventListener("resize", resize); run = null; }
 
 function begin({ cards, mode, focus }) {
-  stop();
+  stop(); fx.quiet = false;
   const sk = app.skin("frog");
   run = { mode, cards, sk, deck: makeDeck(focus ? [...new Set([...focus, ...cards])] : cards), n: 0, correct: 0, score: 0,
           hearts: 3, shield: mode === "challenge" && app.has("boost-shield"), height: 0, streak: 0, missed: [], flies: 0,
@@ -107,7 +107,7 @@ function fillPads() {
 
 function updateClimb(dt) {
   const r = run, f = r.frog, k = r.k;
-  const dir = r.steer.dir() || r.touch;
+  const dir = r.demo ? autoDir() : (r.steer.dir() || r.touch);
   f.vx += ((dir * 290 * Math.max(.8, k)) - f.vx) * Math.min(1, dt * 10);
   if (dir) f.face = dir;
   f.x += f.vx * dt;
@@ -280,7 +280,7 @@ function draw() {
   c.globalAlpha = 1;
   if (r.phase === "climb") drawFrog(c, r.frog.x, r.frog.y, r.frog.vy, r.frog.face, k);
   c.restore();
-  if (r.phase === "climb") {
+  if (r.phase === "climb" && !r.demo) {
     const pct = Math.max(0, r.climbLeft / r.climbTotal);
     c.fillStyle = "rgba(0,0,0,.35)"; c.fillRect(12, 12, W - 24, 8);
     c.fillStyle = "#ffb020"; c.fillRect(12, 12, (W - 24) * (1 - pct), 8);
@@ -313,7 +313,28 @@ document.addEventListener("keydown", (e) => {
   if (i >= 0 && run.qpads[i]) run.qpads[i].click();
 });
 
-function demo(el) {
-  el.classList.add("hop-demo");
-  el.append(h("i", { class: "hd-pad a" }), h("i", { class: "hd-pad b" }), h("i", { class: "hd-fly" }, "🪰"), h("i", { class: "hd-frog" }));
+/* ========================================================= attract mode */
+function demo(el) { setTimeout(() => startDemo(el)); }
+function startDemo(el) {
+  if (!el.isConnected) return;
+  stop(); fx.quiet = true;
+  el.classList.add("live-demo");
+  const sk = skin("frog");
+  const canvas = h("canvas", { class: "pondcv" });
+  const scene = h("div", { class: "demowrap pond", style: `--fa:${sk.a};--fb:${sk.b};height:100%;border:0;border-radius:0` }, canvas);
+  el.append(scene);
+  run = { demo: true, mode: "relaxed", cards: [], sk, n: 0, correct: 0, score: 0, hearts: 3, shield: false, height: 0, streak: 0, missed: [], flies: 0,
+          frozen: false, last: performance.now(), phase: "climb", hud: h("div"), prompt: h("div"), ctrl: h("div"), scene, canvas, ctx: canvas.getContext("2d"),
+          steer: { dir: () => 0, destroy() {} }, touch: 0 };
+  window.addEventListener("resize", resize);
+  resize(); startClimb(true); run.climbLeft = 1e9;
+  raf = requestAnimationFrame(loop);
+}
+function autoDir() {
+  const r = run, f = r.frog, k = r.k;
+  const cands = r.pads.filter((p) => !p.gone && p.y < f.y + 10 && p.y > f.y - 170 * k);
+  if (!cands.length) return 0;
+  const t = f.vy < 0 ? cands.reduce((a, b) => (a.y < b.y ? a : b)) : cands.reduce((a, b) => (Math.abs(a.y - f.y) < Math.abs(b.y - f.y) ? a : b));
+  const cx = t.x + t.w / 2, d = cx - f.x;
+  return Math.abs(d) < 12 ? 0 : Math.sign(d);
 }

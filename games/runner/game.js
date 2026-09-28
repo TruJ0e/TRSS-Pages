@@ -12,7 +12,7 @@
  * Relaxed: 10 gates, the runner waits at each gate, falls/crashes only cost
  * coins. Challenge: faster, endless, falls/crashes and wrong gates cost hearts.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion } from "../common/kit.js?v=8";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion, fx, skin } from "../common/kit.js?v=9";
 
 const ROUND = 10;
 const LANE = 2.2;                  // lane width (world units)
@@ -43,7 +43,7 @@ function stop() {
 
 /* ================================================================== setup */
 function begin({ cards, mode, focus }) {
-  stop();
+  stop(); fx.quiet = false;
   const canvas = h("canvas", { class: "road", "aria-label": "Rooftops. Swipe to move: left, right, up to jump, down to slide." });
   run = {
     mode, cards, deck: makeDeck(focus ? [...new Set([...focus, ...cards])] : cards), canvas, ctx: canvas.getContext("2d"),
@@ -244,6 +244,7 @@ function loop(now) {
 
 function update(dt) {
   const r = run; r.t += dt;
+  if (r.demo) autopilot();
   // falling into a gap: short drop, then a rescue back onto the roof
   if (r.fallT > 0) {
     r.fallT -= dt; r.y -= dt * 14; r.speed *= 0.9;
@@ -699,8 +700,42 @@ function finish() {
     extra: [[Math.round(r.dist) + " m", "ran"], [r.dodged, "dodged"]] });
 }
 
-function demo(el) {
-  el.classList.add("run-demo");
-  el.append(h("div", { class: "rd-road" }), h("div", { class: "rd-coin" }), h("div", { class: "rd-bar" }),
-    h("div", { class: "rd-gate" }, h("b", {}, "A"), h("b", { class: "win" }, "B"), h("b", {}, "C")), h("div", { class: "rd-runner" }));
+/* ========================================================= attract mode */
+/* The start screen shows the real game playing itself, silently. */
+function demo(el) { setTimeout(() => startDemo(el)); }   // after the module has finished loading
+function startDemo(el) {
+  if (!el.isConnected) return;
+  stop(); fx.quiet = true;
+  el.classList.add("live-demo");
+  const canvas = h("canvas", { class: "road" });
+  const wrap = h("div", { class: "demowrap" }, canvas);
+  el.append(wrap);
+  run = {
+    demo: true, mode: "relaxed", cards: [], deck: null, canvas, ctx: canvas.getContext("2d"),
+    sk: skin("runner"), n: 0, correct: 0, score: 0, streak: 0, hearts: 3, missed: [], frozen: false, last: performance.now(),
+    shield: false, magnetT: 0, doubleT: 0, invuln: 0,
+    dist: 0, speed: 0, t: 0, laneF: 0, lane: 0, y: 0, vy: 0, slideT: 0, stumble: 0, shake: 0, fallT: 0,
+    objs: [], parts: [], roofs: [], roofEnd: 0, spawnZ: 30, gate: null, nextGateAt: 1e9, dodged: 0,
+    hud: h("div"), q: h("div"), a: h("div"), wrap,
+  };
+  addRoof(-10, 70); decorate(run.roofs[0]); extendRoofs();
+  for (let z = 26; z < FAR; z += 22) spawnRow(z);
+  window.addEventListener("resize", resize);
+  requestAnimationFrame(() => { if (run && run.demo) { resize(); raf = requestAnimationFrame(loop); } });
+}
+function autopilot() {
+  const r = run;
+  if (r.y < .01 && !onRoof(2.2) && onRoof(0)) act("up");                       // jump the gap
+  const ahead = r.objs.filter((o) => !o.done && /ac|pipe|tank/.test(o.kind) && o.z + (o.len || 0) > 0 && o.z < 8 && Math.abs(o.lane - r.lane) < .5).sort((a, b) => a.z - b.z)[0];
+  if (!ahead) {
+    const c = r.objs.find((o) => o.kind === "coin" && o.z > 3 && o.z < 12);
+    if (c && c.lane !== r.lane && Math.random() < .03 && !r.objs.some((o) => o.kind === "tank" && o.lane === c.lane && o.z < 12)) act(c.lane < r.lane ? "left" : "right");
+    return;
+  }
+  if (ahead.kind === "ac" && ahead.z < 3.4 && r.y < .01) act("up");
+  else if (ahead.kind === "pipe" && ahead.z < 3.4 && r.slideT <= 0) act("down");
+  else if (ahead.kind === "tank") {
+    const ok = [-1, 0, 1].filter((l) => l !== r.lane && !r.objs.some((o) => /ac|pipe|tank/.test(o.kind) && Math.abs(o.lane - l) < .5 && o.z < ahead.z + 5 && o.z + (o.len || 0) > -1));
+    if (ok.length) { const t = ok.sort((a, b) => Math.abs(a - r.lane) - Math.abs(b - r.lane))[0]; act(t < r.lane ? "left" : "right"); }
+  }
 }

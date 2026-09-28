@@ -299,3 +299,9 @@ html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-mo
 .powbtn:disabled { opacity: 1; color: var(--muted); border-color: var(--line); background: var(--surface); }
 .powbtn.ready { color: #fff; border-color: #a78bfa; background: #2a1f4d; }
 [hidden] { display: none !important; }
+/* live attract-mode preview on the start screen */
+.demo.live-demo { height: clamp(200px, 32vh, 280px); padding: 0; }
+.demo.live-demo .demowrap { position: absolute; inset: 0; }
+.demo.live-demo canvas { display: block; width: 100%; height: 100%; }
+.demo.live-demo::after { content: "▶ PREVIEW"; position: absolute; top: 10px; left: 12px; font-size: .62em; font-weight: 700; letter-spacing: .12em;
+  padding: 3px 8px; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff; }

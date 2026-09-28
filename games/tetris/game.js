@@ -10,7 +10,7 @@
  *
  * Controls: ◀ ▶ buttons, swipe or tap left/right of the drill, arrow keys.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, reducedMotion, unlockAudio } from "../common/kit.js?v=8";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, reducedMotion, unlockAudio, fx, skin } from "../common/kit.js?v=9";
 
 const ROUND = 10, COLS = 7, DOORS = [1, 3, 5];
 const HARD = { dirt: 0.22, clay: 0.34, stone: 0.7, gem: 0.3, gold: 0.3, empty: 0.06, door: 0.3 };
@@ -34,7 +34,7 @@ function stop() { cancelAnimationFrame(raf); window.removeEventListener("resize"
 
 /* ================================================================== setup */
 function begin({ cards, mode, focus }) {
-  stop();
+  stop(); fx.quiet = false;
   const canvas = h("canvas", { class: "mine", "aria-label": "Mine. Tap left or right of the drill to steer." });
   run = { mode, cards, sk: app.skin("block"), deck: makeDeck(focus ? [...new Set([...focus, ...cards])] : cards),
           canvas, ctx: canvas.getContext("2d"), rows: [], n: 0, correct: 0, score: 0, streak: 0, hearts: 3, missed: [],
@@ -164,6 +164,8 @@ function tryDown() {
     if (r.col !== DOORS[g.picked]) return;
     return throughDoor();
   }
+  // once a door is chosen the path to it is always clear (bedrock becomes stone)
+  if (g && g.picked >= 0 && tile(r.row + 1, r.col) === "bedrock") setTile(r.row + 1, r.col, "stone");
   if (tile(r.row + 1, r.col) === "bedrock") { r.blocked = (r.blocked || 0) + 1; return; }
   r.blocked = 0;
   startDig(r.row + 1, r.col, "down");
@@ -215,6 +217,7 @@ function loop(now) {
 }
 function update(dt) {
   const r = run; r.t += dt;
+  if (r.demo) autopilot();
   if (r.dig) {
     r.dig.t += dt;
     if (r.dig.type === "stone" && Math.random() < .5) { const p = screenOf(r.dig.row, r.dig.col); r.parts.push({ x: p.x + r.T / 2 + (Math.random() - .5) * r.T * .6, y: p.y + r.T * .2, vx: (Math.random() - .5) * 200, vy: -80 - Math.random() * 120, life: .3, c: "#fde68a" }); }
@@ -249,6 +252,12 @@ function update(dt) {
   r.stuckT = stuck ? (r.stuckT || 0) + dt : 0;
   if (r.stuckT > 1.2 && !r.hinted) { r.hinted = true; r.ctrl.classList.add("nudge"); const b = r.wrap.getBoundingClientRect(); app.floater(b.left + r.W / 2, b.top + r.H * .25, "Bedrock! Steer ◀ ▶", "#e9d5ff"); }
   if (!stuck && r.hinted) { r.hinted = false; r.ctrl.classList.remove("nudge"); }
+  if (stuck) {
+    // boxed in (bedrock both sides and below): the floor cracks so nobody is ever trapped
+    const blocked = (c) => c < 0 || c >= COLS || /bedrock|door/.test(tile(r.row, c));
+    if (r.stuckT > 1 && blocked(r.col - 1) && blocked(r.col + 1)) { setTile(r.row + 1, r.col, "stone"); r.shake = 6; r.stuckT = 0; }
+    else if (r.mode === "relaxed" && r.stuckT > 3) { r.stuckT = 2; findWayDown(); }   // Relaxed: the drill finds its own way
+  }
   r.shake = Math.max(0, r.shake - dt * 30);
   for (const p of r.parts) { p.life -= dt; p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
   r.parts = r.parts.filter((p) => p.life > 0);
@@ -412,7 +421,36 @@ function finish() {
   app.results({ score: r.score, correct: r.correct, total: r.n, missed: r.missed, extra: [[r.row * 2 + " m", "deep"], [r.gems, "gems"]] });
 }
 
-function demo(el) {
-  el.classList.add("mine-demo");
-  el.append(h("i", { class: "md-gem" }, "💎"), h("i", { class: "md-rock" }, "🪨"), h("div", { class: "md-doors" }, h("b", {}, "A"), h("b", { class: "win" }, "B"), h("b", {}, "C")), h("i", { class: "md-drill" }, "⛏️"));
+/* ========================================================= attract mode */
+function demo(el) { setTimeout(() => startDemo(el)); }
+function startDemo(el) {
+  if (!el.isConnected) return;
+  stop(); fx.quiet = true;
+  el.classList.add("live-demo");
+  const canvas = h("canvas", { class: "mine" });
+  const wrap = h("div", { class: "demowrap" }, canvas);
+  el.append(wrap);
+  run = { demo: true, mode: "relaxed", cards: [], sk: skin("block"), deck: null, canvas, ctx: canvas.getContext("2d"), rows: [], n: 0, correct: 0, score: 0, streak: 0, hearts: 3, missed: [],
+          gems: 0, frozen: false, last: performance.now(), t: 0, col: 3, colF: 3, row: 0, rowF: 0, cam: -2.6, dig: null, shake: 0, parts: [], fuel: 1, hudT: 0,
+          shield: false, gate: null, target: null, nextGateRow: 1e9, vaultRow: null, opened: false,
+          hud: h("div"), q: h("div"), signs: h("div"), wrap, ctrl: h("div") };
+  for (let i = 0; i < 40; i++) genRow();
+  window.addEventListener("resize", resize);
+  resize(); raf = requestAnimationFrame(loop);
+}
+function findWayDown() {
+  const r = run;
+  for (let d = 1; d < 7; d++) for (const sd of [-1, 1]) {
+    const c = r.col + sd * d; if (c < 0 || c > 6) continue;
+    let open = true; for (let k = 1; k <= d; k++) if (/bedrock|door/.test(tile(r.row, r.col + sd * k))) open = false;
+    if (open && tile(r.row + 1, c) !== "bedrock") { steer(sd); return; }
+  }
+  setTile(r.row + 1, r.col, "stone");                      // no route: crack the floor
+}
+function autopilot() {
+  const r = run; if (r.dig || Math.random() > .25) return;
+  if (tile(r.row + 1, r.col) === "bedrock") findWayDown();
+  else {
+    for (const s of [-1, 1]) { const c = r.col + s; if (c >= 0 && c < 7 && /gem|gold/.test(tile(r.row + 1, c)) && Math.random() < .5) { steer(s); return; } }
+  }
 }

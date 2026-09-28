@@ -41,6 +41,9 @@ export const reducedMotion = () => settings.motion === "reduce" ||
   (settings.motion === "auto" && window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
 applySettings();
 
+/** fx.quiet = true while a menu preview (attract mode) runs: no sound, speech, coins or popups. */
+export const fx = { quiet: false };
+
 /* ------------------------------------------------------------------ speech */
 /* Natural recorded voices first: every card term and meaning is pre-recorded
    in two neural voices (woman / man) under ../audio/<voice>/<hash>.mp3,
@@ -118,6 +121,7 @@ function playPart(text, token) {
 }
 /** Speak text or a list of texts in order. force=true plays even when auto-read is off (🔊 buttons). */
 export async function say(text, force = false) {
+  if (fx.quiet) return;
   if (!text || settings.muted || settings.voiceVol <= 0 || (!settings.autoRead && !force)) return;
   stopSpeak();
   const token = speakToken;
@@ -140,7 +144,7 @@ export function unlockAudio() {
   } catch { /* silent */ }
 }
 function tone(f, dur, { type = "sine", vol = 0.12, delay = 0, slide = 0 } = {}) {
-  if (settings.muted || settings.sfxVol <= 0 || !actx) return;
+  if (fx.quiet || settings.muted || settings.sfxVol <= 0 || !actx) return;
   vol *= settings.sfxVol * 1.6;
   try {
     const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
@@ -314,6 +318,7 @@ export function createApp(cfg) {
     menu, learn, results, toast, floater, confetti, pause, start,
     coins: 0,
     earn(n, x, y) {
+      if (fx.quiet) return;
       if (wallet.owned["boost-lucky"]) n = Math.round(n * 1.25);
       app.coins += n; sfx.coin();
       if (x != null) floater(x, y, "🪙+" + n, "#ffd166");
@@ -557,10 +562,12 @@ export function createApp(cfg) {
 
   /* ---------------- little feedback helpers */
   function toast(text, ms = 1800) {
+    if (fx.quiet) return;
     const t = h("div", { class: "toast", role: "status" }, text);
     document.body.append(t); setTimeout(() => t.remove(), ms);
   }
   function floater(x, y, text, color) {
+    if (fx.quiet) return;
     const f = h("div", { class: "floater", style: `left:${x}px;top:${y}px;${color ? "color:" + color : ""}` }, text);
     document.body.append(f); setTimeout(() => f.remove(), 1000);
   }

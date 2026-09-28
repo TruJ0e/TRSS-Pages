@@ -5,7 +5,7 @@
  * mix-ups, a right letter locks in green, a wrong letter just bounces back
  * (nothing you've built is wiped), and hints are free in Relaxed mode.
  */
-import { createApp, makeDeck, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, powerMeter } from "../common/kit.js?v=8";
+import { createApp, makeDeck, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, powerMeter } from "../common/kit.js?v=9";
 
 let run = null;
 const ok = (t) => /^[A-Za-z][A-Za-z '\-]*$/.test(t) && t.split(/[\s-]+/).length <= 3 &&

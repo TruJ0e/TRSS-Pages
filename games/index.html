@@ -8,7 +8,7 @@
   <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <title>TRSS Study Games</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="common/kit.css?v=8">
+<link rel="stylesheet" href="common/kit.css?v=9">
 <style>
   .hub { max-width: 860px; margin: 0 auto; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 20px; }
   .hub-top { display: flex; align-items: center; gap: 10px; }
@@ -55,15 +55,15 @@
   </div>
 </div>
 <script type="module">
-import { walletInfo, h } from "./common/kit.js?v=8";
+import { walletInfo, h } from "./common/kit.js?v=9";
 const G = [
-  ["runner", "🏃", "Term Runner", "Jump, slide and dodge trains down the tracks — then dash through the gate with the right term.", ["Action", "Reading"], "#3a2a10", "#ffb020"],
+  ["runner", "🏃", "Term Runner", "Free-run across city rooftops — jump the gaps, slide under pipes, then dash through the gate with the right term.", ["Action", "Reading"], "#3a2a10", "#ffb020"],
   ["hop", "🐸", "Term Hop", "Bounce up the pond, catch flies, then land on the lily pad with the right term.", ["Action", "Reading"], "#0f3a2c", "#6ee7b7"],
-  ["tetris", "⛏️", "Term Miner", "Drill down for treasure, dig up gems, and bore through the door with the right term.", ["Action", "Reading"], "#3a2616", "#fbbf24"],
+  ["tetris", "⛏️", "Term Miner", "Dig down through dirt and stone, grab gems, and drill through the door with the right term.", ["Action", "Reading"], "#3a2616", "#fbbf24"],
   ["match", "🃏", "Memory Match", "Feed Munch the monster! Flip cards to pair each term with its meaning.", ["Memory", "Calm"], "#2b1f47", "#c4b5fd"],
-  ["blitz", "⚡", "True or False", "Does the meaning fit the term? Build streaks and power up.", ["Quick", "Reading"], "#3a1f22", "#ff7b72"],
-  ["scramble", "🔤", "Word Scramble", "Rebuild the term letter by letter — the first one is done for you.", ["Spelling", "Calm"], "#2e2a10", "#ffd166"],
-  ["rush", "⌨️", "Type Rush", "Tap or type the right term from a 5-word bank before the meaning lands.", ["Typing", "Speed"], "#122a3a", "#7dd3fc"],
+  ["blitz", "⚡", "True or False", "It's a game show! Buzz true or false and build a streak to go ON FIRE.", ["Quick", "Reading"], "#3a1f22", "#ff7b72"],
+  ["scramble", "🔤", "Word Scramble", "Spell each term to open the locks on a treasure vault.", ["Spelling", "Calm"], "#2e2a10", "#ffd166"],
+  ["rush", "⌨️", "Type Rush", "Meteors are falling! Type the right term to blast them before they hit the city.", ["Typing", "Speed"], "#122a3a", "#7dd3fc"],
 ];
 const best = (id) => { try { return Math.max(+JSON.parse(localStorage.getItem(`trss-${id === "tetris" ? "drop" : id}-best-relaxed`) || 0), +JSON.parse(localStorage.getItem(`trss-${id === "tetris" ? "drop" : id}-best-challenge`) || 0)); } catch { return 0; } };
 document.getElementById("games").append(...G.map(([id, ico, name, desc, tags, c1, c2], i) => {
