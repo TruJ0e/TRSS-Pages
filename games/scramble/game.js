@@ -30,7 +30,11 @@ function begin({ cards, mode, focus }) {
   run.hud = h("div", { class: "hud" });
   run.body = h("div", { class: "scr" });
   run.power = powerMeter({ max: 3, icon: "🪄", label: "Magic word", onUse: magic });
-  app.stage.replaceChildren(run.hud, run.power.el, run.body);
+  // the treasure vault: every solved word opens one lock
+  run.vault = h("div", { class: "vault", "aria-label": "Vault locks" },
+    h("div", { class: "vdoor" }, h("span", { class: "vwheel" }, "☸"), h("span", { class: "vtxt" }, "Treasure vault")),
+    h("div", { class: "locks" }, Array.from({ length: run.rounds }, () => h("i", { class: "lock" }, "🔒"))));
+  app.stage.replaceChildren(run.hud, run.vault, run.power.el, run.body);
   next();
 }
 
@@ -84,7 +88,7 @@ function next() {
     h("div", { class: "qcard meaning" }, h("div", { class: "label" }, h("span", {}, "Meaning"), sayBtn(defOf(card))), h("div", { class: "big" }, defOf(card)),
       h("div", { class: "cue" }, `${seq.length} letters · the first one is done for you`)),
     slotsWrap, r.q.msg, tray,
-    h("div", { class: "row" }, hintBtn, sayBtn(card.term, "Hear the word"), showBtn));
+    h("div", { class: "row" }, hintBtn, showBtn));
   r.q.slotsWrap = slotsWrap;
   // the first letter starts in place so every word has a foothold
   { const f = words[seq[0].wi].tiles.find((x) => x.ch === seq[0].ch); if (f) { q0(f); } }
@@ -155,6 +159,7 @@ async function solved() {
   if (!clean) { r.missed.push(q.card); r.deck.miss(q.card); }
   else { r.correct++; r.deck.hit(q.card); if (!q.magic) r.power.add(1); app.earn(q.mistakesHere + q.hintsHere === 0 ? 5 : 3); }
   q.slotsWrap.classList.add("win"); sfx.good();
+  openLock(r.n - 1, clean);
   q.msg.innerHTML = ""; q.msg.append(h("b", { class: "okword" }, "✓ " + q.card.term), " +" + pts);
   say(q.card.term);
   paintHud();
@@ -175,12 +180,23 @@ async function reveal() {
   const r = run, q = r.q; if (!q || q.done) return;
   q.done = true; r.n++; r.missed.push(q.card); r.deck.miss(q.card);
   q.pos = q.seq.length; paintSlots();
+  openLock(r.n - 1, false);
   await app.learn(q.card, { title: "Here's the word", note: "It'll come back later so you can try again." });
   if (run) next();
 }
 
-function finish() {
-  const r = run; run = null;
+function openLock(i, clean) {
+  const l = run && run.vault.querySelectorAll(".lock")[i]; if (!l) return;
+  l.textContent = clean ? "🔓" : "🔑"; l.classList.add(clean ? "open" : "helped");
+  run.vault.querySelector(".vwheel").classList.remove("spin"); void run.vault.offsetWidth; run.vault.querySelector(".vwheel").classList.add("spin");
+}
+
+async function finish() {
+  const r = run; if (!r) return;
+  r.vault.classList.add("opened"); r.vault.querySelector(".vtxt").textContent = "Vault open! 💰";
+  sfx.win(); app.earn(10); app.confetti();
+  await wait(1500);
+  run = null;
   app.results({ score: r.score, correct: r.correct, total: r.n, missed: r.missed, extra: [[r.hints, "hints"]] });
 }
 

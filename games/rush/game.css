@@ -34,3 +34,26 @@
 .bank { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
 .bank .sg { min-height: 52px; border-radius: 14px; text-align: center; line-height: 1.2; padding: 8px 10px; }
 .bank .sg.nope { animation: shake .35s; border-color: var(--bad); color: var(--bad); }
+/* meteor defence */
+.field { background: radial-gradient(1.5px 1.5px at 12% 18%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 38% 32%, #fff 50%, transparent 51%),
+  radial-gradient(1.5px 1.5px at 66% 12%, #dbeafe 50%, transparent 51%), radial-gradient(1px 1px at 84% 40%, #fff 50%, transparent 51%),
+  radial-gradient(1px 1px at 24% 55%, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 72% 62%, #fff 50%, transparent 51%),
+  linear-gradient(180deg, #0b1030 0%, #1b1f4d 55%, #3b2a5c 100%); }
+.skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; pointer-events: none; opacity: .95;
+  background: linear-gradient(0deg, #0c0a1c 0 12px, transparent 12px),
+    linear-gradient(90deg, transparent 0 4%, #171433 4% 12%, transparent 12% 15%, #1d1940 15% 22%, transparent 22% 26%, #171433 26% 38%, transparent 38% 41%, #1d1940 41% 47%, transparent 47% 58%, #171433 58% 66%, transparent 66% 69%, #1d1940 69% 80%, transparent 80% 84%, #171433 84% 95%, transparent 95%);
+  -webkit-mask: linear-gradient(0deg, #000 60%, transparent 100%); mask: linear-gradient(0deg, #000 60%, transparent 100%); }
+.cannon { position: absolute; left: 50%; bottom: 8px; width: 34px; height: 22px; margin-left: -17px; border-radius: 17px 17px 4px 4px; background: linear-gradient(#94a3b8, #475569); box-shadow: 0 0 12px rgba(34,211,238,.5); z-index: 2; }
+.cannon::before { content: ""; position: absolute; left: 14px; top: -12px; width: 6px; height: 14px; border-radius: 3px; background: #22d3ee; box-shadow: 0 0 10px #22d3ee; }
+.deadline { background: repeating-linear-gradient(90deg, #22d3ee 0 10px, transparent 10px 18px); opacity: .5; height: 3px; bottom: 34px; box-shadow: 0 0 8px #22d3ee; }
+.fall { border: 2px solid #fb923c; background: linear-gradient(180deg, rgba(60,20,10,.92), rgba(30,14,20,.95)); box-shadow: 0 0 18px rgba(251,146,60,.45), 0 8px 20px rgba(0,0,0,.5); }
+.fall::before { content: ""; position: absolute; left: 12%; right: 12%; bottom: 100%; height: 42px; border-radius: 50% 50% 0 0;
+  background: linear-gradient(0deg, rgba(251,146,60,.55), rgba(251,191,36,.15) 60%, transparent); filter: blur(3px); animation: flicker .25s infinite alternate; }
+.fall .label { color: #fdba74; }
+@keyframes flicker { to { opacity: .6; transform: scaleY(1.15); } }
+.beam { position: absolute; height: 4px; margin-top: -2px; transform-origin: 0 50%; background: linear-gradient(90deg, #22d3ee, #e0f2fe); box-shadow: 0 0 12px #22d3ee; border-radius: 4px; z-index: 3; animation: beam .35s ease-out forwards; }
+@keyframes beam { from { opacity: 1; } to { opacity: 0; } }
+.boom { position: absolute; width: 16px; height: 16px; margin: -8px; border-radius: 50%; z-index: 3; background: radial-gradient(#fff, #fde68a 40%, #fb923c 70%, transparent 72%); animation: boom .5s ease-out forwards; }
+@keyframes boom { to { transform: scale(7); opacity: 0; } }
+.field.hit { animation: shake .4s; box-shadow: inset 0 -30px 40px rgba(239,68,68,.5); }
+.bankbtn { min-height: 48px; }

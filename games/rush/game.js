@@ -14,10 +14,10 @@ const norm = (s) => String(s).toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a
 
 const app = createApp({
   id: "rush", title: "Type Rush", emoji: "⌨️",
-  tagline: "Type the term that matches each falling meaning.",
-  steps: ["A meaning drifts down the screen and is read aloud.",
-          "Tap the matching term in the word bank, or type it.",
-          "Close spelling still counts when you type."],
+  tagline: "Meteors are falling on the city! Type the right term to blast them.",
+  steps: ["A meaning falls like a meteor and is read aloud.",
+          "Type the matching term to fire your laser. Close spelling still counts.",
+          "Stuck? Tap 💡 for a word bank. Typing without it earns a bonus!"],
   modes: { relaxed: "One at a time. It waits for you.", challenge: "Up to 3 at once. 3 hearts." },
   minCards: 4, demo,
   onStart: begin,
@@ -33,16 +33,17 @@ function begin({ cards, mode, focus }) {
   run = { mode, cards, deck: makeDeck(focus ? [...new Set([...focus, ...cards])] : cards), items: [], n: 0, correct: 0, score: 0,
           hearts: 3, missed: [], speed: mode === "relaxed" ? 1 / 22 : 1 / 13, spawnT: 0, frozen: false, last: performance.now(), wrongTries: 0 };
   run.hud = h("div", { class: "hud" });
-  run.field = h("div", { class: "field" }, h("div", { class: "deadline" }));
+  run.field = h("div", { class: "field" }, h("div", { class: "skyline", "aria-hidden": "true" }), h("div", { class: "cannon", "aria-hidden": "true" }), h("div", { class: "deadline" }));
   run.input = h("input", { class: "guess", id: "guess", type: "text", autocomplete: "off", autocapitalize: "off", autocorrect: "off",
     spellcheck: "false", enterkeyhint: "done", placeholder: "Type the term…", "aria-label": "Type the term" });
   run.sugg = h("div", { class: "sugg bank", role: "group", "aria-label": "Word bank" });
   run.msg = h("div", { class: "rmsg", role: "status" });
   const go = h("button", { class: "btn primary gobtn", type: "button", onclick: () => submit(true) }, "Enter");
-  const helpBtn = h("button", { class: "btn ghost gobtn", type: "button", onclick: showMe, title: "Show me the answer" }, "🙈");
+  const helpBtn = h("button", { class: "btn ghost gobtn", type: "button", onclick: showMe, title: "Show me the answer", "aria-label": "Show me the answer" }, "🙈");
+  run.bankBtn = h("button", { class: "btn ghost bankbtn", type: "button", onclick: () => showBank(true) }, "💡 Word bank" + (mode === "challenge" ? " (−20)" : ""));
   run.slow = 0;
   run.power = powerMeter({ max: 3, icon: "🐢", label: "Slow-mo", onUse: () => { run.slow = 8; app.toast("🐢 Everything slows down for 8 seconds!"); run.field.classList.add("slowmo"); } });
-  app.stage.replaceChildren(run.hud, run.power.el, run.field, h("div", { class: "typebar" }, h("div", { class: "inrow" }, run.input, go, helpBtn), run.sugg, run.msg));
+  app.stage.replaceChildren(run.hud, run.power.el, run.field, h("div", { class: "typebar" }, h("div", { class: "inrow" }, run.input, go, helpBtn), run.bankBtn, run.sugg, run.msg));
   run.input.addEventListener("input", () => { unlockAudio(); submit(false); });
   run.input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(true); } });
   if (window.visualViewport) visualViewport.addEventListener("resize", fit);
@@ -81,6 +82,8 @@ function spawn() {
   paintBank();
   if (r.items.length === 1) say(defOf(card));
   r.wrongTries = 0;
+  // the word bank stays hidden at first; in Relaxed it offers itself after a while
+  if (r.items.length === 1) { hideBank(); clearTimeout(r.bankTimer); if (r.mode === "relaxed") r.bankTimer = setTimeout(() => run === r && showBank(false), 7000); }
 }
 
 function loop(now) {
@@ -140,12 +143,15 @@ async function clear(it, exact) {
   r.items = r.items.filter((x) => x !== it);
   r.correct++; r.n++;
   const height = 1 - it.y / Math.max(1, r.field.clientHeight);
-  const pts = 100 + Math.round(60 * Math.max(0, height)) - (exact ? 0 : 20);
+  const noHelp = !r.bankOpen;
+  const pts = 100 + Math.round(60 * Math.max(0, height)) - (exact ? 0 : 20) + (noHelp ? 50 : 0);
   r.score += pts; r.deck.hit(it.card); r.power.add(1);
   app.earn(exact ? 3 : 2);
   const b = it.el.getBoundingClientRect();
   app.floater(b.left + b.width / 2, b.top + 10, "+" + pts);
+  laser(it.el);
   it.el.classList.add("cleared"); setTimeout(() => it.el.remove(), 400);
+  if (noHelp) app.toast("🎯 No-help bonus +50", 1200);
   sfx.good();
   r.input.value = ""; paintBank();
   r.msg.replaceChildren(exact ? h("span", { class: "okw" }, "✓ " + it.card.term) : h("span", {}, "Close enough! It's spelled ", h("b", { class: "okw" }, it.card.term)));
@@ -187,9 +193,27 @@ async function showMe() {
   r.input.focus({ preventScroll: true });
 }
 
+function hideBank() { const r = run; r.bankOpen = false; r.sugg.hidden = true; r.bankBtn.hidden = false; fit(); }
+function showBank(asked) {
+  const r = run; if (!r || r.bankOpen) return;
+  if (asked && r.mode === "challenge") r.score = Math.max(0, r.score - 20);
+  r.bankOpen = true; r.sugg.hidden = false; r.bankBtn.hidden = true; paintBank(); paintHud(); fit();
+  if (!asked) app.toast("💡 Here's a word bank to help", 1400);
+}
+/* Laser from the city cannon to the meteor, then an explosion. */
+function laser(target) {
+  const r = run, f = r.field.getBoundingClientRect(), t = target.getBoundingClientRect();
+  const x0 = f.width / 2, y0 = f.height - 16, x1 = t.left - f.left + t.width / 2, y1 = t.top - f.top + t.height / 2;
+  const len = Math.hypot(x1 - x0, y1 - y0), ang = Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI;
+  const beam = h("i", { class: "beam", style: `left:${x0}px;top:${y0}px;width:${len}px;transform:rotate(${ang}deg)` });
+  const boom = h("i", { class: "boom", style: `left:${x1}px;top:${y1}px` });
+  r.field.append(beam, boom);
+  setTimeout(() => { beam.remove(); boom.remove(); }, 600);
+}
+
 /* Word bank: always 5 terms, including the answer for every falling meaning. */
 function paintBank() {
-  const r = run; if (!r) return;
+  const r = run; if (!r || !r.bankOpen) return;
   const need = r.items.map((i) => i.card);
   const keep = (r.bankCards || []).filter((c) => need.includes(c) || Math.random() < 0.5);
   let pool = [...new Set([...need, ...keep])];
