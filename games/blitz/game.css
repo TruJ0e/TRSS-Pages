@@ -23,3 +23,34 @@
 .td-btns .n { border-color: var(--bad); background: var(--bad-bg); }
 .td-btns .y { border-color: var(--good); background: var(--good-bg); animation: tdPress 2.4s infinite; }
 @keyframes tdPress { 0%, 55% { transform: none; box-shadow: none; } 62% { transform: scale(.9); } 70%, 95% { transform: scale(1.08); box-shadow: 0 0 0 6px rgba(52,209,124,.25); } }
+/* game show */
+.show { position: relative; }
+.marquee { position: relative; padding: 14px; border-radius: 26px; background: linear-gradient(180deg, #2a1745, #16122b); border: 2px solid #7c3aed;
+  box-shadow: 0 0 0 4px #1b1030, 0 0 30px rgba(124,58,237,.35); overflow: hidden; }
+.marquee::before { content: ""; position: absolute; inset: 4px; border-radius: 22px; pointer-events: none;
+  background: radial-gradient(circle, #fde68a 0 2.5px, transparent 3px) 0 0 / 18px 18px; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; padding: 5px; animation: bulbs 1s steps(2) infinite; opacity: .85; }
+@keyframes bulbs { 50% { background-position: 9px 0; } }
+.marquee .qcard { position: relative; z-index: 1; }
+.spot { position: absolute; top: -40px; width: 120px; height: 260px; pointer-events: none; opacity: .18; z-index: 0;
+  background: linear-gradient(180deg, #fff7c2, transparent); clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%); }
+.spot.l { left: 4%; transform: rotate(-18deg); animation: sweep 4s ease-in-out infinite alternate; }
+.spot.r { right: 4%; transform: rotate(18deg); animation: sweep 4s ease-in-out infinite alternate-reverse; }
+@keyframes sweep { to { transform: rotate(0deg); } }
+.marquee.win { animation: pop .4s; box-shadow: 0 0 0 4px #14532d, 0 0 40px rgba(52,209,124,.55); border-color: var(--good); }
+.marquee.win .spot { opacity: .45; }
+.marquee.buzz { animation: shake .45s; box-shadow: 0 0 0 4px #4c1414, 0 0 40px rgba(255,123,114,.45); border-color: var(--bad); }
+.tfbtn { border-radius: 999px; min-height: 96px; font-family: var(--display); letter-spacing: .04em; }
+.tfbtn.yes { background: radial-gradient(circle at 50% 30%, #3ee08a, #0f7a45); color: #fff; border-color: #a7f3c9; box-shadow: 0 8px 0 #0a4f2d, 0 10px 24px rgba(0,0,0,.45); }
+.tfbtn.no { background: radial-gradient(circle at 50% 30%, #ff8a80, #b42318); color: #fff; border-color: #ffd0cb; box-shadow: 0 8px 0 #6e1410, 0 10px 24px rgba(0,0,0,.45); }
+.tfbtn:active { transform: translateY(6px); box-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.banner { position: absolute; left: 50%; top: 38%; z-index: 5; transform: translate(-50%, -50%); white-space: nowrap; padding: 10px 22px; border-radius: 999px;
+  font-family: var(--display); font-weight: 700; font-size: 1.5em; color: #2a1a00; background: linear-gradient(90deg, #fde68a, #fbbf24); box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  animation: bannerIn 1.3s var(--ease) forwards; pointer-events: none; }
+@keyframes bannerIn { 0% { transform: translate(-50%, -50%) scale(.4); opacity: 0; } 20% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; } 80% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -80%) scale(.9); opacity: 0; } }
+.marquee::before { display: none; }
+.marquee { padding: 22px 14px; }
+.bulbs { position: absolute; left: 14px; right: 14px; height: 10px; pointer-events: none; z-index: 2;
+  background: radial-gradient(circle, #fde68a 0 3px, rgba(253,230,138,.25) 3.5px, transparent 5px) 0 50% / 20px 10px repeat-x; animation: bulbs .8s steps(2) infinite; }
+.bulbs.t { top: 6px; } .bulbs.b { bottom: 6px; animation-direction: reverse; }
+@keyframes bulbs { 50% { background-position: 10px 50%; } }
+.marquee.win .bulbs { background-image: radial-gradient(circle, #86efac 0 3px, rgba(134,239,172,.3) 3.5px, transparent 5px); animation-duration: .25s; }

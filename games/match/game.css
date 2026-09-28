@@ -60,3 +60,14 @@
 .ghostcard.meaning { background: var(--meaning-bg); border-color: var(--meaning); color: var(--meaning); }
 .mtile.gold .back { box-shadow: inset 0 0 0 3px #ffd166, 0 0 14px rgba(255,209,102,.45); }
 .mtile.gold .back::after { content: "✨"; position: absolute; top: 8px; right: 10px; }
+/* card-table look */
+.mgrid { padding: 12px; border-radius: 24px; background: radial-gradient(ellipse at 50% 30%, #1f5a45, #123a2d 70%); border: 6px solid #6b4423;
+  box-shadow: inset 0 0 30px rgba(0,0,0,.45), 0 12px 30px rgba(0,0,0,.4); }
+.mtile .back { box-shadow: 0 6px 12px rgba(0,0,0,.35); }
+.mtile.term .back { background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.12), transparent 60%), repeating-linear-gradient(45deg, #1d4f7a 0 10px, #184468 10px 20px); border-color: #7cc4f5; }
+.mtile.meaning .back { background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.12), transparent 60%), repeating-linear-gradient(45deg, #1d6a50 0 10px, #185a44 10px 20px); border-color: #7ee2b8; }
+.mtile .mk { background: rgba(0,0,0,.35); box-shadow: inset 0 0 0 2px currentColor; }
+.mtile:not(.up):hover .inner { transform: translateY(-3px) rotateY(8deg); }
+.mtile .front { box-shadow: 0 6px 14px rgba(0,0,0,.35); }
+.mtile.good .front { background: linear-gradient(180deg, #1f6b44, #173d2d); }
+.munch { padding: 8px 12px; border-radius: 22px; background: linear-gradient(180deg, rgba(124,58,237,.18), transparent); }

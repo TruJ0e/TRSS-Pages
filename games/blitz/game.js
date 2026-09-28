@@ -29,7 +29,7 @@ function begin({ cards, mode, focus }) {
   run = { mode, cards, deck: makeDeck(focus ? shuffle([...focus, ...cards]).slice(0, Math.max(ROUND, focus.length)) : cards),
           n: 0, correct: 0, score: 0, streak: 0, best: 0, missed: [], left: SECONDS, frozen: false, busy: false };
   run.hud = h("div", { class: "hud" });
-  run.body = h("div", { class: "tf" });
+  run.body = h("div", { class: "tf show" });
   run.double = 0; run.freeze = 0;
   run.power = powerMeter(mode === "challenge"
     ? { max: 4, icon: "❄️", label: "Freeze 10s", onUse: () => { run.freeze = 10; app.toast("❄️ Clock frozen for 10 seconds!"); paintHud(); } }
@@ -72,7 +72,7 @@ function next() {
   const fBtn = h("button", { class: "tfbtn no", type: "button", onclick: () => answer(false) }, h("span", { class: "ic" }, "✗"), "False");
   r.btns = { tBtn, fBtn };
   r.body.replaceChildren(
-    h("div", { class: "statement" },
+    h("div", { class: "statement marquee" }, h("i", { class: "spot l", "aria-hidden": "true" }), h("i", { class: "spot r", "aria-hidden": "true" }), h("i", { class: "bulbs t", "aria-hidden": "true" }), h("i", { class: "bulbs b", "aria-hidden": "true" }),
       h("div", { class: "qcard term" }, h("div", { class: "label" }, h("span", {}, "Term"), sayBtn(card.term)), h("div", { class: "big termword" }, card.term)),
       h("div", { class: "means", "aria-hidden": "true" }, "means…"),
       h("div", { class: "qcard meaning" }, h("div", { class: "label" }, h("span", {}, "Meaning"), sayBtn(defOf(shown))), h("div", { class: "big" }, defOf(shown)))),
@@ -94,11 +94,13 @@ async function answer(saysTrue) {
     r.score += pts; r.deck.hit(r.q.card); r.power.add(1);
     app.earn(r.streak % 5 === 0 ? 6 : 2);
     btn.classList.add("picked-good"); sfx.good();
+    cheer(r.streak);
     const b = btn.getBoundingClientRect(); app.floater(b.left + b.width / 2, b.top, "+" + pts);
     paintHud(); await wait(550);
   } else {
     r.streak = 0; r.deck.miss(r.q.card); r.missed.push(r.q.card);
     btn.classList.add("picked-bad"); sfx.bad(); paintHud();
+    r.body.querySelector(".statement").classList.add("buzz");
     await wait(450);
     const note = r.q.isTrue
       ? "That meaning really did belong to this term, so the answer was TRUE."
@@ -129,4 +131,15 @@ function demo(el) {
   el.classList.add("tf-demo");
   el.append(h("div", { class: "td-card" }, h("b", {}, "emotion"), h("span", {}, "a body reaction plus a feeling")),
     h("div", { class: "td-btns" }, h("i", { class: "n" }, "✗"), h("i", { class: "y" }, "✓")));
+}
+
+/* game-show feedback: spotlights flash, streak banners */
+function cheer(streak) {
+  const st = run && run.body.querySelector(".statement"); if (!st) return;
+  st.classList.add("win");
+  if (streak === 3 || streak === 5 || streak % 10 === 0) {
+    const label = streak >= 10 ? "🏆 UNSTOPPABLE!" : streak >= 5 ? "🔥 ON FIRE!" : "⚡ HEATING UP!";
+    const b = h("div", { class: "banner" }, label); run.body.append(b); setTimeout(() => b.remove(), 1300);
+    sfx.win();
+  }
 }
