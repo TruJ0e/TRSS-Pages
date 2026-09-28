@@ -4,7 +4,7 @@
  * A wrong pair stays face-up until the player taps to continue, so there's
  * always time to read. Relaxed: 4 pairs, no clock. Challenge: 6 pairs + clock.
  */
-import { createApp, shuffle, h, wait, defOf, say, sfx, stopSpeak, powerMeter } from "../common/kit.js?v=6";
+import { createApp, shuffle, h, wait, defOf, say, sfx, stopSpeak, powerMeter } from "../common/kit.js?v=7";
 
 let run = null, clock = 0;
 

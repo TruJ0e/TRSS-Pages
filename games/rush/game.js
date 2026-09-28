@@ -6,7 +6,7 @@
  * Relaxed: one meaning at a time, 10 words, and a meaning that lands just
  * waits. Challenge: up to 3 at once, faster and faster, 3 hearts.
  */
-import { createApp, makeDeck, h, wait, defOf, say, sfx, editDistance, unlockAudio, powerMeter, shuffle, pickDistractors } from "../common/kit.js?v=6";
+import { createApp, makeDeck, h, wait, defOf, say, sfx, editDistance, unlockAudio, powerMeter, shuffle, pickDistractors } from "../common/kit.js?v=7";
 
 const ROUND = 10;
 let run = null, raf = 0;
@@ -46,7 +46,7 @@ function begin({ cards, mode, focus }) {
   run.input.addEventListener("input", () => { unlockAudio(); submit(false); });
   run.input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(true); } });
   if (window.visualViewport) visualViewport.addEventListener("resize", fit);
-  fit(); paintHud(); spawn();
+  paintHud(); spawn(); fit(); setTimeout(fit, 60);
   setTimeout(() => run && run.input.focus({ preventScroll: true }), 200);
   raf = requestAnimationFrame(loop);
 }
@@ -56,8 +56,9 @@ function fit() {
   if (!run) return;
   const vh = window.visualViewport ? visualViewport.height : innerHeight;
   const top = run.field.getBoundingClientRect().top + (window.visualViewport ? visualViewport.pageTop - scrollY : 0);
-  const below = 150;
-  run.field.style.height = Math.max(170, Math.min(520, vh - Math.max(60, top) - below)) + "px";
+  const bar = run.field.nextElementSibling;
+  const below = (bar ? bar.offsetHeight : 260) + 28;
+  run.field.style.height = Math.max(150, Math.min(460, vh - Math.max(60, top) - below)) + "px";
 }
 
 function paintHud() {

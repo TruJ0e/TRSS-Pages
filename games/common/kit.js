@@ -616,10 +616,13 @@ export const store_ = store;
  *  powerMeter({ max, label, icon, onUse }) -> { el, add(n), reset() } */
 export function powerMeter({ max = 4, label, icon: ic = "⚡", onUse }) {
   let v = 0;
-  const bar = h("i"), prog = h("div", { class: "progress", "aria-hidden": "true" }, bar);
-  const btn = h("button", { class: "powbtn", type: "button", disabled: true, onclick: () => { if (v < max) return; v = 0; paint(); sfx.power(); onUse(); } }, ic + " " + label);
-  const el = h("div", { class: "powerbar", title: "Answer correctly to charge your power" }, prog, btn);
-  const paint = () => { bar.style.width = (v / max) * 100 + "%"; btn.disabled = v < max; btn.classList.toggle("ready", v >= max); };
+  const fill = h("i", { class: "pfill" }), txt = h("span", { class: "ptxt" });
+  const btn = h("button", { class: "powbtn", type: "button", disabled: true, onclick: () => { if (v < max) return; v = 0; paint(); sfx.power(); onUse(); } }, fill, h("span", { class: "pic" }, ic), txt);
+  const el = h("div", { class: "powerbar" }, btn);
+  const paint = () => {
+    fill.style.width = (v / max) * 100 + "%"; btn.disabled = v < max; btn.classList.toggle("ready", v >= max);
+    txt.textContent = v >= max ? label + " — tap to use!" : `${label} · ${max - v} more right ${max - v === 1 ? "answer" : "answers"}`;
+  };
   paint();
   return { el, add(n = 1) { const was = v >= max; v = Math.min(max, v + n); paint(); if (!was && v >= max) sfx.lock(); }, reset() { v = 0; paint(); } };
 }

@@ -8,7 +8,7 @@
  * cost gems, then the treasure chest at the bottom. Challenge: endless,
  * faster, lava pockets deeper down, wrong doors cost hearts.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, reducedMotion, steerPad, unlockAudio } from "../common/kit.js?v=6";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, reducedMotion, steerPad, unlockAudio } from "../common/kit.js?v=7";
 
 const ROUND = 10;
 let run = null, raf = 0, genTo = 0, hudT = 0;

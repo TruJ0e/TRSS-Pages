@@ -8,7 +8,7 @@
  * Relaxed: 10 perches, falling in just costs a couple of coins.
  * Challenge: falls and wrong pads cost hearts, climbs get longer and trickier.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, reducedMotion, steerPad } from "../common/kit.js?v=6";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, reducedMotion, steerPad } from "../common/kit.js?v=7";
 
 const ROUND = 10;
 let run = null, raf = 0;
@@ -267,7 +267,11 @@ function draw() {
     const g = c.createRadialGradient(p.x + p.w * .4, p.y, 4, p.x + p.w / 2, p.y + 6, p.w * .7);
     const col = p.type === "crumble" ? ["#d9b778", "#8a6d3b"] : p.type === "move" ? ["#8fe0ff", "#2f86b0"] : ["#5fd48d", "#2f9e63"];
     g.addColorStop(0, col[0]); g.addColorStop(1, col[1]);
-    c.fillStyle = g; c.beginPath(); c.ellipse(p.x + p.w / 2, p.y + 7 * k, p.w / 2, 11 * k, 0, 0, 6.29); c.fill();
+    const cx = p.x + p.w / 2, cy = p.y + 7 * k, rx = p.w / 2, ry = 11 * k;
+    c.fillStyle = "rgba(0,0,0,.22)"; c.beginPath(); c.ellipse(cx + 3, cy + 5, rx, ry, 0, 0, 6.29); c.fill();
+    c.fillStyle = g; c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0.25, 6.03); c.lineTo(cx, cy); c.closePath(); c.fill();   // notched leaf
+    c.strokeStyle = "rgba(255,255,255,.18)"; c.lineWidth = 1.5; c.beginPath(); c.ellipse(cx, cy - 1, rx * .8, ry * .6, 0, 3.4, 6); c.stroke();
+    c.strokeStyle = "rgba(0,0,0,.15)"; for (const a of [2.2, 3.1, 4.0]) { c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * rx * .8, cy + Math.sin(a) * ry * .8); c.stroke(); }
     if (p.type === "crumble") { c.strokeStyle = "rgba(60,40,10,.6)"; c.beginPath(); c.moveTo(p.x + p.w * .3, p.y + 2); c.lineTo(p.x + p.w * .45, p.y + 12); c.lineTo(p.x + p.w * .6, p.y + 4); c.stroke(); }
   }
   c.font = `${Math.round(22 * Math.max(.8, k))}px sans-serif`; c.textAlign = "center"; c.textBaseline = "middle";
@@ -280,8 +284,11 @@ function draw() {
     const pct = Math.max(0, r.climbLeft / r.climbTotal);
     c.fillStyle = "rgba(0,0,0,.35)"; c.fillRect(12, 12, W - 24, 8);
     c.fillStyle = "#ffb020"; c.fillRect(12, 12, (W - 24) * (1 - pct), 8);
-    c.fillStyle = "#fff"; c.font = "600 13px Lexend, sans-serif"; c.textAlign = "left";
-    c.fillText(`🪰 ${r.flies}   ❓ question soon`, 14, 34);
+    const label = `🪰 ${r.flies} caught  ·  ❓ question soon`;
+    c.font = "600 13px Lexend, sans-serif"; const lw = c.measureText(label).width + 22;
+    c.fillStyle = "rgba(8,20,30,.72)"; c.beginPath(); c.roundRect ? c.roundRect(12, 26, lw, 26, 13) : c.rect(12, 26, lw, 26); c.fill();
+    c.fillStyle = "#fff"; c.textAlign = "left"; c.textBaseline = "middle";
+    c.fillText(label, 23, 39.5);
   }
 }
 function drawFrog(c, x, y, vy, face, k) {
