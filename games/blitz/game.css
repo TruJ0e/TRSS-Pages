@@ -54,3 +54,39 @@
 .bulbs.t { top: 6px; } .bulbs.b { bottom: 6px; animation-direction: reverse; }
 @keyframes bulbs { 50% { background-position: 10px 50%; } }
 .marquee.win .bulbs { background-image: radial-gradient(circle, #86efac 0 3px, rgba(134,239,172,.3) 3.5px, transparent 5px); animation-duration: .25s; }
+/* eggs & creatures */
+.eggbox { display: flex; align-items: center; gap: 16px; padding: 10px 14px; border-radius: 20px; background: linear-gradient(135deg, #1e2a4a, #151d33); border: 1px solid var(--line); min-height: 124px; }
+.nest { position: relative; width: 96px; height: 108px; flex: none; display: grid; place-items: end center; }
+.nest::after { content: ""; position: absolute; bottom: 0; left: 4px; right: 4px; height: 22px; border-radius: 50%; background: repeating-linear-gradient(20deg, #8b5a2b 0 4px, #a16207 4px 8px); box-shadow: 0 4px 10px rgba(0,0,0,.4); z-index: 0; }
+.egg { position: relative; z-index: 1; width: 70px; height: 88px; margin-bottom: 9px; border-radius: 50% 50% 48% 48% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 30% 70%, var(--eb) 0 6px, transparent 7px), radial-gradient(circle at 70% 45%, var(--eb) 0 5px, transparent 6px),
+    radial-gradient(circle at 45% 28%, var(--eb) 0 4px, transparent 5px), radial-gradient(ellipse at 35% 30%, #fff, var(--ea) 70%);
+  box-shadow: inset -8px -10px 16px rgba(0,0,0,.18); transform-origin: 50% 90%; }
+.egg .shine { position: absolute; left: 18%; top: 14%; width: 14px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.6); transform: rotate(20deg); }
+.egg .cracks, .egg .cracks svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.egg .cracks path { fill: none; stroke: #3b2a1a; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 60; stroke-dashoffset: 60; transition: stroke-dashoffset .35s; }
+.egg.c1 .c1, .egg.c2 .c2, .egg.c3 .c3 { stroke-dashoffset: 0; }
+.egg.hit { animation: eggHit .45s; }
+.egg.wob { animation: eggWob .6s; }
+.egg.burst { animation: eggBurst .5s forwards; }
+@keyframes eggHit { 20% { transform: rotate(-9deg) scale(1.05); } 45% { transform: rotate(8deg); } 70% { transform: rotate(-4deg); } }
+@keyframes eggWob { 25% { transform: rotate(5deg); } 50% { transform: rotate(-5deg); } 75% { transform: rotate(3deg); } }
+@keyframes eggBurst { 40% { transform: scale(1.2); filter: brightness(1.8); } 100% { transform: scale(.2); opacity: 0; } }
+.creature { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; }
+.creature .emo { position: relative; font-size: 64px; line-height: 1; animation: popOut .7s cubic-bezier(.2,1.6,.4,1) both; filter: drop-shadow(0 8px 12px rgba(0,0,0,.5)); }
+.creature .rays { position: absolute; width: 130px; height: 130px; border-radius: 50%; background: repeating-conic-gradient(rgba(255,209,102,.5) 0 12deg, transparent 12deg 30deg); animation: spin 4s linear infinite; }
+.creature.rare .rays { background: repeating-conic-gradient(rgba(196,181,253,.75) 0 12deg, transparent 12deg 30deg); width: 150px; height: 150px; }
+@keyframes popOut { 0% { transform: scale(0) translateY(30px); } 100% { transform: scale(1) translateY(-8px); } }
+.eggside { display: grid; gap: 6px; }
+.eggside b { font-family: var(--display); font-size: 1.1em; line-height: 1.2; }
+.eggside span { color: var(--muted); font-size: .85em; }
+.eggdots { display: flex; gap: 6px; }
+.eggdots i { width: 24px; height: 10px; border-radius: 99px; background: var(--surface2); border: 1px solid var(--line); }
+.eggdots i.on { background: linear-gradient(90deg, #fbbf24, #f59e0b); border-color: #fbbf24; }
+.dexbox { display: grid; gap: 8px; padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+.dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
+.dexitem { height: 44px; display: grid; place-items: center; border-radius: 12px; background: var(--bg2); font-size: 26px; color: var(--muted); opacity: .5; }
+.dexitem.got { opacity: 1; background: var(--surface2); }
+.dexitem.rare.got { background: linear-gradient(135deg, #3b2a6b, #1f2e4b); box-shadow: 0 0 0 2px #a78bfa; }
+.dexnew { margin: 0; color: var(--muted); }
+.eggbox { overflow: hidden; }

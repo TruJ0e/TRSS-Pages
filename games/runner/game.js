@@ -12,7 +12,7 @@
  * Relaxed: 10 gates, the runner waits at each gate, falls/crashes only cost
  * coins. Challenge: faster, endless, falls/crashes and wrong gates cost hearts.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion, fx, skin } from "../common/kit.js?v=9";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, answerList, reducedMotion, fx, skin } from "../common/kit.js?v=10";
 
 const ROUND = 10;
 const LANE = 2.2;                  // lane width (world units)

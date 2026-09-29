@@ -10,7 +10,7 @@
  *
  * Controls: ◀ ▶ buttons, swipe or tap left/right of the drill, arrow keys.
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, reducedMotion, unlockAudio, fx, skin } from "../common/kit.js?v=9";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, reducedMotion, unlockAudio, fx, skin } from "../common/kit.js?v=10";
 
 const ROUND = 10, COLS = 7, DOORS = [1, 3, 5];
 const HARD = { dirt: 0.22, clay: 0.34, stone: 0.7, gem: 0.3, gold: 0.3, empty: 0.06, door: 0.3 };

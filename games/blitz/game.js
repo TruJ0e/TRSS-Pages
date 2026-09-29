@@ -3,17 +3,17 @@
  * Relaxed: 10 statements, no clock. Challenge: 60 seconds, streak bonus.
  * A wrong answer opens the Learn-it card (the clock stops while it's open).
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, powerMeter } from "../common/kit.js?v=9";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, powerMeter } from "../common/kit.js?v=10";
 
 const ROUND = 10, SECONDS = 60;
 let run = null, timer = 0;
 
 const app = createApp({
   id: "blitz", title: "True or False", emoji: "⚡",
-  tagline: "Does this meaning go with this term? Decide true or false.",
+  tagline: "Answer right to crack the egg. What will hatch? A dragon? A unicorn?",
   steps: ["Read the term and the meaning under it.",
-          "Tap ✓ True if they go together.",
-          "Tap ✗ False if the meaning belongs to a different term."],
+          "Tap ✓ True if they go together, ✗ False if they don't.",
+          "Every right answer cracks the egg. Three cracks and a creature hatches for your collection!"],
   modes: { relaxed: "10 questions. No clock.", challenge: "60 seconds. Build a streak." },
   minCards: 4, demo,
   onStart: begin,
@@ -34,7 +34,10 @@ function begin({ cards, mode, focus }) {
   run.power = powerMeter(mode === "challenge"
     ? { max: 4, icon: "❄️", label: "Freeze 10s", onUse: () => { run.freeze = 10; app.toast("❄️ Clock frozen for 10 seconds!"); paintHud(); } }
     : { max: 4, icon: "✨", label: "Double ×3", onUse: () => { run.double = 3; app.toast("✨ Next 3 right answers score double!"); paintHud(); } });
-  app.stage.replaceChildren(run.hud, run.power.el, run.body);
+  run.hatched = [];
+  run.eggBox = h("div", { class: "eggbox" });
+  app.stage.replaceChildren(run.hud, run.eggBox, run.power.el, run.body);
+  newEgg();
   if (mode === "challenge") timer = setInterval(tick, 1000);
   paintHud(); next();
 }
@@ -95,12 +98,14 @@ async function answer(saysTrue) {
     app.earn(r.streak % 5 === 0 ? 6 : 2);
     btn.classList.add("picked-good"); sfx.good();
     cheer(r.streak);
+    crack();
     const b = btn.getBoundingClientRect(); app.floater(b.left + b.width / 2, b.top, "+" + pts);
     paintHud(); await wait(550);
   } else {
     r.streak = 0; r.deck.miss(r.q.card); r.missed.push(r.q.card);
     btn.classList.add("picked-bad"); sfx.bad(); paintHud();
     r.body.querySelector(".statement").classList.add("buzz");
+    wobble();
     await wait(450);
     const note = r.q.isTrue
       ? "That meaning really did belong to this term, so the answer was TRUE."
@@ -114,11 +119,75 @@ async function answer(saysTrue) {
   paintHud(); next();
 }
 
-function finish() {
-  const r = run; stop();
+async function finish() {
+  const r = run; if (!r) return; stop();
+  if (r.hatching) await r.hatching;
   app.results({ score: r.score, correct: r.correct, total: r.n, missed: r.missed,
-    extra: [[r.best, "best streak"]] });
+    extra: [[r.best, "best streak"], [r.hatched.length, "hatched"]] });
+  showCollection(r.hatched);
 }
+
+/* ================================================= eggs & creatures */
+/* Every right answer cracks the egg; three cracks hatch a creature. Wrong
+   answers only make the egg wobble — progress is never taken away. */
+const COMMON = [["🐣", "Chick"], ["🐰", "Bunny"], ["🐼", "Panda"], ["🐨", "Koala"], ["🦊", "Fox cub"], ["🐧", "Penguin"], ["🦦", "Otter"],
+  ["🐢", "Turtle"], ["🐙", "Octopus"], ["🦉", "Owlet"], ["🐱", "Kitten"], ["🐶", "Puppy"], ["🦥", "Sloth"], ["🦔", "Hedgehog"], ["🐹", "Hamster"], ["🦭", "Seal pup"]];
+const RARE = [["🐉", "Dragon"], ["🐲", "Baby dragon"], ["🦄", "Unicorn"], ["🐦‍🔥", "Phoenix"], ["🦖", "T-rex"], ["🦕", "Long-neck dino"],
+  ["🦑", "Kraken"], ["🐍", "Sea serpent"], ["🦅", "Griffin"], ["🧚", "Fairy"], ["🧜", "Merfolk"]];
+const EGG_COLS = [["#fde68a", "#f59e0b"], ["#bfdbfe", "#3b82f6"], ["#fbcfe8", "#db2777"], ["#bbf7d0", "#16a34a"], ["#ddd6fe", "#7c3aed"], ["#fed7aa", "#ea580c"]];
+const CRACKS = 3;
+const loadDex = () => { try { return JSON.parse(localStorage.getItem("trss-creatures") || "{}"); } catch { return {}; } };
+const saveDex = (d) => { try { localStorage.setItem("trss-creatures", JSON.stringify(d)); } catch {} };
+
+function newEgg() {
+  const r = run; if (!r) return;
+  r.cracks = 0;
+  const [a, b] = EGG_COLS[(Math.random() * EGG_COLS.length) | 0];
+  r.egg = h("div", { class: "egg", style: `--ea:${a};--eb:${b}`, role: "img", "aria-label": "Egg: 0 of 3 cracks" },
+    h("span", { class: "shine" }),
+    h("span", { class: "cracks", html:
+      '<svg viewBox="0 0 100 120"><path class="c1" d="M18 58 L30 50 L38 60 L50 52"/><path class="c2" d="M50 52 L60 62 L68 50 L82 58"/><path class="c3" d="M50 52 L47 70 L55 82 L50 98"/></svg>' }));
+  const dots = h("div", { class: "eggdots" }, Array.from({ length: CRACKS }, () => h("i")));
+  r.eggBox.replaceChildren(h("div", { class: "nest" }, r.egg), h("div", { class: "eggside" }, h("b", {}, "Crack the egg!"), h("span", {}, "Each right answer cracks it"), dots));
+  r.dots = dots;
+}
+function crack() {
+  const r = run; if (!r || !r.egg || r.cracks >= CRACKS) return;
+  r.cracks++;
+  r.egg.classList.remove("hit"); void r.egg.offsetWidth; r.egg.classList.add("hit", "c" + r.cracks);
+  r.egg.setAttribute("aria-label", `Egg: ${r.cracks} of ${CRACKS} cracks`);
+  [...r.dots.children].forEach((d, i) => d.classList.toggle("on", i < r.cracks));
+  sfx.lock();
+  if (r.cracks >= CRACKS) r.hatching = hatch();
+}
+function wobble() { const r = run; if (r && r.egg) { r.egg.classList.remove("wob"); void r.egg.offsetWidth; r.egg.classList.add("wob"); } }
+async function hatch() {
+  const r = run;
+  const rare = Math.random() < Math.min(0.6, 0.22 + r.streak * 0.04);   // streaks make rare creatures likelier
+  const pool = rare ? RARE : COMMON;
+  const [emo, name] = pool[(Math.random() * pool.length) | 0];
+  r.hatched.push({ emo, name, rare });
+  const dex = loadDex(); dex[emo] = { name, n: ((dex[emo] && dex[emo].n) || 0) + 1, rare }; saveDex(dex);
+  await wait(250);
+  if (run !== r) return;
+  r.egg.classList.add("burst");
+  r.egg.parentElement.append(h("div", { class: "creature" + (rare ? " rare" : "") }, h("span", { class: "rays" }), h("span", { class: "emo" }, emo)));
+  r.eggBox.querySelector(".eggside").replaceChildren(h("b", {}, rare ? "✨ RARE! A " + name + "!" : "It's a " + name + "!"), h("span", {}, rare ? "A mythical creature joins your collection" : "Added to your collection"));
+  rare ? sfx.win() : sfx.power();
+  app.earn(rare ? 10 : 4);
+  await wait(1800);
+  if (run === r) newEgg();
+}
+function showCollection(list) {
+  const res = document.querySelector(".results"); if (!res) return;
+  const dex = loadDex(), all = Object.keys(dex).length;
+  const box = h("div", { class: "dexbox" },
+    h("div", { class: "label" }, `Your creature collection · ${all} of ${COMMON.length + RARE.length} found`),
+    h("div", { class: "dex" }, [...COMMON, ...RARE].map(([e, n]) => h("span", { class: "dexitem" + (dex[e] ? " got" : "") + (RARE.some((x) => x[0] === e) ? " rare" : ""), title: dex[e] ? n : "Not found yet" }, dex[e] ? e : "?"))),
+    list.length ? h("p", { class: "dexnew" }, "Hatched this round: ", list.map((c) => c.emo).join(" ")) : null);
+  res.querySelector(".statgrid").after(box);
+}
+
 
 document.addEventListener("keydown", (e) => {
   if (!run || document.querySelector(".scrim")) return;
