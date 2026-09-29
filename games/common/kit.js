@@ -568,6 +568,7 @@ export function createApp(cfg) {
   }
   function floater(x, y, text, color) {
     if (fx.quiet) return;
+    x = Math.max(60, Math.min(innerWidth - 60, x)); y = Math.max(40, y);   // keep popups on screen
     const f = h("div", { class: "floater", style: `left:${x}px;top:${y}px;${color ? "color:" + color : ""}` }, text);
     document.body.append(f); setTimeout(() => f.remove(), 1000);
   }

@@ -3,7 +3,7 @@
  * Relaxed: 10 statements, no clock. Challenge: 60 seconds, streak bonus.
  * A wrong answer opens the Learn-it card (the clock stops while it's open).
  */
-import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, powerMeter } from "../common/kit.js?v=10";
+import { createApp, makeDeck, pickDistractors, shuffle, h, wait, defOf, say, sfx, sayBtn, powerMeter } from "../common/kit.js?v=11";
 
 const ROUND = 10, SECONDS = 60;
 let run = null, timer = 0;

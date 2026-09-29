@@ -305,3 +305,4 @@ html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-mo
 .demo.live-demo canvas { display: block; width: 100%; height: 100%; }
 .demo.live-demo::after { content: "▶ PREVIEW"; position: absolute; top: 10px; left: 12px; font-size: .62em; font-weight: 700; letter-spacing: .12em;
   padding: 3px 8px; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff; }
+.floater { white-space: nowrap; }

@@ -7,7 +7,7 @@
  * Wrong pairs stay face-up until the player taps on, so there's time to read.
  * Relaxed: no clock. Challenge: the clock runs and fewer flips score more.
  */
-import { createApp, shuffle, h, wait, defOf, say, sfx, stopSpeak, powerMeter, sayBtn } from "../common/kit.js?v=10";
+import { createApp, shuffle, h, wait, defOf, say, sfx, stopSpeak, powerMeter, sayBtn } from "../common/kit.js?v=11";
 
 const PAIRS = 12;
 let run = null, clock = 0;

@@ -1,217 +1,284 @@
-/* Word Scramble — spell the term from its letters, one word at a time.
+/* Word Wheel — a Wheel-of-Fortune-style spelling game.
  *
- * Built for dyslexic players: each word of the term is scrambled on its own
- * row (spaces and hyphens stay put), letters are UPPERCASE to avoid b/d/p/q
- * mix-ups, a right letter locks in green, a wrong letter just bounces back
- * (nothing you've built is wiped), and hints are free in Relaxed mode.
+ * The meaning is the clue. The term hides on a puzzle board (first letter
+ * already showing). Spin the wheel, then pick a consonant: every copy of it
+ * on the board pays the wedge value. Vowels are free in Relaxed and cost 250
+ * in Challenge. Tap "Solve" to type the answer (close spelling counts).
+ * Relaxed: 6 puzzles, no Bankrupt, and after a few misses the right key
+ * glows. Challenge: 8 puzzles, Bankrupt is on the wheel, vowels cost.
  */
-import { createApp, makeDeck, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, powerMeter } from "../common/kit.js?v=10";
+import { createApp, makeDeck, shuffle, h, wait, defOf, say, sfx, sayBtn, unlockAudio, editDistance, reducedMotion } from "../common/kit.js?v=11";
 
 let run = null;
+const VOWELS = "AEIOU";
 const ok = (t) => /^[A-Za-z][A-Za-z '\-]*$/.test(t) && t.split(/[\s-]+/).length <= 3 &&
   t.split(/[\s-]+/).every((w) => w.replace(/'/g, "").length <= 12) && t.replace(/[^A-Za-z]/g, "").length <= 22;
 
 const app = createApp({
-  id: "scramble", title: "Word Scramble", emoji: "🔤",
-  tagline: "Read the meaning, then build the term letter by letter.",
-  steps: ["Read (or listen to) the meaning.",
-          "Tap the letters in order to spell the term.",
-          "Right letters lock in. Stuck? Tap 💡 Hint — it's free."],
-  modes: { relaxed: "8 words. Free hints. Helpful glow.", challenge: "10 words. Hints cost points." },
+  id: "scramble", title: "Word Wheel", emoji: "🎡",
+  tagline: "Spin the wheel, pick letters, and solve the puzzle!",
+  steps: ["Read the clue — it's the meaning of the hidden term.",
+          "Tap SPIN, then pick a letter. Every match on the board wins the wheel's points.",
+          "Vowels are free in Relaxed. Know it? Tap SOLVE and type the term!"],
+  modes: { relaxed: "5 puzzles. No Bankrupt. Free vowels.", challenge: "7 puzzles. Bankrupt! Vowels cost 250." },
   minCards: 4, demo,
   filter: (cards) => cards.filter((c) => ok(c.term)),
   onStart: begin, onQuit: () => (run = null),
 });
 
+function wedges(mode) {
+  const w = [300, 500, 250, 800, 400, "FREE", 600, 200, 1000, 350, 450, mode === "challenge" ? "BANKRUPT" : 700];
+  const cols = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316", "#eab308", "#6366f1", "#10b981", mode === "challenge" ? "#111827" : "#0ea5e9"];
+  return w.map((v, i) => ({ v, col: cols[i] }));
+}
+
 function begin({ cards, mode, focus }) {
-  const rounds = mode === "relaxed" ? 8 : 10;
+  const rounds = mode === "relaxed" ? 5 : 7;
   const pool = focus ? [...focus.filter((c) => ok(c.term)), ...cards] : cards;
-  run = { mode, rounds, deck: makeDeck([...new Set(pool)]), n: 0, score: 0, correct: 0, mistakes: 0, hints: 0, missed: [] };
+  run = { mode, rounds, deck: makeDeck([...new Set(pool)]), n: 0, score: 0, correct: 0, missed: [], wedges: wedges(mode), angle: 0, spinning: false };
   run.hud = h("div", { class: "hud" });
-  run.body = h("div", { class: "scr" });
-  run.power = powerMeter({ max: 3, icon: "🪄", label: "Magic word", onUse: magic });
-  // the treasure vault: every solved word opens one lock
-  run.vault = h("div", { class: "vault", "aria-label": "Vault locks" },
-    h("div", { class: "vdoor" }, h("span", { class: "vwheel" }, "☸"), h("span", { class: "vtxt" }, "Treasure vault")),
-    h("div", { class: "locks" }, Array.from({ length: run.rounds }, () => h("i", { class: "lock" }, "🔒"))));
-  app.stage.replaceChildren(run.hud, run.vault, run.power.el, run.body);
+  run.body = h("div", { class: "wheelgame" });
+  app.stage.replaceChildren(run.hud, run.body);
   next();
 }
 
 function paintHud() {
-  const r = run;
+  const r = run; if (!r) return;
   r.hud.replaceChildren(h("div", { class: "progress" }, h("i", { style: `width:${(r.n / r.rounds) * 100}%` })),
-    h("span", { class: "chip" }, h("b", {}, Math.min(r.n + 1, r.rounds)), " / " + r.rounds),
-    h("span", { class: "chip" }, "⭐ ", h("b", {}, r.score)), app.coinChip());
+    h("span", { class: "chip" }, "🧩 ", h("b", {}, Math.min(r.n + 1, r.rounds)), " / " + r.rounds),
+    h("span", { class: "chip bankchip" }, "🏦 ", h("b", {}, r.score)), app.coinChip());
 }
 
 function next() {
   const r = run; if (!r) return;
   if (r.n >= r.rounds) return finish();
   const card = r.deck.next();
-  // Split the term into words; keep separators as fixed marks.
-  const parts = card.term.split(/(\s+|-)/).filter((p) => p && !/^\s+$/.test(p));
-  const words = [];
-  for (const p of parts) if (p === "-") words.push({ sep: "-" }); else words.push({ letters: p.replace(/'/g, "").toUpperCase().split("") });
-  const seq = []; // every letter slot in order
-  words.forEach((w, wi) => w.letters && w.letters.forEach((ch, li) => seq.push({ ch, wi, li })));
-  r.q = { card, words, seq, pos: 0, wrongHere: 0, hintsHere: 0, mistakesHere: 0 };
-
-  const slotsWrap = h("div", { class: "slots", "aria-live": "polite" });
+  const letters = [];
+  const words = card.term.toUpperCase().split(/(\s+)/).filter((w) => !/^\s+$/.test(w));
+  r.q = { card, words, guessed: new Set(), bank: 0, misses: 0, value: null, done: false };
+  // the first letter is shown for free
+  r.q.first = card.term.replace(/[^A-Za-z]/g, "")[0].toUpperCase();
+  const board = h("div", { class: "pboard", "aria-label": "Puzzle board" });
+  r.q.tiles = [];
   words.forEach((w) => {
-    if (w.sep) { slotsWrap.append(h("span", { class: "sep" }, "–")); return; }
-    const g = h("span", { class: "word" });
-    w.slotEls = w.letters.map(() => g.appendChild(h("span", { class: "slot" })));
-    slotsWrap.append(g);
-  });
-  const tray = h("div", { class: "tray" });
-  words.forEach((w, wi) => {
-    if (!w.letters) return;
-    let order = shuffle(w.letters.map((ch, i) => ({ ch, i })));
-    for (let g = 0; g < 10 && w.letters.length > 1 && order.every((o, k) => o.ch === w.letters[k]); g++) order = shuffle(order);
-    const row = h("div", { class: "trow" });
-    w.tiles = order.map((o) => {
-      const t = { ch: o.ch, wi, used: false };
-      t.el = h("button", { class: "ltile", type: "button", "aria-label": "Letter " + o.ch, onclick: () => tap(t) }, o.ch);
-      row.append(t.el); return t;
+    const row = h("div", { class: "pword" });
+    [...w].forEach((ch, i) => {
+      if (!/[A-Z]/.test(ch)) { row.append(h("span", { class: "ptile sym" }, ch)); return; }
+      const el = h("span", { class: "ptile" }, h("b", {}, ch));
+      r.q.tiles.push({ ch, el, shown: false });
+      row.append(el);
     });
-    tray.append(row);
+    board.append(row);
   });
-  // one golden tile per word: place it for bonus coins
-  const all = words.flatMap((w) => w.tiles || []);
-  const gold = all[(Math.random() * all.length) | 0];
-  if (gold) { gold.gold = true; gold.el.classList.add("gold"); }
-  const hintBtn = h("button", { class: "btn ghost", type: "button", onclick: hint }, "💡 Hint" + (r.mode === "challenge" ? " (−30)" : ""));
-  const showBtn = h("button", { class: "btn ghost", type: "button", onclick: reveal }, "🙈 Show me");
-  r.q.msg = h("div", { class: "smsg", role: "status" });
+  r.q.tiles[0].shown = true; r.q.tiles[0].el.classList.add("on");
+  r.wheelCv = h("canvas", { class: "wheel", "aria-hidden": "true" });
+  r.pointerEl = h("div", { class: "wpointer", "aria-hidden": "true" });
+  r.valueEl = h("div", { class: "wvalue", role: "status" }, "Tap SPIN!");
+  r.spinBtn = h("button", { class: "btn primary spinbtn", type: "button", onclick: spin }, "🎡 SPIN");
+  r.solveBtn = h("button", { class: "btn ghost", type: "button", onclick: solve }, "💡 SOLVE");
+  r.showBtn = h("button", { class: "btn ghost", type: "button", onclick: reveal, "aria-label": "Show me the answer" }, "🙈");
+  r.keys = h("div", { class: "keyboard" }, [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map((L) =>
+    h("button", { class: "key" + (VOWELS.includes(L) ? " vowel" : ""), type: "button", "data-l": L, onclick: () => guess(L) }, L)));
+  r.msg = h("div", { class: "wmsg", role: "status" });
   r.body.replaceChildren(
-    h("div", { class: "qcard meaning" }, h("div", { class: "label" }, h("span", {}, "Meaning"), sayBtn(defOf(card))), h("div", { class: "big" }, defOf(card)),
-      h("div", { class: "cue" }, `${seq.length} letters · the first one is done for you`)),
-    slotsWrap, r.q.msg, tray,
-    h("div", { class: "row" }, hintBtn, showBtn));
-  r.q.slotsWrap = slotsWrap;
-  // the first letter starts in place so every word has a foothold
-  { const f = words[seq[0].wi].tiles.find((x) => x.ch === seq[0].ch); if (f) { q0(f); } }
-  paintSlots(); paintHud();
+    h("div", { class: "qcard meaning clue" }, h("div", { class: "label" }, h("span", {}, "Clue"), sayBtn(defOf(card))), h("div", { class: "big" }, defOf(card)),
+      h("div", { class: "cue" }, `${r.q.tiles.length} letters · the first one is on the board`)),
+    board,
+    h("div", { class: "wheelrow" }, h("div", { class: "wheelbox" }, r.wheelCv, r.pointerEl), h("div", { class: "wside" }, r.valueEl, r.spinBtn, h("div", { class: "row2" }, r.solveBtn, r.showBtn))),
+    r.msg, r.keys);
+  r.q.board = board;
+  markKey(r.q.first);
+  paintHud(); updateKeys();
+  requestAnimationFrame(() => drawWheel());
   say(defOf(card));
 }
 
-function q0(t) {
-  const q = run.q;
-  t.used = true; t.el.classList.add("used"); t.el.disabled = true; if (t.gold) { t.gold = false; t.el.classList.remove("gold"); }
-  q.pos = 1;
-}
-
-function paintSlots() {
-  const q = run.q;
-  q.seq.forEach((s, i) => {
-    const el = q.words[s.wi].slotEls[s.li];
-    el.textContent = i < q.pos ? s.ch : "";
-    el.className = "slot" + (i < q.pos ? " filled" : "") + (i === q.pos ? " now" : "");
+function markKey(L) { const k = run.keys.querySelector(`[data-l="${L}"]`); if (k) k.classList.add("used"); }
+function updateKeys() {
+  const r = run; if (!r) return; const q = r.q;
+  r.keys.querySelectorAll(".key").forEach((k) => {
+    const L = k.dataset.l, used = q.guessed.has(L) || L === q.first && !q.tiles.some((t) => t.ch === L && !t.shown);
+    const vowel = VOWELS.includes(L);
+    k.disabled = q.done || used || r.spinning || (!vowel && q.value == null);
+    k.classList.toggle("used", used);
   });
+  r.spinBtn.disabled = q.done || r.spinning || q.value != null;
+  r.solveBtn.disabled = q.done || r.spinning;
 }
 
-function glowNeeded() {
-  const q = run.q, need = q.seq[q.pos];
-  const t = q.words[need.wi].tiles.find((x) => !x.used && x.ch === need.ch);
-  if (t) t.el.classList.add("glow");
+/* ---------------------------------------------------------------- wheel */
+function drawWheel() {
+  const r = run; if (!r || !r.wheelCv.isConnected) return;
+  const cv = r.wheelCv, dpr = Math.min(2, devicePixelRatio || 1), S = cv.clientWidth;
+  if (cv.width !== S * dpr) { cv.width = S * dpr; cv.height = S * dpr; }
+  const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const R = S / 2, n = r.wedges.length, a0 = r.angle;
+  c.clearRect(0, 0, S, S);
+  c.save(); c.translate(R, R);
+  c.fillStyle = "#1f2937"; c.beginPath(); c.arc(0, 0, R - 1, 0, 6.29); c.fill();
+  r.wedges.forEach((w, i) => {
+    const s = a0 + (i / n) * Math.PI * 2, e = s + Math.PI * 2 / n;
+    c.fillStyle = w.col; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, R - 6, s, e); c.closePath(); c.fill();
+    c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth = 1.5; c.stroke();
+    c.save(); c.rotate(s + Math.PI / n); c.fillStyle = "#fff"; c.textAlign = "right"; c.textBaseline = "middle";
+    const label = typeof w.v === "number" ? String(w.v) : w.v === "FREE" ? "FREE" : "BANK-\nRUPT";
+    c.font = `800 ${Math.round(R * (typeof w.v === "number" ? .15 : w.v === "FREE" ? .12 : .085))}px Fredoka, sans-serif`;
+    c.fillText(label.replace("\n", ""), R - 12, 0);
+    c.restore();
+  });
+  // pegs + hub
+  for (let i = 0; i < n; i++) { const a = a0 + (i / n) * Math.PI * 2; c.fillStyle = "#fde68a"; c.beginPath(); c.arc(Math.cos(a) * (R - 6), Math.sin(a) * (R - 6), 3, 0, 6.29); c.fill(); }
+  const hub = c.createRadialGradient(-4, -4, 2, 0, 0, R * .2); hub.addColorStop(0, "#fff7c2"); hub.addColorStop(1, "#b45309");
+  c.fillStyle = hub; c.beginPath(); c.arc(0, 0, R * .17, 0, 6.29); c.fill();
+  c.restore();
 }
 
-async function tap(t) {
+async function spin() {
   unlockAudio();
-  const r = run, q = r.q; if (!q || t.used || q.done) return;
-  const need = q.seq[q.pos];
-  if (t.ch === need.ch && t.wi === need.wi) {
-    place(t);
+  const r = run, q = r.q; if (!r || r.spinning || q.value != null || q.done) return;
+  r.spinning = true; updateKeys(); r.valueEl.textContent = "Spinning…";
+  const n = r.wedges.length, target = (Math.random() * n) | 0;
+  // pointer sits at the top (-90°): land the target wedge's middle there
+  const want = -Math.PI / 2 - (target + .5) * (Math.PI * 2 / n);
+  const turns = 4 + Math.random() * 2;
+  const start = r.angle, end = want - Math.PI * 2 * Math.ceil(turns) + (start - (start % (Math.PI * 2)));
+  const dur = reducedMotion() ? 300 : 2300, t0 = performance.now();
+  let lastPeg = -1;
+  await new Promise((res) => {
+    const step = (now) => {
+      if (!run) return res();
+      const k = Math.min(1, (now - t0) / dur), ease = 1 - Math.pow(1 - k, 3);
+      r.angle = start + (end - start) * ease;
+      const peg = Math.floor((r.angle / (Math.PI * 2 / n)));
+      if (peg !== lastPeg) { lastPeg = peg; sfx.tap(); r.pointerEl.classList.remove("tick"); void r.pointerEl.offsetWidth; r.pointerEl.classList.add("tick"); }
+      drawWheel();
+      if (k < 1) requestAnimationFrame(step); else res();
+    };
+    requestAnimationFrame(step);
+  });
+  if (!run) return;
+  r.spinning = false;
+  const w = r.wedges[target];
+  if (w.v === "BANKRUPT") {
+    q.bank = 0; sfx.hurt(); r.valueEl.textContent = "💥 BANKRUPT!"; r.valueEl.className = "wvalue bad";
+    r.msg.textContent = "Bankrupt — this puzzle's winnings are gone. Spin again!";
+  } else if (w.v === "FREE") {
+    sfx.power(); r.valueEl.textContent = "🎁 FREE LETTER"; r.valueEl.className = "wvalue good";
+    const hidden = q.tiles.filter((t) => !t.shown);
+    const L = hidden[(Math.random() * hidden.length) | 0].ch;
+    r.msg.textContent = `Free letter: ${L}!`;
+    await revealLetter(L, 100);
+    if (!run) return;
   } else {
-    q.mistakesHere++; r.mistakes++; q.wrongHere++;
-    t.el.classList.remove("wrong"); void t.el.offsetWidth; t.el.classList.add("wrong");
-    sfx.bad();
-    q.msg.textContent = t.wi !== need.wi ? "That letter is in a different word." : "Not that one — try another letter.";
-    if (r.mode === "relaxed" && q.wrongHere >= 2) glowNeeded();
+    q.value = w.v; sfx.lock(); r.valueEl.textContent = `${w.v} per letter`; r.valueEl.className = "wvalue";
+    r.msg.textContent = "Pick a letter!";
+    hintIfStuck();
   }
+  updateKeys();
 }
 
-function place(t) {
-  const r = run, q = r.q;
-  t.used = true; t.el.classList.remove("glow", "wrong"); t.el.classList.add("used"); t.el.disabled = true;
-  if (t.gold && !q.hinting) { const b = t.el.getBoundingClientRect(); app.earn(3, b.left + b.width / 2, b.top); }
-  q.pos++; q.wrongHere = 0; q.msg.textContent = "";
-  sfx.lock();
-  paintSlots();
-  if (q.pos >= q.seq.length) solved();
-}
-
-function hint() {
-  const r = run, q = r.q; if (!q || q.done) return;
-  const need = q.seq[q.pos];
-  const t = q.words[need.wi].tiles.find((x) => !x.used && x.ch === need.ch);
-  if (!t) return;
-  r.hints++; q.hintsHere++;
-  q.hinting = true; place(t); q.hinting = false;
-}
-
-async function solved() {
-  const r = run, q = r.q; q.done = true;
-  const pts = Math.max(20, 100 - q.mistakesHere * 15 - (r.mode === "challenge" ? q.hintsHere * 30 : q.hintsHere * 5));
-  r.score += pts; r.n++;
-  const clean = q.mistakesHere + q.hintsHere <= 2;
-  if (!clean) { r.missed.push(q.card); r.deck.miss(q.card); }
-  else { r.correct++; r.deck.hit(q.card); if (!q.magic) r.power.add(1); app.earn(q.mistakesHere + q.hintsHere === 0 ? 5 : 3); }
-  q.slotsWrap.classList.add("win"); sfx.good();
-  openLock(r.n - 1, clean);
-  q.msg.innerHTML = ""; q.msg.append(h("b", { class: "okword" }, "✓ " + q.card.term), " +" + pts);
-  say(q.card.term);
+async function guess(L) {
+  unlockAudio();
+  const r = run, q = r.q; if (!r || q.done || q.guessed.has(L)) return;
+  const vowel = VOWELS.includes(L);
+  if (!vowel && q.value == null) { r.msg.textContent = "Spin the wheel first!"; return; }
+  if (vowel && r.mode === "challenge") { if (r.score + q.bank < 250) { r.msg.textContent = "You need 250 points to buy a vowel."; return; } q.bank -= 250; }
+  q.guessed.add(L);
+  const count = q.tiles.filter((t) => t.ch === L && !t.shown).length;
+  const value = vowel ? 0 : q.value;
+  q.value = null;
+  r.keys.querySelectorAll(".key.glow").forEach((k) => k.classList.remove("glow"));
+  if (count) { q.misses = 0; r.msg.textContent = count === 1 ? `There is 1 ${L}!` : `There are ${count} ${L}'s!`; await revealLetter(L, value); }
+  else {
+    q.misses++; sfx.bad(); r.msg.textContent = `No ${L}. ${vowel ? "Try another letter." : "Spin again!"}`;
+    const k = r.keys.querySelector(`[data-l="${L}"]`); k.classList.add("miss");
+    r.valueEl.textContent = "Tap SPIN!"; r.valueEl.className = "wvalue";
+  }
+  updateKeys();
   paintHud();
-  await wait(1300);
-  if (run) next();
 }
 
-function magic() {
-  const r = run, q = r.q; if (!q || q.done) return;
-  q.magic = true;
-  // spell the rest of the current word automatically
-  const wi = q.seq[q.pos].wi;
-  const step = () => { if (!run || q.done || q.pos >= q.seq.length || q.seq[q.pos].wi !== wi) return; hint(); r.hints--; q.hintsHere--; setTimeout(step, 160); };
-  step();
+async function revealLetter(L, value) {
+  const r = run, q = r.q;
+  q.guessed.add(L);
+  const ts = q.tiles.filter((t) => t.ch === L && !t.shown);
+  for (const t of ts) {
+    t.shown = true; t.el.classList.add("flip"); sfx.lock();
+    await wait(reducedMotion() ? 0 : 260);
+    t.el.classList.add("on");
+  }
+  if (value) { q.bank += value * ts.length; const b = r.valueEl.getBoundingClientRect(); app.floater(b.left + b.width / 2, b.top, "+" + value * ts.length, "#fde68a"); }
+  if (!run) return;
+  r.valueEl.textContent = "Tap SPIN!"; r.valueEl.className = "wvalue";
+  paintHud();
+  if (q.tiles.every((t) => t.shown)) await solved(false);
+}
+
+function hintIfStuck() {
+  const r = run, q = r.q;
+  if (r.mode !== "relaxed" || q.misses < 2) return;
+  const t = q.tiles.find((x) => !x.shown && !VOWELS.includes(x.ch));
+  if (t) r.keys.querySelector(`[data-l="${t.ch}"]`).classList.add("glow");
+}
+
+function solve() {
+  const r = run, q = r.q; if (!r || q.done) return;
+  const input = h("input", { class: "solvebox", id: "solvebox", type: "text", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", placeholder: "Type the term…", "aria-label": "Type the term" });
+  const err = h("p", { class: "wmsg" });
+  const tryIt = () => {
+    const norm = (s) => s.toLowerCase().replace(/[^a-z]/g, "");
+    const a = norm(input.value), b = norm(q.card.term);
+    if (!a) return;
+    if (editDistance(a, b) <= Math.max(1, Math.floor(b.length / 6))) { close(); solved(true); }
+    else { sfx.bad(); input.classList.remove("shake"); void input.offsetWidth; input.classList.add("shake"); err.textContent = "Not quite — check the board and try again."; }
+  };
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") tryIt(); });
+  const close = app.sheet([h("h2", {}, "Solve the puzzle"), h("p", { style: "margin:0;color:var(--muted)" }, defOf(q.card)), input, err,
+    h("div", { class: "row sheet-actions" }, h("button", { class: "btn ghost", onclick: () => close() }, "Back"), h("button", { class: "btn primary", onclick: tryIt }, "Solve!"))], () => close());
+  setTimeout(() => input.focus(), 80);
+}
+
+async function solved(bySolve) {
+  const r = run, q = r.q; if (q.done) return;
+  q.done = true;
+  const hiddenLeft = q.tiles.filter((t) => !t.shown).length;
+  q.tiles.forEach((t) => { t.shown = true; t.el.classList.add("on"); });
+  const bonus = bySolve ? 100 * hiddenLeft : 0;
+  const win = Math.max(0, q.bank) + bonus + 100;
+  r.score += win; r.n++;
+  const clean = q.misses <= 2;
+  if (clean) { r.correct++; r.deck.hit(q.card); app.earn(bySolve && hiddenLeft >= 2 ? 6 : 4); } else { r.missed.push(q.card); r.deck.miss(q.card); app.earn(2); }
+  q.board.classList.add("win"); sfx.win();
+  r.msg.replaceChildren(h("b", { class: "okword" }, "✓ " + q.card.term), ` +${win}` + (bonus ? ` (solve bonus ${bonus})` : ""));
+  say(q.card.term);
+  paintHud(); updateKeys();
+  await wait(1700);
+  if (run === r) next();
 }
 
 async function reveal() {
   const r = run, q = r.q; if (!q || q.done) return;
   q.done = true; r.n++; r.missed.push(q.card); r.deck.miss(q.card);
-  q.pos = q.seq.length; paintSlots();
-  openLock(r.n - 1, false);
-  await app.learn(q.card, { title: "Here's the word", note: "It'll come back later so you can try again." });
-  if (run) next();
+  q.tiles.forEach((t) => { t.shown = true; t.el.classList.add("on"); });
+  updateKeys();
+  await app.learn(q.card, { title: "Here's the answer", note: "It'll come back later so you can try again." });
+  if (run === r) next();
 }
 
-function openLock(i, clean) {
-  const l = run && run.vault.querySelectorAll(".lock")[i]; if (!l) return;
-  l.textContent = clean ? "🔓" : "🔑"; l.classList.add(clean ? "open" : "helped");
-  run.vault.querySelector(".vwheel").classList.remove("spin"); void run.vault.offsetWidth; run.vault.querySelector(".vwheel").classList.add("spin");
-}
-
-async function finish() {
-  const r = run; if (!r) return;
-  r.vault.classList.add("opened"); r.vault.querySelector(".vtxt").textContent = "Vault open! 💰";
-  sfx.win(); app.earn(10); app.confetti();
-  await wait(1500);
-  run = null;
-  app.results({ score: r.score, correct: r.correct, total: r.n, missed: r.missed, extra: [[r.hints, "hints"]] });
+function finish() {
+  const r = run; run = null;
+  app.results({ score: r.score, correct: r.correct, total: r.n, missed: r.missed, extra: [["🏦 " + r.score, "banked"]] });
 }
 
 document.addEventListener("keydown", (e) => {
   if (!run || !run.q || run.q.done || document.querySelector(".scrim") || e.ctrlKey || e.metaKey) return;
   const k = e.key.toUpperCase();
-  if (/^[A-Z]$/.test(k)) {
-    const q = run.q, need = q.seq[q.pos];
-    const t = q.words[need.wi].tiles.find((x) => !x.used && x.ch === k) || q.words.flatMap((w) => w.tiles || []).find((x) => !x.used && x.ch === k);
-    if (t) tap(t);
-  }
+  if (k === " " || k === "ENTER") { e.preventDefault(); spin(); return; }
+  if (/^[A-Z]$/.test(k)) guess(k);
 });
 
 function demo(el) {
   el.classList.add("s-demo");
   el.append(h("div", { class: "sd-slots" }, ..."DRIVE".split("").map((c, i) => h("i", { style: `--d:${i * .45}s` }, c))),
-    h("div", { class: "sd-tray" }, ..."VRDEI".split("").map((c) => h("b", {}, c))));
+    h("div", { class: "sd-tray" }, h("b", { class: "sd-wheel" }, "🎡")));
 }
