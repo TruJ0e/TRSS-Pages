@@ -438,9 +438,16 @@ const AUTODRAFT_STOP = new Set(("this that these those it its they them their " 
   "chapter page figure table section lesson module unit slide term definition " +
   "note example ex tip warning key answer question summary overview objective " +
   "conclusion result results introduction").split(" "));
-// Auxiliary/modal verbs: a "term" containing one is a sentence fragment.
+// Verb-ish words: a "term" containing one is a clause, not a term
+// ("Hermann Ebbinghaus documented the forgetting curve" is a sentence).
 const AUTODRAFT_VERBS = new Set(
-  "was were is are be been being has have had will would could should did does do can may might must shall".split(" "));
+  ("was were is are be been being has have had will would could should did does do can may might must shall " +
+   "documented described proposed introduced discovered identified named called " +
+   "describe control controls regulate regulates " +
+   "found shown reported demonstrated observed concluded suggested stated claimed argued noted believed " +
+   "illustrates illustrate " +
+   "happens occurs means involves contains holds lasts plays encodes stores transfers replays remains " +
+   "survives persists describes").split(" "));
 // Personal pronouns: a "term" containing one is a clause, not a term
 // ("Biological Psychology If you" is not a flashcard term).
 const AUTODRAFT_PRONOUNS = new Set(
@@ -448,23 +455,44 @@ const AUTODRAFT_PRONOUNS = new Set(
 
 function autodraftSentences(text) {
   const out = [];
+  const t0 = String(text == null ? "" : text).replace(/\s+/g, " ");
+  // Keep multi-initial abbreviations (H.M., U.S.A.) from splitting sentences:
+  // their dots hide behind an ASCII placeholder until after the split.
+  const PH = "ABBRDOT";
+  const t = t0
+    .replace(/([A-Z])\. ([A-Z]\.)/g, "$1.$2")
+    .replace(/\b((?:[A-Z]\.){2,})/g, (m) => m.split(".").join(PH));
   const re = /[^.!?]+[.!?]+/g;
-  const t = String(text == null ? "" : text).replace(/\s+/g, " ");
   let m;
-  while ((m = re.exec(t)) !== null && out.length < 4000) out.push(m[0].trim());
+  while ((m = re.exec(t)) !== null && out.length < 4000) out.push(m[0].trim().split(PH).join("."));
   return out;
 }
 
 function autodraftCleanTerm(t) {
   return String(t == null ? "" : t)
     .replace(/\s+/g, " ").trim()
-    .replace(/^[("\u201c\u2018'[]+/, "")
-    .replace(/[)"\u201d\u2019'.,;:!?-]+$/, "");
+    .replace(/^[("“‘'[]+/, "")
+    .replace(/[)"”’'.,;:!?-]+$/, "");
+}
+
+// Shared term cleanup: strip articles, leading ordinals ("Third,"), trailing
+// filler adverbs ("often"), "such as" asides, and parenthetical qualifiers
+// ("Iconic memory (visual)" -> "Iconic memory").
+function autodraftBaseTerm(t) {
+  const noParen = String(t == null ? "" : t).replace(/\s*\([^)]*\)/g, "");
+  return autodraftCleanTerm(noParen)
+    .replace(/^(the|a|an)\s+/i, "")
+    .replace(/^(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s*,\s+/i, "")
+    .replace(/\s+(often|usually|typically|generally|normally|always|never|also|even|just|still)$/i, "")
+    .replace(/,\s*such as\s+[^,]+,/i, "")
+    .replace(/,\s*such as\s+[^,]+$/i, "")
+    .replace(/\s+/g, " ").trim();
 }
 
 function autodraftTermOk(term) {
   if (!term) return false;
   if (term.length > 70) return false;
+  if (/[:;]/.test(term)) return false;   // glossary/heading artifact, not a term
   const words = term.split(/\s+/);
   if (words.length > 8) return false;
   if (/[.!?]/.test(term)) return false;          // sentence fragment, not a term
@@ -472,8 +500,13 @@ function autodraftTermOk(term) {
   const toks = words.map((w) => w.toLowerCase().replace(/[^a-z]/g, ""));
   if (toks.some((w) => AUTODRAFT_VERBS.has(w))) return false;
   if (toks.some((w) => AUTODRAFT_PRONOUNS.has(w))) return false; // clause, not a term
-  // First word (split on non-letters so "TRUE/FALSE" checks as true+false).
-  const firstToks = words[0].toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  // First word: hyphenated compounds ("short-term") count as one token so the
+  // "term" stopword (meant for "Key term:" header debris) doesn't kill them.
+  // Otherwise split on non-letters ("TRUE/FALSE" checks as true+false).
+  const firstWord = words[0].toLowerCase();
+  const firstToks = firstWord.indexOf("-") >= 0
+    ? [firstWord.replace(/[^a-z]/g, "")]
+    : firstWord.split(/[^a-z]+/).filter(Boolean);
   if (firstToks.some((t) => AUTODRAFT_STOP.has(t))) return false;
   return true;
 }
@@ -487,10 +520,11 @@ function autodraftDefOk(def) {
 }
 
 /**
- * sanitizeExtractedText — drop CSS/HTML debris that extractors can leave
- * behind (web content pasted or saved as .txt, HTML fragments inside docs):
- * <style>/<script> blocks, HTML comments, and CSS-rule lines.
- * Conservative: only lines that look like CSS rules are removed; ordinary
+ * sanitizeExtractedText — drop debris that extractors can leave behind
+ * (web content pasted or saved as .txt, HTML fragments inside docs):
+ * <style>/<script> blocks, HTML comments, CSS-rule lines, and ALL-CAPS
+ * header/disclaimer lines (fixture banners, "CHAPTER 7" headings).
+ * Conservative: only lines that look like debris are removed; ordinary
  * prose — even with braces — stays.
  */
 function sanitizeExtractedText(text) {
@@ -506,7 +540,13 @@ function sanitizeExtractedText(text) {
     if (/[a-z0-9)\]"']\s*\{/.test(l)) return true;    // selector before "{"
     return false;
   };
-  t = t.split("\n").filter((line) => !cssDebris(line)).join("\n");
+  // No lowercase letters at all: "DISCLAIMER: THIS IS A SYNTHETIC FIXTURE",
+  // "CHAPTER 7: HOW MEMORY WORKS". Real prose always has lowercase.
+  const capsDebris = (line) => {
+    const l = line.trim();
+    return l.length >= 8 && /[A-Z]/.test(l) && !/[a-z]/.test(l);
+  };
+  t = t.split("\n").filter((line) => !cssDebris(line) && !capsDebris(line)).join("\n");
   return t.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
@@ -519,27 +559,93 @@ function extractDrafts(pages) {
     const base = typeof p.n === "number" ? "Page " + p.n : String(p.n);
     return p.src ? p.src + " · " + base : base;
   };
+  // "Working memory, proposed by Baddeley" -> term "Working memory"; the
+  // attribution is folded into the definition so the fact isn't lost.
+  const splitAttribution = (term) => {
+    const m = /^(.*?),\s*(proposed|introduced|described|developed|created|founded|discovered|named)\s+by\s+([^,;]+?)\s*,?\s*$/i.exec(term);
+    if (!m) return { term, note: "" };
+    return { term: m[1].trim(), note: " (" + m[2].toLowerCase() + " by " + m[3].trim() + ")" };
+  };
+  // Returns true when a card was kept, so a rejected match falls through to
+  // the next pattern instead of silently dropping the sentence.
   const push = (term, def, p) => {
-    term = autodraftCleanTerm(term).replace(/^(the|a|an)\s+/i, "");
-    const simple = String(def == null ? "" : def).replace(/\s+/g, " ").trim();
-    if (!autodraftTermOk(term) || !autodraftDefOk(simple)) return;
-    const key = term.toLowerCase();
-    if (seen.has(key)) return;
+    const attr = splitAttribution(autodraftBaseTerm(term));
+    const t = attr.term;
+    let simple = (String(def == null ? "" : def).replace(/\s+/g, " ").trim() + attr.note).trim();
+    if (!/[.!?]$/.test(simple)) simple += ".";
+    if (!autodraftTermOk(t) || !autodraftDefOk(simple)) return false;
+    const key = t.toLowerCase();
+    if (seen.has(key)) return false;
     seen.add(key);
-    drafts.push({ term: term, simple: simple, src: srcOf(p) });
+    drafts.push({ term: t, simple: simple, src: srcOf(p) });
+    return true;
+  };
+  // Factual linking verbs for the generic branch (multi-word verbs included).
+  const FACT_VERBS = "holds|contains|controls?|regulates?|lasts|involves|encodes|stores|transfers|replays|blocks|impairs|improves|" +
+    "means|shows|demonstrates|describes|plays|survives|persists|remains|outperforms?|has|have|" +
+    "depends\\s+on|relies\\s+on|results\\s+in|leads\\s+to|consists\\s+of|is\\s+caused\\s+by|results\\s+from";
+  const STUDY_VERBS = "found|reported|showed|demonstrated|discovered|observed|concluded";
+  const CLAIM_VERBS = "states|suggests|proposes|claims|argues|demonstrates|shows";
+  const isCapsDebris = (u) => /[A-Z]/.test(u) && !/[a-z]/.test(u);
+  // Optional leading "In|During <...>, " clause ("In a 1975 study, X found
+  // that ...", "During slow-wave sleep, the hippocampus replays ...").
+  const leaderOf = (s) => {
+    const lm = /^(in|during)\s+([^,]{2,60}?)\s*,\s*/i.exec(s);
+    return lm ? { text: lm[2].trim(), rest: s.slice(lm[0].length) } : { text: "", rest: s };
+  };
+  const factBranch = (r, L, p) => {
+    let m;
+    if ((m = new RegExp("^(.{2,60}?)\\s+(" + STUDY_VERBS + ")\\s+that\\s+(.{15,})$", "i").exec(r))) {
+      const yr = (/\b((?:19|20)\d{2})\b/.exec(L.text) || [])[1];
+      return push(m[1], m[2].toLowerCase() + " that " + m[3] + (yr ? " [" + yr + " study]" : ""), p);
+    }
+    if ((m = /^(.{2,60}?)\s+([a-z]+ed)\s+(.{10,})$/.exec(r))) {
+      const nyr = (/\b((?:19|20)\d{2})\b/.exec(L.text) || [])[1];
+      if (nyr || /\bstud(y|ies)\b/i.test(L.text)) {
+        return push(m[1], m[2].toLowerCase() + " " + m[3] + (nyr ? " [" + nyr + "]" : ""), p);
+      }
+    }
+    if ((m = new RegExp("^(.{2,60}?)\\s+(" + CLAIM_VERBS + ")\\s+that\\s+(.{15,})$", "i").exec(r))) {
+      return push(m[1], m[2].toLowerCase() + " that " + m[3], p);
+    }
+    if ((m = /^(.{2,60}?)\s+(happens|occurs)\s+when\s+(.{15,})$/i.exec(r))) {
+      return push(m[1], m[2].toLowerCase() + " when " + m[3], p);
+    }
+    if ((m = /^(.{2,60}?)\s+(occurs|takes place)\s+during\s+(.{15,})$/i.exec(r))) {
+      return push(m[1], m[2].toLowerCase() + " during " + m[3], p);
+    }
+    if ((m = new RegExp("^(.{2,60}?)\\s+(" + FACT_VERBS + ")\\s+(.{15,})$", "i").exec(r))) {
+      const lead = L.text.length >= 8 ? L.text + ", " : "";
+      return push(m[1], lead + m[2].toLowerCase().replace(/\s+/g, " ") + " " + m[3], p);
+    }
+    return false;
   };
   for (const p of pages || []) {
     const text = String((p && p.text) || "").trim();
     if (!text) continue;
+    // Multi-fact sentences are split into clauses so each fact becomes its
+    // own card ("Sensory memory holds …; iconic memory lasts …, while
+    // echoic memory lasts …").
+    const units = [];
+    for (const block of text.split(/\n\s*\n/)) {
+      for (const s of autodraftSentences(block)) {
+        if (s.length > 400 || isCapsDebris(s)) continue;
+        for (const f of s.split(/\s*;\s*/)) {
+          for (const u of f.split(/\s*,\s*while\s+/)) {
+            const t = u.trim();
+            if (t) units.push(t);
+          }
+        }
+      }
+    }
     // 1) glossary units: "Term: definition" / "Term — definition".
     // Sentence-level FIRST: definitions wrapped across line breaks stay
     // whole (line-only matching clipped them at the break, producing
     // half-meaning cards). Line-level second as a fallback; the seen-set
     // dedup keeps the first (fullest) match per term.
     const colonRe = /^([^:\n]{2,70}?)\s*[:\u2013\u2014-]\s+(.{15,})$/u;
-    for (const s of autodraftSentences(text)) {
-      if (s.length > 400) continue;
-      const m = colonRe.exec(s);
+    for (const u of units) {
+      const m = colonRe.exec(u);
       if (m) push(m[1], m[2], p);
     }
     // Pasted text often arrives as one long line, so long lines are also
@@ -547,7 +653,7 @@ function extractDrafts(pages) {
     // unrelated sentences into one bloated definition).
     for (const raw of text.split(/\n/)) {
       const l = raw.trim();
-      if (!l) continue;
+      if (!l || isCapsDebris(l)) continue;
       const targets = l.length > 260
         ? autodraftSentences(l).filter((s) => s.length <= 260)
         : [l];
@@ -556,23 +662,84 @@ function extractDrafts(pages) {
         if (m) push(m[1], m[2], p);
       }
     }
-    // 2) definition sentences: "X is defined as Y", "X refers to Y", …
-    // The linking verb is restored so definitions read as sentences.
-    const sents = autodraftSentences(text);
-    for (const s of sents) {
-      let m;
-      if ((m = /^(.{2,70}?)\s+is defined as\s+(.{15,})$/i.exec(s))) push(m[1], "is defined as " + m[2], p);
-      else if ((m = /^(.{2,70}?)\s+are defined as\s+(.{15,})$/i.exec(s))) push(m[1], "are defined as " + m[2], p);
-      else if ((m = /^(.{2,70}?)\s+refers to\s+(.{15,})$/i.exec(s))) push(m[1], "refers to " + m[2], p);
-      else if ((m = /^(.{2,70}?)\s+is (a|an)\s+(.{15,})$/i.exec(s))) push(m[1], "is " + m[2] + " " + m[3], p);
-      else if ((m = /^(.{2,70}?)\s+are\s+(.{15,})$/i.exec(s))) push(m[1], "are " + m[2], p);
-      else if ((m = /^(.{2,70}?)\s+is the (?:process|tendency|ability|system|study|branch|theory|principle|response|behavior|change|state|condition)\b\s*(?:by which|of|in which)?\s*(.{15,})$/i.exec(s))) push(m[1], "is the " + m[2], p);
+    // 2) definition sentences. The linking verb is restored so definitions
+    // read as sentences.
+    const docRe = /^(.{2,60}?)\s+(documented|described|introduced|proposed|discovered|identified)\s+(?:the\s+)?(.{2,60}?)\s*:\s*(.{15,})$/i;
+    const defAsRe = /^(.{2,70}?)\s+is defined as\s+(.{15,})$/i;
+    const defAsPlRe = /^(.{2,70}?)\s+are defined as\s+(.{15,})$/i;
+    const refersRe = /^(.{2,70}?)\s+refers to\s+(.{15,})$/i;
+    const enumRe = /^(.{2,60}?)\s+is\s+(a|an)\s+([^:;]{10,120}?)\s+with\s+(two|three|four|five|six|seven|eight|\d+)\s+parts?\s*:\s*(.{20,})$/i;
+    const isARe = /^(.{2,70}?)\s+is (a|an)\s+(.{15,})$/i;
+    const areRe = /^(.{2,70}?)\s+are\s+(.{15,})$/i;
+    const isTheRe = /^(.{2,70}?)\s+is\s+(the|a|an|our|their|his|her|its)\s+(.{15,})$/i;
+    const knownAsRe = /^(.{2,60}?)\s+(is|are)\s+(known as|called)\s+(.{15,})$/i;
+    for (const s of units) {
+      let m; let done = false;
+      // "X documented the Y: Z" — the discovery becomes the card, not the clause.
+      if (!done && (m = docRe.exec(s))) {
+        let who = m[1].trim();
+        const yl = /^in\s+(\d{4})\s*,\s*(.+)$/i.exec(who);
+        const yrNote = yl ? " [" + yl[1] + "]" : "";
+        if (yl) who = yl[2];
+        done = push(m[3], m[2].toLowerCase() + " by " + who + ": " + m[4] + yrNote, p);
+      }
+      if (!done && (m = defAsRe.exec(s))) done = push(m[1], "is defined as " + m[2], p);
+      if (!done && (m = defAsPlRe.exec(s))) done = push(m[1], "are defined as " + m[2], p);
+      if (!done && (m = refersRe.exec(s))) done = push(m[1], "refers to " + m[2], p);
+      // "X is a Y with N parts: a, b, c" — main card plus one card per part.
+      if (!done && (m = enumRe.exec(s))) {
+        done = push(m[1], "is " + m[2] + " " + m[3] + " with " + m[4] + " parts: " + m[5], p);
+        const base = autodraftBaseTerm(m[1]);
+        const am = /^(.*?),\s*(proposed|introduced|described|developed|created|founded|discovered|named)\s+by\s+[^,;]+,?\s*$/i.exec(base);
+        const mainTerm = am ? am[1].trim() : base;
+        const raw = m[5];
+        const items = (raw.includes(",") ? raw.split(/\s*;\s*|,\s*(?:and\s+)?/) : raw.split(/\s*;\s*|\s+and\s+/))
+          .map((x) => x.trim()).filter((x) => x && x.length <= 90);
+        if (items.length >= 2) {
+          for (const it of items) {
+            const im = /^(.*?)\s+(with|for|that|which|who|where|when)\s+(.+)$/i.exec(it);
+            const iname = (im ? im[1] : it).replace(/^(the|a|an|and)\s+/i, "").trim();
+            const idesc = im ? im[3].replace(/[.!?]+$/, "") : "";
+            push(iname, im ? im[2].toLowerCase() + " " + idesc + " (part of " + mainTerm + ")" : "part of " + mainTerm, p);
+          }
+        }
+      }
+      // "X describe(s)/divide(s) N categories: A, and B." - same main+sub-card treatment.
+      if (!done) {
+        const me = /^(.{2,70}?)\s+(?:describe|describes|divide|divides|fall\s+into|group\s+into)\s+(two|three|four|five|six|seven|eight|\d+)\s+(?:broad\s+)?(parts|categories|stages|types|phases|steps|divisions)\s*:\s*(.{15,})$/i.exec(s);
+        if (me) {
+          const mainTerm2 = autodraftBaseTerm(me[1]);
+          const raw2 = me[4];
+          const items2 = (raw2.includes(",") ? raw2.split(/\s*;\s*|,\s*(?:and\s+)?/) : raw2.split(/\s*;\s*|\s+and\s+/))
+            .map((x) => x.trim()).filter((x) => x && x.length <= 90);
+          if (items2.length >= 2 && mainTerm2) {
+            done = push(mainTerm2, "has " + me[2] + " " + me[3] + ": " + me[4].trim(), p);
+            for (const it of items2) {
+              const im2 = /^(.*?)\s+(with|for|that|which|who|where|when)\s+(.+)$/i.exec(it);
+              const iname2 = (im2 ? im2[1] : it).replace(/^(the|a|an|and)\s+/i, "").trim();
+              const idesc2 = im2 ? im2[3].replace(/[.!?]+$/, "") : "";
+              push(iname2, im2 ? im2[2].toLowerCase() + " " + idesc2 + " (part of " + mainTerm2 + ")" : "part of " + mainTerm2, p);
+            }
+          }
+        }
+      }
+      if (!done && (m = isARe.exec(s))) done = push(m[1], "is " + m[2] + " " + m[3], p);
+      if (!done && (m = areRe.exec(s))) done = push(m[1], "are " + m[2], p);
+      // "X is the <anything>" — the noun is kept so the back stays grammatical
+      // ("retrieval" / "is the process of getting information out of storage").
+      if (!done && (m = isTheRe.exec(s))) done = push(m[1], "is " + m[2] + " " + m[3], p);
+      if (!done && (m = knownAsRe.exec(s))) done = push(m[1], m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
+      if (!done) {
+        const L = leaderOf(s);
+        done = factBranch(L.rest, L, p);
+      }
     }
     if (drafts.length >= AUTODRAFT_CAP) break;
   }
   return drafts.slice(0, AUTODRAFT_CAP);
 }
 /* AUTO-DRAFT PURE END */
+
 
 /* ── auto-draft: review UI ──
  * The studio finds term–definition pairs in the extracted text and
