@@ -8,10 +8,10 @@
 <link rel="icon" href="data:,">
 <title>TRSS Upload Studio — anything → your flashcards</title>
 <style>
-  :root { color-scheme: light dark; }
+  :root { color-scheme: light; }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
          max-width: 900px; margin: 0 auto; padding: 24px 16px 80px;
-         line-height: 1.5; }
+         line-height: 1.5; background: #ffffff; color: #161616; }
   h1 { font-size: 1.6rem; margin: 0 0 4px; }
   .sub { color: #666; margin: 0 0 24px; }
   .panel { border: 1px solid #ccc; border-radius: 12px; padding: 18px;
@@ -70,8 +70,8 @@
 </head>
 <body>
   <h1>📥 TRSS Upload Studio</h1>
-  <p class="sub">Drop in a PDF, photos, a Word doc, slides, an ebook, or a
-  lecture recording — read it here, select any text to make a flashcard.
+  <p class="sub">Drop in a PDF, photos, a Word doc, slides, an ebook, a zip of
+  readings, or a whole folder — read it here, select any text to make a flashcard.
   Everything runs in your browser — your file never leaves this device.
   Cards export as JSON in the TRSS base-model schema.</p>
 
@@ -79,9 +79,11 @@
     <h2>1 · Load your material</h2>
     <div class="drop" id="drop">Drop files here, or
       <input type="file" id="file" multiple aria-label="Study material files"
-             accept=".pdf,.txt,.md,.markdown,.docx,.pptx,.epub,.png,.jpg,.jpeg,.webp,.gif,.bmp,.mp3,.wav,.m4a,.ogg,.webm,.mp4">
+             accept=".pdf,.txt,.md,.markdown,.docx,.pptx,.epub,.zip,.png,.jpg,.jpeg,.webp,.gif,.bmp,.mp3,.wav,.m4a,.ogg,.webm,.mp4">
     </div>
     <button class="primary" id="extract">Process files</button>
+    <button id="folder">📁 Upload folder</button>
+    <input type="file" id="folder-input" webkitdirectory hidden aria-label="Upload a folder of study files">
     <button id="paste">📋 Paste text</button>
     <div id="paste-fallback" hidden style="margin-top:12px">
       <p class="hint">Clipboard read was blocked &mdash; long-press in the box and paste manually, then tap &ldquo;Use this text&rdquo;.</p>
@@ -89,9 +91,10 @@
       <div><button class="primary" id="paste-use" style="margin-top:8px">Use this text</button></div>
     </div>
     <p class="hint">PDF · images (OCR) · Word · PowerPoint · EPUB books ·
-    lecture audio · plain text. Tip: PDFs with selectable text work best —
-    scanned pages work better dropped in as images. OCR reads printed text
-    well; handwriting is best-effort. Lecture transcription runs on-device
+    lecture audio · plain text · <strong>zip archives</strong> (every readable file inside
+    is processed) · <strong>folders</strong> via the Upload folder button. Tip: PDFs with
+    selectable text work best — scanned pages work better dropped in as images. OCR reads
+    printed text well; handwriting is best-effort. Lecture transcription runs on-device
     (first run downloads a ~75MB model, one-time).</p>
     <div id="log" aria-live="polite">Starting…</div>
   </section>

@@ -22,6 +22,7 @@ import {
   extractDocx,
   extractPptx,
   extractTextFile,
+  loadJsZip,
 } from "./studio-ingest-docs.mjs";
 import {
   supportedMediaExt,
@@ -236,9 +237,85 @@ const INGESTORS = {
   audio: transcribeAudio,
 };
 
-$("extract").addEventListener("click", async () => {
-  const files = Array.from(fileInput.files);
-  if (!files.length) { log("Choose a file first."); return; }
+/** Ingest one non-zip file → {pages, label}. Shared by picker, drop, zip, folder. */
+async function ingestSingleFile(file, prog) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) {
+    log("Extracting text from PDF: " + file.name);
+    const r = await extractPdfText(file,
+      (i, n) => log("…page " + i + "/" + n));
+    const chars = r.pages.reduce(
+      (a, p) => a + (p.text ? p.text.length : 0), 0);
+    if (r.numPages > 0 && chars < 200) {
+      // Scanned PDF: no text layer. Read the pages as images automatically.
+      log("No readable text found — this looks like a scanned PDF. " +
+        "Reading pages as images instead (slower, automatic)…");
+      return ocrScannedPdf(file, r.numPages,
+        (d, t, label) => log("…" + label + " (" + d + "/" + t + ")"));
+    }
+    return { pages: r.pages,
+             label: file.name + " — PDF (" + r.numPages + " pages)" };
+  }
+  const kind = supportedDocExt(name) || supportedMediaExt(name);
+  if (!kind || !INGESTORS[kind]) {
+    throw new Error("Unsupported file type: " + file.name +
+      " — see the supported list above.");
+  }
+  if (kind === "audio") {
+    log("Transcribing audio — first run downloads a ~75MB model " +
+        "(one-time, stays on this device).");
+  }
+  if (kind === "image") {
+    log("Running OCR — printed text works best; handwriting is best-effort.");
+  }
+  return INGESTORS[kind](file, prog);
+}
+
+const ZIP_ENTRY_CAP = 200; // sanity cap: a study-materials zip is never bigger
+
+/** Ingest a .zip: every supported file inside becomes pages, labeled zip/inner. */
+async function ingestZip(file, prog) {
+  let zip;
+  try {
+    zip = await (await loadJsZip()).loadAsync(file);
+  } catch (e) {
+    throw new Error("That zip file couldn't be opened — it may be corrupted.");
+  }
+  const entries = Object.keys(zip.files)
+    .filter((p) => { const f = zip.files[p]; return f && !f.dir; })
+    .sort();
+  if (!entries.length) throw new Error("That zip is empty — nothing to read.");
+  if (entries.length > ZIP_ENTRY_CAP) {
+    throw new Error("That zip has " + entries.length + " files (max " +
+      ZIP_ENTRY_CAP + ") — split it up and try again.");
+  }
+  const pages = [];
+  let skipped = 0, n = 0;
+  for (const path of entries) {
+    const base = path.split("/").pop();
+    const lname = (base || "").toLowerCase();
+    const kind = supportedDocExt(lname);
+    const usable = base && (lname.endsWith(".pdf") ||
+      (kind && INGESTORS[kind] && kind !== "audio"));
+    if (!usable) { skipped++; continue; } // audio, nested zips, unsupported: skip
+    prog(n + 1, entries.length, "Reading " + base + "…");
+    const blob = await zip.file(path).async("blob");
+    const inner = new File([blob], base, { type: blob.type || "" });
+    const r = await ingestSingleFile(inner, prog);
+    for (const p of r.pages) {
+      pages.push({ n: ++n, text: p.text, src: file.name + "/" + path });
+    }
+  }
+  if (!pages.length) {
+    throw new Error("No readable files found in that zip" +
+      (skipped ? " (skipped " + skipped + ")" : "") + ".");
+  }
+  if (skipped) log("Skipped " + skipped + " file(s) in the zip (unsupported type).");
+  return { pages, label: file.name + " — zip (" + pages.length + " sections)" };
+}
+
+/** Shared pipeline: files in → sanitized pages → reader pane. */
+async function processFiles(files, srcOf) {
   const btn = $("extract");
   btn.disabled = true;
   logEl.textContent = "Starting…";
@@ -255,42 +332,18 @@ $("extract").addEventListener("click", async () => {
     const labels = [];
     for (const file of files) {
       const name = file.name.toLowerCase();
+      const srcLabel = srcOf ? srcOf(file) : file.name;
       let out;
-      if (name.endsWith(".pdf")) {
-        log("Extracting text from PDF: " + file.name);
-        const r = await extractPdfText(file,
-          (i, n) => log("…page " + i + "/" + n));
-        const chars = r.pages.reduce(
-          (a, p) => a + (p.text ? p.text.length : 0), 0);
-        if (r.numPages > 0 && chars < 200) {
-          // Scanned PDF: no text layer. Read the pages as images automatically.
-          log("No readable text found — this looks like a scanned PDF. " +
-            "Reading pages as images instead (slower, automatic)…");
-          out = await ocrScannedPdf(file, r.numPages,
-            (d, t, label) => log("…" + label + " (" + d + "/" + t + ")"));
-        } else {
-          out = { pages: r.pages,
-                  label: file.name + " — PDF (" + r.numPages + " pages)" };
-        }
+      if (name.endsWith(".zip")) {
+        log("Opening zip archive: " + file.name);
+        out = await ingestZip(file, prog);
       } else {
-        const kind = supportedDocExt(name) || supportedMediaExt(name);
-        if (!kind || !INGESTORS[kind]) {
-          throw new Error("Unsupported file type: " + file.name +
-            " — see the supported list above.");
-        }
-        if (kind === "audio") {
-          log("Transcribing audio — first run downloads a ~75MB model " +
-              "(one-time, stays on this device).");
-        }
-        if (kind === "image") {
-          log("Running OCR — printed text works best; handwriting is best-effort.");
-        }
-        out = await INGESTORS[kind](file, prog);
+        out = await ingestSingleFile(file, prog);
       }
       out.pages.forEach((p) => allPages.push({
         n: p.n,
-        text: p.text,
-        src: files.length > 1 ? file.name : undefined,
+        text: sanitizeExtractedText(p.text),
+        src: p.src || (files.length > 1 ? srcLabel : undefined),
       }));
       labels.push(out.label);
     }
@@ -312,13 +365,29 @@ $("extract").addEventListener("click", async () => {
     btn.disabled = false;
     btn.textContent = "Process files";
   }
+}
+
+$("extract").addEventListener("click", async () => {
+  const files = Array.from(fileInput.files);
+  if (!files.length) { log("Choose a file first."); return; }
+  processFiles(files, null);
+});
+
+/* ── folder upload (webkitdirectory): a whole folder of readings at once ── */
+
+$("folder").addEventListener("click", () => $("folder-input").click());
+$("folder-input").addEventListener("change", () => {
+  const files = Array.from($("folder-input").files);
+  if (!files.length) return;
+  log("Picked folder: " + files.length + " file(s).");
+  processFiles(files, (f) => f.webkitRelativePath || f.name);
 });
 
 /* ── paste text directly (no file needed) ── */
 
 function ingestPastedText(text) {
-  const t = (text || "").trim();
-  if (t.length < 10) { log("Pasted text is too short \u2014 copy more material first."); return; }
+  const t = sanitizeExtractedText(text || "");
+  if (t.length < 10) { log("Pasted text is too short — copy more material first."); return; }
   renderReader([{ n: 1, text: t }]);
   $("step-read").hidden = false;
   log("Pasted " + t.length.toLocaleString() +
@@ -360,16 +429,22 @@ $("paste-use").addEventListener("click", () => {
  * one in the review list. All client-side, zero network. */
 
 /* AUTO-DRAFT PURE BEGIN */
-const AUTODRAFT_CAP = 40;
+const AUTODRAFT_CAP = 100;
 const AUTODRAFT_STOP = new Set(("this that these those it its they them their " +
   "he she we you i the a an one some such what which who how why when where " +
   "there here something anything nothing everything someone anyone " +
+  "even if while although though because since unless whether whereas " +
+  "true false " +
   "chapter page figure table section lesson module unit slide term definition " +
   "note example ex tip warning key answer question summary overview objective " +
   "conclusion result results introduction").split(" "));
 // Auxiliary/modal verbs: a "term" containing one is a sentence fragment.
 const AUTODRAFT_VERBS = new Set(
   "was were is are be been being has have had will would could should did does do can may might must shall".split(" "));
+// Personal pronouns: a "term" containing one is a clause, not a term
+// ("Biological Psychology If you" is not a flashcard term).
+const AUTODRAFT_PRONOUNS = new Set(
+  "i me my mine we us our ours you your yours he him his she her hers it its they them their theirs".split(" "));
 
 function autodraftSentences(text) {
   const out = [];
@@ -390,19 +465,49 @@ function autodraftCleanTerm(t) {
 function autodraftTermOk(term) {
   if (!term) return false;
   if (term.length > 70) return false;
-  if (term.split(/\s+/).length > 8) return false;
+  const words = term.split(/\s+/);
+  if (words.length > 8) return false;
   if (/[.!?]/.test(term)) return false;          // sentence fragment, not a term
   if (/^\d+$/.test(term.replace(/\s/g, ""))) return false; // bare number
-  if (term.split(/\s+/).some((w) =>
-      AUTODRAFT_VERBS.has(w.toLowerCase().replace(/[^a-z]/g, "")))) return false;
-  const first = term.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "");
-  if (AUTODRAFT_STOP.has(first)) return false;   // "chapter 3", "this", ...
+  const toks = words.map((w) => w.toLowerCase().replace(/[^a-z]/g, ""));
+  if (toks.some((w) => AUTODRAFT_VERBS.has(w))) return false;
+  if (toks.some((w) => AUTODRAFT_PRONOUNS.has(w))) return false; // clause, not a term
+  // First word (split on non-letters so "TRUE/FALSE" checks as true+false).
+  const firstToks = words[0].toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  if (firstToks.some((t) => AUTODRAFT_STOP.has(t))) return false;
   return true;
 }
 
 function autodraftDefOk(def) {
   const d = String(def == null ? "" : def).replace(/\s+/g, " ").trim();
-  return d.length >= 15 && d.length <= 500;
+  if (d.length < 15 || d.length > 500) return false;
+  // Quiz/answer-key debris, not study content.
+  if (/^(feedback|correct answers?|incorrect|true|false)\b/i.test(d)) return false;
+  return true;
+}
+
+/**
+ * sanitizeExtractedText — drop CSS/HTML debris that extractors can leave
+ * behind (web content pasted or saved as .txt, HTML fragments inside docs):
+ * <style>/<script> blocks, HTML comments, and CSS-rule lines.
+ * Conservative: only lines that look like CSS rules are removed; ordinary
+ * prose — even with braces — stays.
+ */
+function sanitizeExtractedText(text) {
+  let t = String(text == null ? "" : text);
+  t = t.replace(/<style[\s\S]*?<\/style\s*>/gi, " ");
+  t = t.replace(/<script[\s\S]*?<\/script\s*>/gi, " ");
+  t = t.replace(/<!--[\s\S]*?-->/g, " ");
+  const cssDebris = (line) => {
+    const l = line.trim();
+    if (!l || !/[{}]/.test(l)) return false;
+    if (l.includes(";")) return true;                 // declarations & rule tails
+    if (/^\s*\}\s*$/.test(l)) return true;            // lone closing brace
+    if (/[a-z0-9)\]"']\s*\{/.test(l)) return true;    // selector before "{"
+    return false;
+  };
+  t = t.split("\n").filter((line) => !cssDebris(line)).join("\n");
+  return t.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /* Extract candidate {term, simple, src} pairs from reader pages.
@@ -427,6 +532,16 @@ function extractDrafts(pages) {
     const text = String((p && p.text) || "").trim();
     if (!text) continue;
     // 1) glossary units: "Term: definition" / "Term — definition".
+    // Sentence-level FIRST: definitions wrapped across line breaks stay
+    // whole (line-only matching clipped them at the break, producing
+    // half-meaning cards). Line-level second as a fallback; the seen-set
+    // dedup keeps the first (fullest) match per term.
+    const colonRe = /^([^:\n]{2,70}?)\s*[:\u2013\u2014-]\s+(.{15,})$/u;
+    for (const s of autodraftSentences(text)) {
+      if (s.length > 400) continue;
+      const m = colonRe.exec(s);
+      if (m) push(m[1], m[2], p);
+    }
     // Pasted text often arrives as one long line, so long lines are also
     // tried sentence-by-sentence (the whole-line match would swallow
     // unrelated sentences into one bloated definition).
@@ -437,20 +552,21 @@ function extractDrafts(pages) {
         ? autodraftSentences(l).filter((s) => s.length <= 260)
         : [l];
       for (const u of targets) {
-        const m = /^([^:\n]{2,70}?)\s*[:\u2013\u2014-]\s+(.{15,})$/u.exec(u);
+        const m = colonRe.exec(u);
         if (m) push(m[1], m[2], p);
       }
     }
     // 2) definition sentences: "X is defined as Y", "X refers to Y", …
+    // The linking verb is restored so definitions read as sentences.
     const sents = autodraftSentences(text);
     for (const s of sents) {
       let m;
-      if ((m = /^(.{2,70}?)\s+is defined as\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
-      else if ((m = /^(.{2,70}?)\s+are defined as\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
-      else if ((m = /^(.{2,70}?)\s+refers to\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
-      else if ((m = /^(.{2,70}?)\s+is (a|an)\s+(.{15,})$/i.exec(s))) push(m[1], m[2] + " " + m[3], p);
-      else if ((m = /^(.{2,70}?)\s+are\s+(.{15,})$/i.exec(s))) push(m[1], m[2], p);
-      else if ((m = /^(.{2,70}?)\s+is the (?:process|tendency|ability|system|study|branch|theory|principle|response|behavior|change|state|condition)\b\s*(?:by which|of|in which)?\s*(.{15,})$/i.exec(s))) push(m[1], m[2], p);
+      if ((m = /^(.{2,70}?)\s+is defined as\s+(.{15,})$/i.exec(s))) push(m[1], "is defined as " + m[2], p);
+      else if ((m = /^(.{2,70}?)\s+are defined as\s+(.{15,})$/i.exec(s))) push(m[1], "are defined as " + m[2], p);
+      else if ((m = /^(.{2,70}?)\s+refers to\s+(.{15,})$/i.exec(s))) push(m[1], "refers to " + m[2], p);
+      else if ((m = /^(.{2,70}?)\s+is (a|an)\s+(.{15,})$/i.exec(s))) push(m[1], "is " + m[2] + " " + m[3], p);
+      else if ((m = /^(.{2,70}?)\s+are\s+(.{15,})$/i.exec(s))) push(m[1], "are " + m[2], p);
+      else if ((m = /^(.{2,70}?)\s+is the (?:process|tendency|ability|system|study|branch|theory|principle|response|behavior|change|state|condition)\b\s*(?:by which|of|in which)?\s*(.{15,})$/i.exec(s))) push(m[1], "is the " + m[2], p);
     }
     if (drafts.length >= AUTODRAFT_CAP) break;
   }
