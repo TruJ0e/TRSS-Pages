@@ -21,6 +21,14 @@ const TESSERACT_ESM_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/
 const MAMMOTH_BROWSER_URL = 'https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js';
 const JSZIP_URL = 'https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js';
 
+/**
+ * Shared JSZip loader (the .zip archive intake in studio.js uses this;
+ * the .pptx path keeps its own call). Exposed so both stay on one pin.
+ */
+export function loadJsZip() {
+  return loadScriptOnce(JSZIP_URL, 'JSZip', 'the zip reader');
+}
+
 /** Default progress sink: (done, total, label) => void */
 const noopProgress = () => {};
 
