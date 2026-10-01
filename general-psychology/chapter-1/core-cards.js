@@ -4,7 +4,7 @@ window.CH1_CORE_CARDS = [
     "term": "Structuralism",
     "type": "book-term",
     "category": "How Did the Science of Psychology Begin?",
-    "cue": "Think: Structuralism is a theory of mental experience developed by Wilhelm Wundt (18321920) and Edward Titchner...",
+    "cue": "Think: Structuralism is a theory of mental experience developed by Wilhelm Wundt (1832–1920) and Edward Titchner...",
     "simple": "Structuralism is a theory of mental experience developed by Wilhelm Wundt and Edward Titchner.",
     "examples": [
       "These included structuralism, Gestalt psychology, functionalism, psychodynamic theory, and humanistic psychology.",
@@ -15,7 +15,7 @@ window.CH1_CORE_CARDS = [
       "You observe a real situation involving how did the science of psychology begin?. Explain how Structuralism accounts for what is happening, citing one specific detail from its definition.",
       "A classmate confuses Structuralism with Mind. Explain the distinction between them in your own words."
     ],
-    "compare": "Unlike Mind, which belongs to the same section, Structuralism specifically involves structuralism is a theory of mental experience developed by Wilhelm Wundt (18321920) and...."
+    "compare": "Unlike Mind, which belongs to the same section, Structuralism specifically involves structuralism is a theory of mental experience developed by Wilhelm Wundt (1832–1920) and...."
   },
   {
     "id": "ch1-core-002",
@@ -288,7 +288,7 @@ window.CH1_CORE_CARDS = [
     "cue": "Think: Regarded as the first psychologist and often called the father of psychology.",
     "simple": "Regarded as the first psychologist and often called the father of psychology.",
     "examples": [
-      "Structuralism: Structuralism is a theory of mental experience developed by Wilhelm Wundt (18321920) and Edward Titchner (1867-1923).",
+      "Structuralism: Structuralism is a theory of mental experience developed by Wilhelm Wundt (1832–1920) and Edward Titchner (1867-1923).",
       "Wilhelm Wundt: Regarded as the first psychologist and often called the father of psychology."
     ],
     "apply": [

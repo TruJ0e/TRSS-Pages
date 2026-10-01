@@ -17,6 +17,6 @@ window.CH1_STUDY_DATA = {
     "How Did the Science of Psychology Begin?",
     "Why Is Psychology a Hub Science?"
   ],
-  "generatedAt": "2026-10-01T21:39:02.341591+00:00",
+  "generatedAt": "2026-10-01T21:49:52.095269+00:00",
   "generator": "trss-generator (HeuristicCardGenerator+curate)"
 };
