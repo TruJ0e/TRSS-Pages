@@ -802,6 +802,10 @@
   function switchMode(newMode) {
     state.mode = newMode;
     TRSS_TTS.stop();
+    if (newMode === "quiz") {
+      state.quizScore = { correct: 0, total: 0 };
+      localStore.saveQuizScore(state.quizScore);
+    }
     const isFc = newMode === "flashcards";
     if (els.modeFlashcardsBtn) {
       els.modeFlashcardsBtn.classList.toggle("active", isFc);
@@ -1024,8 +1028,9 @@
   // Quiz Mode Logic
   function generateOptions(question) {
     const correctTerm = question.term;
-    const sameCatCards = allCards.filter(c => c.category === question.category && c.term !== correctTerm);
-    const diffCatCards = allCards.filter(c => c.category !== question.category && c.term !== correctTerm);
+    const pool = (state.quizDeck && state.quizDeck.length >= 4) ? state.quizDeck : allCards;
+    const sameCatCards = pool.filter(c => c.category === question.category && c.term !== correctTerm);
+    const diffCatCards = pool.filter(c => c.category !== question.category && c.term !== correctTerm);
 
     const shuffledSame = shuffleArray(sameCatCards);
     const shuffledDiff = shuffleArray(diffCatCards);
@@ -1175,19 +1180,51 @@
     if (!state.quizDeck.length) return;
     TRSS_TTS.stop();
     if (state.quizIndex >= state.quizDeck.length - 1) {
-      const isFiltered = state.setFilter !== "all" || state.sectionFilter !== "all" || Boolean(state.searchQuery);
-      if (isFiltered) {
-        completeScopedSession();
-        return;
-      }
-      state.quizIndex = 0;
-    } else {
-      state.quizIndex += 1;
+      showQuizComplete();
+      return;
     }
+    state.quizIndex += 1;
     state.quizAnswered = false;
     state.quizSelectedAnswer = null;
     renderQuiz();
     renderStatusBar();
+  }
+
+  function showQuizComplete() {
+    let ov = document.getElementById("quizCompleteOverlay");
+    if (!ov) {
+      ov = document.createElement("div");
+      ov.id = "quizCompleteOverlay";
+      ov.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);padding:20px;";
+      ov.innerHTML =
+        '<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
+        '<div style="font-size:48px;margin-bottom:8px;">🎉</div>' +
+        '<h2 style="margin:0 0 8px;font-size:24px;">Quiz Complete!</h2>' +
+        '<p id="quizCompleteStats" style="font-size:18px;margin:0 0 24px;color:#333;"></p>' +
+        '<button id="quizRestartBtn" style="display:block;width:100%;padding:14px;margin-bottom:12px;font-size:16px;font-weight:600;border:none;border-radius:10px;background:#4f46e5;color:#fff;cursor:pointer;">Restart Quiz</button>' +
+        '<button id="quizBackBtn" style="display:block;width:100%;padding:14px;font-size:16px;border:1px solid #ddd;border-radius:10px;background:#fff;cursor:pointer;">Review Flashcards</button>' +
+        '</div>';
+      document.body.appendChild(ov);
+      ov.querySelector("#quizRestartBtn").addEventListener("click", () => {
+        ov.style.display = "none";
+        state.quizScore = { correct: 0, total: 0 };
+        localStore.saveQuizScore(state.quizScore);
+        state.quizIndex = 0;
+        state.quizAnswered = false;
+        state.quizSelectedAnswer = null;
+        renderQuiz();
+        renderStatusBar();
+      });
+      ov.querySelector("#quizBackBtn").addEventListener("click", () => {
+        ov.style.display = "none";
+        switchMode("flashcards");
+      });
+    }
+    const pct = state.quizScore.total > 0
+      ? Math.round((state.quizScore.correct / state.quizScore.total) * 100) : 0;
+    ov.querySelector("#quizCompleteStats").textContent =
+      "You scored " + state.quizScore.correct + " / " + state.quizScore.total + " (" + pct + "%)";
+    ov.style.display = "flex";
   }
 
   // Status Bar
