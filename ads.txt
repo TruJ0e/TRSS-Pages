@@ -1,0 +1,3 @@
+# TRSS ads.txt — REPLACE pub-XXXXXXXXXXXXXXXX with your AdSense publisher ID before enabling ads.
+# No AdSense account is on file; never invent or hardcode a real publisher ID here.
+google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
