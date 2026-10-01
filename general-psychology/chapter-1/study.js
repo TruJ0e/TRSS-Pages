@@ -1297,18 +1297,15 @@
     }
   }
 
-  // Standalone chapter page: landing (chapter view) by default; study views via ?mode=.
+  // Standalone chapter page: the study view is the whole page.
   function handleRouting() {
+    showView("study");
     const params = new URLSearchParams(window.location.search || "");
     const mode = params.get("mode");
     if (mode === "quiz") {
-      showView("study");
       switchMode("quiz");
     } else if (mode === "flashcards") {
-      showView("study");
       switchMode("flashcards");
-    } else {
-      showView("chapter");
     }
   }
 
@@ -1478,7 +1475,18 @@
 
   // Quiz interaction
   if (els.quizNextBtn) els.quizNextBtn.addEventListener("click", nextQuizQuestion);
-  if (els.quizSkipBtn) els.quizSkipBtn.addEventListener("click", nextQuizQuestion);
+  if (els.quizSkipBtn) els.quizSkipBtn.addEventListener("click", () => {
+    // Skipping counts as an answered miss, not a free pass.
+    if (!state.quizAnswered) {
+      state.quizAnswered = true;
+      state.quizScore.total += 1;
+      localStore.saveQuizScore(state.quizScore);
+      renderQuiz();
+      renderStatusBar();
+      return;
+    }
+    nextQuizQuestion();
+  });
 
   // Back button listener
   if (els.studyTopBackBtn) els.studyTopBackBtn.addEventListener("click", handleStudyBack);

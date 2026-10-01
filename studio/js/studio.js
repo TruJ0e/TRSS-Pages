@@ -430,6 +430,11 @@ $("paste-use").addEventListener("click", () => {
 
 /* AUTO-DRAFT PURE BEGIN */
 const AUTODRAFT_CAP = 100;
+// Single vague nouns that are never flashcard terms on their own
+// ("Efforts are being made…" is throat-clearing, not a concept).
+const AUTODRAFT_VAGUE = new Set(
+  ("effort efforts fact facts thing things way ways part parts approach approaches " +
+   "many much lot lots kind kinds study studies result results").split(" "));
 const AUTODRAFT_STOP = new Set(("this that these those it its they them their " +
   "he she we you i the a an one some such what which who how why when where " +
   "there here something anything nothing everything someone anyone " +
@@ -471,8 +476,9 @@ function autodraftSentences(text) {
 function autodraftCleanTerm(t) {
   return String(t == null ? "" : t)
     .replace(/\s+/g, " ").trim()
-    .replace(/^[("“‘'[]+/, "")
-    .replace(/[)"”’'.,;:!?-]+$/, "");
+    .replace(/^[("“‘'#\[]+/, "")
+    .replace(/[)"”’'.,;:!?-]+$/, "")
+    .replace(/\*\*/g, "");
 }
 
 // Shared term cleanup: strip articles, leading ordinals ("Third,"), trailing
@@ -482,6 +488,8 @@ function autodraftBaseTerm(t) {
   const noParen = String(t == null ? "" : t).replace(/\s*\([^)]*\)/g, "");
   return autodraftCleanTerm(noParen)
     .replace(/^(the|a|an)\s+/i, "")
+    .replace(/^word\s+/i, "")
+    .replace(/^[Ii]n\s+(?:19|20)\d{2}\s*,\s+/, "")
     .replace(/^(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s*,\s+/i, "")
     .replace(/\s+(often|usually|typically|generally|normally|always|never|also|even|just|still)$/i, "")
     .replace(/,\s*such as\s+[^,]+,/i, "")
@@ -495,9 +503,21 @@ function autodraftTermOk(term) {
   if (/[:;]/.test(term)) return false;   // glossary/heading artifact, not a term
   const words = term.split(/\s+/);
   if (words.length > 8) return false;
-  if (/[.!?]/.test(term)) return false;          // sentence fragment, not a term
+  if (/[.!?]/.test(term.replace(/\b[A-Z]\./g, ""))) return false; // sentence fragment, not a term ("F. Skinner" survives)
+  if (/[#*]/.test(term)) return false;               // markdown/header debris
+  if (/https?:|www\.|\.com\/|_{2,}|deploymentId/i.test(term)) return false; // URL/tracking leak
+  if (term.includes("/")) return false;             // table-caption mash ("A/B experiments")
+  const opens = (term.match(/\(/g) || []).length;  // unbalanced paren: a date or aside
+  const closes = (term.match(/\)/g) || []).length;  // split across a line break, not a term
+  if (opens !== closes) return false;
+  if (/\b(that|which|who|whom|whose)\b/i.test(term)) return false;    // relative-clause fragment
+  if (words.length > 4 && /\bas\b/i.test(term)) return false;         // section header, not a term
+  if (/^(many|several|numerous)\s/i.test(term)) return false; // generic quantifier phrase, not a term
+  if (/\bvarious\b/i.test(term)) return false;                      // "Scientists from various fields"
+  if (/^[A-Z][a-z]+\s+and\s+[a-z]+$/.test(term)) return false;      // "Geology and psychology": two nouns, no head
   if (/^\d+$/.test(term.replace(/\s/g, ""))) return false; // bare number
   const toks = words.map((w) => w.toLowerCase().replace(/[^a-z]/g, ""));
+  if (words.length === 1 && AUTODRAFT_VAGUE.has(toks[0])) return false; // "Efforts", "fact" …
   if (toks.some((w) => AUTODRAFT_VERBS.has(w))) return false;
   if (toks.some((w) => AUTODRAFT_PRONOUNS.has(w))) return false; // clause, not a term
   // First word: hyphenated compounds ("short-term") count as one token so the
@@ -529,6 +549,22 @@ function autodraftDefOk(def) {
  */
 function sanitizeExtractedText(text) {
   let t = String(text == null ? "" : text);
+  // MindTap/Cengage quiz blocks: "Did You Get It?" through the page footer.
+  // Cut first, while the footer anchor still exists to bound the removal.
+  t = t.replace(/Did You Get It\?[\s\S]*?(?:MindTap - Cengage Learning|\[page \d+\]|$)/g, " ");
+  t = t.replace(/https?:\/\/\S+/g, " ");                        // bare URLs
+  t = t.replace(/deploymentId=\d+/g, " ");                       // tracking tokens
+  t = t.replace(/^\s*\[page \d+\]\s*$/gm, " ");              // [page N] markers
+  t = t.replace(/\d{1,2}\/\d{1,2}\/\d{2,4},\s*\d{1,2}:\d{2}\s*[AP]M[^\n]*/g, " "); // "9/30/26, 11:39 AM …" (whole- or mid-line)
+  t = t.replace(/MindTap - Cengage Learning[^\n]*/g, " ");     // footer text (whole- or mid-line)
+  t = t.replace(/^Feedback$/gm, " ");                       // quiz-UI label, never prose
+  t = t.replace(/\(\s*(\d{4}\s*[\u2013\u2014-])\s*\n\s*/g, "($1 "); // "(1856–\n1939)" → "(1856– 1939)"
+  t = t.replace(/^.*\b(Row Titles|Column Titles)\b.*$/gm, " "); // classification-table chrome
+  t = t.replace(/^.*\bto Classify\b.*$/gm, " ");
+  t = t.replace(/^.*\bResponses \(Right Side\b.*$/gm, " ");
+  t = t.replace(/^.*\bStimuli \(Left Side\b.*$/gm, " ");
+  t = t.replace(/^Chapter \d+ Lesson:.*$/gm, " ");
+  t = t.replace(/^Transcript \(.*$/gm, " ");
   t = t.replace(/<style[\s\S]*?<\/style\s*>/gi, " ");
   t = t.replace(/<script[\s\S]*?<\/script\s*>/gi, " ");
   t = t.replace(/<!--[\s\S]*?-->/g, " ");
@@ -550,11 +586,85 @@ function sanitizeExtractedText(text) {
   return t.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+/* Numbered-glossary pairing. Textbook glossaries list terms ("1.\\nmind 2.\\npsychology")
+ * on one page and definitions ("1.\\nThe brain… 2.\\nThe scientific…") on another.
+ * Entries are paired by number. The glossary is the highest-signal term source in
+ * the source text, so these drafts are pushed before the sentence-pattern passes
+ * and claim their terms in the seen-set first. */
+function extractGlossaryEntries(text) {
+  const markers = [];
+  const re = /(\d{1,3})\.\s*/g;
+  let m;
+  while ((m = re.exec(text)) !== null) markers.push({ num: +m[1], start: m.index, end: m.index + m[0].length });
+  const entries = [];
+  for (let i = 0; i < markers.length; i++) {
+    const nextStart = i + 1 < markers.length ? markers[i + 1].start : text.length;
+    entries.push({ num: markers[i].num, content: text.slice(markers[i].end, nextStart) });
+  }
+  return entries;
+}
+function glossaryRuns(entries) {
+  // Maximal runs of consecutive numbers, split at term-like/def-like
+  // boundaries so "definitions 1-10, terms 11-17" never merge into one run.
+  const runs = [];
+  let cur = [];
+  const typeOf = (e) => (glossTermLike(e.content) ? "t" : "d");
+  for (const e of entries) {
+    const continues = cur.length && e.num === cur[cur.length - 1].num + 1 &&
+      typeOf(e) === typeOf(cur[cur.length - 1]);
+    if (continues) cur.push(e);
+    else { if (cur.length >= 3) runs.push(cur); cur = [e]; }
+  }
+  if (cur.length >= 3) runs.push(cur);
+  return runs;
+}
+const glossTermLike = (c) => {
+  const t = String(c).replace(/\s+/g, " ").trim();
+  return t.length >= 2 && t.length <= 70 && t.split(/\s+/).length <= 8 && !/[.!?]/.test(t);
+};
+const glossDefLike = (c) => {
+  const t = String(c).replace(/\s+/g, " ").trim();
+  return t.length >= 20 && t.length <= 500;
+};
+function extractGlossaryDrafts(fullText, push, srcPage) {
+  const runs = glossaryRuns(extractGlossaryEntries(fullText));
+  const termRuns = runs.filter((r) => r.every((e) => glossTermLike(e.content)));
+  const defRuns = runs.filter((r) => r.every((e) => glossDefLike(e.content)) &&
+    !r.every((e) => glossTermLike(e.content)));
+  for (const tr of termRuns) {
+    for (const dr of defRuns) {
+      const defByNum = new Map(dr.map((e) => [e.num, e.content]));
+      for (const te of tr) {
+        if (defByNum.has(te.num)) {
+          push(te.content.replace(/\s+/g, " ").trim(),
+               defByNum.get(te.num).replace(/\s+/g, " ").trim(), srcPage);
+        }
+      }
+    }
+  }
+}
+
 /* Extract candidate {term, simple, src} pairs from reader pages.
  * pages: [{n, text, src?}] — same shape renderReader takes. */
 function extractDrafts(pages) {
   const drafts = [];
   const seen = new Set();
+  const personCards = new Map(); // last-name key → { key, idx, term }
+  // Person-like term → canonical last-name key, else null. Multi-word needs
+  // every word capitalized ("Gestalt psychology" is not a person);
+  // single capitalized words participate so "Pavlov" and "Ivan Petrovich
+  // Pavlov" resolve to the same person.
+  const personLast = (term) => {
+    const pw = term.split(/\s+/);
+    const normW = (w) => w.toLowerCase().replace(/[^a-z]/g, "");
+    if (pw.length >= 2 && pw.length <= 4 && pw.every((w) => /^[A-Z]/.test(w))) {
+      return normW(pw[pw.length - 1]);
+    }
+    // Single capitalized word with no digits ("Freud", "Wundt") — but not
+    // "Concept1" or "Figure2": digits mean it's a label, not a surname.
+    if (pw.length === 1 && /^[A-Z][a-z]+$/.test(term)) return normW(term);
+    return null;
+  };
   const srcOf = (p) => {
     const base = typeof p.n === "number" ? "Page " + p.n : String(p.n);
     return p.src ? p.src + " · " + base : base;
@@ -576,8 +686,33 @@ function extractDrafts(pages) {
     if (!autodraftTermOk(t) || !autodraftDefOk(simple)) return false;
     const key = t.toLowerCase();
     if (seen.has(key)) return false;
+    // Single-word fragment of an already-claimed compound ("Gestalt" when
+    // "Gestalt psychology" is claimed) — the compound is the card.
+    if (t.split(/\s+/).length === 1) {
+      for (const k of seen) {
+        if (k !== key && k.split(/\s+/).length > 1 && k.split(/\s+/).indexOf(key) >= 0) return false;
+      }
+    }
+    // One card per person: a full name claims its last name. If a shorter
+    // card ("Pavlov") was already taken, the fuller name ("Ivan Petrovich
+    // Pavlov") replaces it in place — never two cards for one person.
+    const pl = personLast(t);
+    if (pl) {
+      const prev = personCards.get(pl);
+      if (prev) {
+        if (t.split(/\s+/).length > prev.term.split(/\s+/).length) {
+          seen.delete(prev.key);
+          drafts[prev.idx] = { term: t, simple: simple, src: srcOf(p) };
+          seen.add(key);
+          personCards.set(pl, { key: key, idx: prev.idx, term: t });
+          return true;
+        }
+        return false;
+      }
+    }
     seen.add(key);
     drafts.push({ term: t, simple: simple, src: srcOf(p) });
+    if (pl) personCards.set(pl, { key: key, idx: drafts.length - 1, term: t });
     return true;
   };
   // Factual linking verbs for the generic branch (multi-word verbs included).
@@ -620,6 +755,12 @@ function extractDrafts(pages) {
     }
     return false;
   };
+  // Glossary pass over the full input text (terms and definitions often live
+  // on different pages). Runs first so glossary terms win the seen-set.
+  const glossPage = { n: "Glossary", src: pages && pages[0] ? pages[0].src : "" };
+  extractGlossaryDrafts(
+    (pages || []).map((p) => String((p && p.text) || "")).join("\n\n"),
+    (t, d) => push(t, d, glossPage), glossPage);
   for (const p of pages || []) {
     const text = String((p && p.text) || "").trim();
     if (!text) continue;
@@ -630,6 +771,7 @@ function extractDrafts(pages) {
     for (const block of text.split(/\n\s*\n/)) {
       for (const s of autodraftSentences(block)) {
         if (s.length > 400 || isCapsDebris(s)) continue;
+        if (/_{3,}/.test(s)) continue;   // fill-in-the-blank quiz debris
         for (const f of s.split(/\s*;\s*/)) {
           for (const u of f.split(/\s*,\s*while\s+/)) {
             const t = u.trim();
@@ -654,6 +796,7 @@ function extractDrafts(pages) {
     for (const raw of text.split(/\n/)) {
       const l = raw.trim();
       if (!l || isCapsDebris(l)) continue;
+      if (/_{3,}/.test(l)) continue;   // fill-in-the-blank quiz debris
       const targets = l.length > 260
         ? autodraftSentences(l).filter((s) => s.length <= 260)
         : [l];
@@ -669,25 +812,37 @@ function extractDrafts(pages) {
     const defAsPlRe = /^(.{2,70}?)\s+are defined as\s+(.{15,})$/i;
     const refersRe = /^(.{2,70}?)\s+refers to\s+(.{15,})$/i;
     const enumRe = /^(.{2,60}?)\s+is\s+(a|an)\s+([^:;]{10,120}?)\s+with\s+(two|three|four|five|six|seven|eight|\d+)\s+parts?\s*:\s*(.{20,})$/i;
-    const isARe = /^(.{2,70}?)\s+is (a|an)\s+(.{15,})$/i;
-    const areRe = /^(.{2,70}?)\s+are\s+(.{15,})$/i;
-    const isTheRe = /^(.{2,70}?)\s+is\s+(the|a|an|our|their|his|her|its)\s+(.{15,})$/i;
-    const knownAsRe = /^(.{2,60}?)\s+(is|are)\s+(known as|called)\s+(.{15,})$/i;
+    const isARe = /^(.{2,70}?)\s+(is|was)\s+(a|an)\s+(.{15,})$/i;
+    const areRe = /^(.{2,70}?)\s+(are|were)\s+(.{15,})$/i;
+    const isTheRe = /^(.{2,70}?)\s+(is|was)\s+(the|a|an|our|their|his|her|its)\s+(.{15,})$/i;
+    const knownAsRe = /^(.{2,60}?)\s+(is|was|are|were)\s+(known as|called)\s+(.{15,})$/i;
+    const isOneRe = /^(.{2,70}?)\s+is\s+one\s+(that|who|which)\s+(.{15,})$/i;
+    const knownForRe = /^(.{2,60}?)\s+(is|was|are|were)\s+((?:known|responsible)\s+for)\s+(.{15,})$/i;
+    const nameLike = "[A-Z][\\w.]*(?:\\s+[A-Z][\\w.]*){0,2}\\s*(?:\\(\\s*\\d{4}\\s*[\\u2013\\u2014-]?\\s*\\d{0,4}\\s*\\))?";
+    const personSubj = "(" + nameLike + "(?:\\s+and\\s+" + nameLike + ")?)";
+    const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded)\\s+(.{15,})$");
+    const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created)\s+(.{15,})$/i;
+    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?developed\s+by\s+(.{5,})$/i;
     for (const s of units) {
-      let m; let done = false;
+      // Definition patterns as a retryable unit: after trying the whole
+      // sentence, a leading "Label: " (textbook key-term header) is stripped
+      // and the remainder is tried too, so
+      // "Functionalism: William James (1842–1910) developed ..." yields [William James].
+      const tryOne = (str) => {
+        let m; let done = false;
       // "X documented the Y: Z" — the discovery becomes the card, not the clause.
-      if (!done && (m = docRe.exec(s))) {
+      if (!done && (m = docRe.exec(str))) {
         let who = m[1].trim();
         const yl = /^in\s+(\d{4})\s*,\s*(.+)$/i.exec(who);
         const yrNote = yl ? " [" + yl[1] + "]" : "";
         if (yl) who = yl[2];
         done = push(m[3], m[2].toLowerCase() + " by " + who + ": " + m[4] + yrNote, p);
       }
-      if (!done && (m = defAsRe.exec(s))) done = push(m[1], "is defined as " + m[2], p);
-      if (!done && (m = defAsPlRe.exec(s))) done = push(m[1], "are defined as " + m[2], p);
-      if (!done && (m = refersRe.exec(s))) done = push(m[1], "refers to " + m[2], p);
+      if (!done && (m = defAsRe.exec(str))) done = push(m[1], "is defined as " + m[2], p);
+      if (!done && (m = defAsPlRe.exec(str))) done = push(m[1], "are defined as " + m[2], p);
+      if (!done && (m = refersRe.exec(str))) done = push(m[1], "refers to " + m[2], p);
       // "X is a Y with N parts: a, b, c" — main card plus one card per part.
-      if (!done && (m = enumRe.exec(s))) {
+      if (!done && (m = enumRe.exec(str))) {
         done = push(m[1], "is " + m[2] + " " + m[3] + " with " + m[4] + " parts: " + m[5], p);
         const base = autodraftBaseTerm(m[1]);
         const am = /^(.*?),\s*(proposed|introduced|described|developed|created|founded|discovered|named)\s+by\s+[^,;]+,?\s*$/i.exec(base);
@@ -706,7 +861,7 @@ function extractDrafts(pages) {
       }
       // "X describe(s)/divide(s) N categories: A, and B." - same main+sub-card treatment.
       if (!done) {
-        const me = /^(.{2,70}?)\s+(?:describe|describes|divide|divides|fall\s+into|group\s+into)\s+(two|three|four|five|six|seven|eight|\d+)\s+(?:broad\s+)?(parts|categories|stages|types|phases|steps|divisions)\s*:\s*(.{15,})$/i.exec(s);
+        const me = /^(.{2,70}?)\s+(?:describe|describes|divide|divides|fall\s+into|group\s+into)\s+(two|three|four|five|six|seven|eight|\d+)\s+(?:broad\s+)?(parts|categories|stages|types|phases|steps|divisions)\s*:\s*(.{15,})$/i.exec(str);
         if (me) {
           const mainTerm2 = autodraftBaseTerm(me[1]);
           const raw2 = me[4];
@@ -723,15 +878,63 @@ function extractDrafts(pages) {
           }
         }
       }
-      if (!done && (m = isARe.exec(s))) done = push(m[1], "is " + m[2] + " " + m[3], p);
-      if (!done && (m = areRe.exec(s))) done = push(m[1], "are " + m[2], p);
+      if (!done && (m = isARe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
+      if (!done && (m = areRe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3], p);
       // "X is the <anything>" — the noun is kept so the back stays grammatical
       // ("retrieval" / "is the process of getting information out of storage").
-      if (!done && (m = isTheRe.exec(s))) done = push(m[1], "is " + m[2] + " " + m[3], p);
-      if (!done && (m = knownAsRe.exec(s))) done = push(m[1], m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
+      if (!done && (m = isTheRe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
+      if (!done && (m = isOneRe.exec(str))) done = push(m[1], "is one " + m[2] + " " + m[3], p);
+      if (!done && (m = knownForRe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3].toLowerCase() + " " + m[4], p);
+      if (!done && (m = personRe.exec(str))) {
+        const pdef = m[2].toLowerCase() + " " + m[3];
+        const cm = new RegExp("^(.+?)\\s+and\\s+(" + nameLike + ")$").exec(m[1].trim());
+        if (cm) { const r1 = push(cm[1], pdef, p); const r2 = push(cm[2], pdef, p); done = r1 || r2; }
+        else done = push(m[1], pdef, p);
+      }
+      // "X was developed by PERSON (and PERSON)" — the developers get cards
+      // ("Structuralism ... developed by Wilhelm Wundt ..." → [Wilhelm Wundt]).
+      // The correct spelling here also blocks the textbook's own "William Wundt"
+      // typo later via the person last-name rule.
+      if (!done && (m = developedByRe.exec(str))) {
+        const topic = (/^([A-Z][\w-]*(?:\s+[A-Z][\w-]*){0,2})/.exec(m[1].trim()) || [])[1] || "";
+        const ddef = "developed" + (topic ? " " + topic.toLowerCase() : "");
+        const nameOnly = new RegExp("^" + nameLike + "$");
+        let any = false;
+        for (const person of m[2].split(/\s+and\s+|,\s*/)) {
+          const pn = person.trim().replace(/[.]+$/, "");
+          if (pn && nameOnly.test(pn)) any = push(pn, ddef, p) || any;
+        }
+        done = any;
+      }
+      if (!done && (m = madeRe.exec(str))) {
+        // Preserve a leading "In <year>, " on the back (baseTerm strips it
+        // from the front) — "In 1953, Aserinsky and Kleitman discovered ..."
+        const ym = /^[Ii]n\s+((?:19|20)\d{2})\s*,\s*/.exec(m[1]);
+        done = push(m[1], m[2].toLowerCase() + " " + m[3] + (ym ? " [" + ym[1] + "]" : ""), p);
+      }
+      if (!done && (m = knownAsRe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
       if (!done) {
-        const L = leaderOf(s);
+        const L = leaderOf(str);
         done = factBranch(L.rest, L, p);
+      }
+        return done;
+      };
+      let done = tryOne(s);
+      if (!done) {
+        const lab = /^([^:\n]{2,50}?)\s*:\s+(.{15,})$/s.exec(s);
+        // Only strip textbook key-term headers ("Functionalism: ..."). Quiz
+        // chrome ("Correct answers: ...") is debris — stripping it would
+        // launder "Feedback shows ..." into a card.
+        const labHead = lab ? lab[1].trim() : "";
+        if (lab && !/^[\d,]+$/.test(labHead) &&
+            !/\b(answers?|feedback|questions?|options?|choices?|correct|incorrect)\b/i.test(labHead))
+          done = tryOne(lab[2]);
+      }
+      if (!done) {
+        // "Humanists like Abraham Maslow and Carl Rogers rejected ..." —
+        // the group label is throat-clearing; the names carry the card.
+        const like = /^[A-Z][\w]*s\s+like\s+(.+)$/.exec(s);
+        if (like) done = tryOne(like[1]);
       }
     }
     if (drafts.length >= AUTODRAFT_CAP) break;
