@@ -822,8 +822,8 @@ function extractDrafts(pages) {
     const nameLike = "[A-Z][\\w.]*(?:\\s+[A-Z][\\w.]*){0,2}\\s*(?:\\(\\s*\\d{4}\\s*[\\u2013\\u2014-]?\\s*\\d{0,4}\\s*\\))?";
     const personSubj = "(" + nameLike + "(?:\\s+and\\s+" + nameLike + ")?)";
     const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded)\\s+(.{15,})$");
-    const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created)\s+(.{15,})$/i;
-    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced)\s+by\s+(.{5,})$/i;
+    const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed)\s+(.{15,})$/i;
+    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed)\s+by\s+(.{5,})$/i;
     for (const s of units) {
       // Definition patterns as a retryable unit: after trying the whole
       // sentence, a leading "Label: " (textbook key-term header) is stripped
@@ -896,7 +896,7 @@ function extractDrafts(pages) {
       if (!done) {
         const m2 = /^(.{2,60}?)\s+emerged\s+through\s+the\s+work\s+of\s+(.{5,})$/i.exec(str);
         if (m2) {
-          const topic2 = (/^([A-Z][\w-]*(?:\s+[A-Z][\w-]*){0,2})/.exec(m2[1].trim()) || [])[1] || "";
+          const topic2 = (/^(((?:The|A|An)\s+)?[A-Za-z][\w-]*(?:\s+[A-Za-z][\w-]*){0,2})/.exec(m2[1].trim()) || [])[1] || "";
           const nameOnly2 = new RegExp("^" + nameLike + "$");
           let any2 = false;
           for (const person of m2[2].split(/\s+and\s+|,\s*/)) {
@@ -917,7 +917,7 @@ function extractDrafts(pages) {
       if (!done) {
         const lm = /^(.{2,60}?)\s+(?:was\s+)?(founded|developed|created)\s+by\s+(.+?)\s+and\s+later\s+(advanced|expanded|continued)\s+by\s+(.+)$/i.exec(str);
         if (lm) {
-          const topicL = (/^([A-Z][\w-]*(?:\s+[A-Z][\w-]*){0,2})/.exec(lm[1].trim()) || [])[1] || "";
+          const topicL = (/^(((?:The|A|An)\s+)?[A-Za-z][\w-]*(?:\s+[A-Za-z][\w-]*){0,2})/.exec(lm[1].trim()) || [])[1] || "";
           const verbL = lm[2].toLowerCase();
           const verbL2 = lm[4].toLowerCase();
           const nameOnlyL = new RegExp("^" + nameLike + "$");
@@ -933,7 +933,7 @@ function extractDrafts(pages) {
       }
       if (!done && (m = developedByRe.exec(str))) {
         const verb = (m[2] || "developed").toLowerCase();
-        const topic = (/^([A-Z][\w-]*(?:\s+[A-Z][\w-]*){0,2})/.exec(m[1].trim()) || [])[1] || "";
+        const topic = (/^(((?:The|A|An)\s+)?[A-Za-z][\w-]*(?:\s+[A-Za-z][\w-]*){0,2})/.exec(m[1].trim()) || [])[1] || "";
         const nameOnly = new RegExp("^" + nameLike + "$");
         let any = false;
         for (const person of m[3].split(/\s+and\s+|,\s*/)) {
