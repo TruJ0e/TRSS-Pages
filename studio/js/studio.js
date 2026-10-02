@@ -466,7 +466,8 @@ function autodraftSentences(text) {
   const PH = "ABBRDOT";
   const t = t0
     .replace(/([A-Z])\. ([A-Z]\.)/g, "$1.$2")
-    .replace(/\b((?:[A-Z]\.){2,})/g, (m) => m.split(".").join(PH));
+    .replace(/\b((?:[A-Z]\.){2,})/g, (m) => m.split(".").join(PH))
+    .replace(/\b([A-Z])\. (?=[A-Z][a-z])/g, "$1" + PH + " ");
   const re = /[^.!?]+[.!?]+/g;
   let m;
   while ((m = re.exec(t)) !== null && out.length < 4000) out.push(m[0].trim().split(PH).join("."));
@@ -822,7 +823,7 @@ function extractDrafts(pages) {
     const personSubj = "(" + nameLike + "(?:\\s+and\\s+" + nameLike + ")?)";
     const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded)\\s+(.{15,})$");
     const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created)\s+(.{15,})$/i;
-    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?developed\s+by\s+(.{5,})$/i;
+    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced)\s+by\s+(.{5,})$/i;
     for (const s of units) {
       // Definition patterns as a retryable unit: after trying the whole
       // sentence, a leading "Label: " (textbook key-term header) is stripped
@@ -838,9 +839,9 @@ function extractDrafts(pages) {
         if (yl) who = yl[2];
         done = push(m[3], m[2].toLowerCase() + " by " + who + ": " + m[4] + yrNote, p);
       }
-      if (!done && (m = defAsRe.exec(str))) done = push(m[1], "is defined as " + m[2], p);
-      if (!done && (m = defAsPlRe.exec(str))) done = push(m[1], "are defined as " + m[2], p);
-      if (!done && (m = refersRe.exec(str))) done = push(m[1], "refers to " + m[2], p);
+      if (!done && (m = defAsRe.exec(str))) done = push(m[1], m[1] + " is defined as " + m[2], p);
+      if (!done && (m = defAsPlRe.exec(str))) done = push(m[1], m[1] + " are defined as " + m[2], p);
+      if (!done && (m = refersRe.exec(str))) done = push(m[1], m[1] + " refers to " + m[2], p);
       // "X is a Y with N parts: a, b, c" — main card plus one card per part.
       if (!done && (m = enumRe.exec(str))) {
         done = push(m[1], "is " + m[2] + " " + m[3] + " with " + m[4] + " parts: " + m[5], p);
@@ -878,31 +879,68 @@ function extractDrafts(pages) {
           }
         }
       }
-      if (!done && (m = isARe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
-      if (!done && (m = areRe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3], p);
+      if (!done && (m = isARe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
+      if (!done && (m = areRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3], p);
       // "X is the <anything>" — the noun is kept so the back stays grammatical
       // ("retrieval" / "is the process of getting information out of storage").
-      if (!done && (m = isTheRe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
-      if (!done && (m = isOneRe.exec(str))) done = push(m[1], "is one " + m[2] + " " + m[3], p);
-      if (!done && (m = knownForRe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3].toLowerCase() + " " + m[4], p);
+      if (!done && (m = isTheRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
+      if (!done && (m = isOneRe.exec(str))) done = push(m[1], m[1] + " is one " + m[2] + " " + m[3], p);
+      if (!done && (m = knownForRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3].toLowerCase() + " " + m[4], p);
       if (!done && (m = personRe.exec(str))) {
-        const pdef = m[2].toLowerCase() + " " + m[3];
+        const pdef = m[1] + " " + m[2].toLowerCase() + " " + m[3];
         const cm = new RegExp("^(.+?)\\s+and\\s+(" + nameLike + ")$").exec(m[1].trim());
         if (cm) { const r1 = push(cm[1], pdef, p); const r2 = push(cm[2], pdef, p); done = r1 || r2; }
         else done = push(m[1], pdef, p);
+      }
+      // "X emerged through the work of PERSON (and PERSON)"
+      if (!done) {
+        const m2 = /^(.{2,60}?)\s+emerged\s+through\s+the\s+work\s+of\s+(.{5,})$/i.exec(str);
+        if (m2) {
+          const topic2 = (/^([A-Z][\w-]*(?:\s+[A-Z][\w-]*){0,2})/.exec(m2[1].trim()) || [])[1] || "";
+          const nameOnly2 = new RegExp("^" + nameLike + "$");
+          let any2 = false;
+          for (const person of m2[2].split(/\s+and\s+|,\s*/)) {
+            const pn2 = person.trim().replace(/[.]+$/, "");
+            const pdef2 = pn2 + " contributed to " + (topic2 ? topic2.toLowerCase() : "psychology") + ".";
+            if (pn2 && nameOnly2.test(pn2)) any2 = push(pn2, pdef2, p) || any2;
+          }
+          // Also create a card for the topic itself
+          if (topic2) push(topic2, m2[1].trim().replace(/[.]+$/, "") + " emerged through the work of " + m2[2].trim().replace(/[.]+$/, "") + ".", p);
+          done = any2;
+        }
       }
       // "X was developed by PERSON (and PERSON)" — the developers get cards
       // ("Structuralism ... developed by Wilhelm Wundt ..." → [Wilhelm Wundt]).
       // The correct spelling here also blocks the textbook's own "William Wundt"
       // typo later via the person last-name rule.
+      // "X was founded by A and later advanced by B" — capture the second contributor
+      if (!done) {
+        const lm = /^(.{2,60}?)\s+(?:was\s+)?(founded|developed|created)\s+by\s+(.+?)\s+and\s+later\s+(advanced|expanded|continued)\s+by\s+(.+)$/i.exec(str);
+        if (lm) {
+          const topicL = (/^([A-Z][\w-]*(?:\s+[A-Z][\w-]*){0,2})/.exec(lm[1].trim()) || [])[1] || "";
+          const verbL = lm[2].toLowerCase();
+          const verbL2 = lm[4].toLowerCase();
+          const nameOnlyL = new RegExp("^" + nameLike + "$");
+          let anyL = false;
+          for (const [pnRaw, vb] of [[lm[3], verbL], [lm[5], verbL2]]) {
+            const pnL = pnRaw.trim().replace(/[.]+$/, "");
+            const pdefL = pnL + " " + vb + (topicL ? " " + topicL.toLowerCase() : "") + ".";
+            if (pnL && nameOnlyL.test(pnL)) anyL = push(pnL, pdefL, p) || anyL;
+          }
+          if (topicL) push(topicL, lm[1].trim() + " was " + verbL + " by " + lm[3].trim() + ".", p);
+          done = anyL;
+        }
+      }
       if (!done && (m = developedByRe.exec(str))) {
+        const verb = (m[2] || "developed").toLowerCase();
         const topic = (/^([A-Z][\w-]*(?:\s+[A-Z][\w-]*){0,2})/.exec(m[1].trim()) || [])[1] || "";
-        const ddef = "developed" + (topic ? " " + topic.toLowerCase() : "");
         const nameOnly = new RegExp("^" + nameLike + "$");
         let any = false;
-        for (const person of m[2].split(/\s+and\s+|,\s*/)) {
+        for (const person of m[3].split(/\s+and\s+|,\s*/)) {
           const pn = person.trim().replace(/[.]+$/, "");
-          if (pn && nameOnly.test(pn)) any = push(pn, ddef, p) || any;
+          // Complete sentence with subject: "Wilhelm Wundt developed structuralism."
+          const pdef = pn + " " + verb + (topic ? " " + topic.toLowerCase() : "") + ".";
+          if (pn && nameOnly.test(pn)) any = push(pn, pdef, p) || any;
         }
         done = any;
       }
@@ -910,9 +948,9 @@ function extractDrafts(pages) {
         // Preserve a leading "In <year>, " on the back (baseTerm strips it
         // from the front) — "In 1953, Aserinsky and Kleitman discovered ..."
         const ym = /^[Ii]n\s+((?:19|20)\d{2})\s*,\s*/.exec(m[1]);
-        done = push(m[1], m[2].toLowerCase() + " " + m[3] + (ym ? " [" + ym[1] + "]" : ""), p);
+        done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + (ym ? " [" + ym[1] + "]" : ""), p);
       }
-      if (!done && (m = knownAsRe.exec(str))) done = push(m[1], m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
+      if (!done && (m = knownAsRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
       if (!done) {
         const L = leaderOf(str);
         done = factBranch(L.rest, L, p);
