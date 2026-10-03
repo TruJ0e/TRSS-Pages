@@ -809,20 +809,20 @@ function extractDrafts(pages) {
     // 2) definition sentences. The linking verb is restored so definitions
     // read as sentences.
     const docRe = /^(.{2,60}?)\s+(documented|described|introduced|proposed|discovered|identified)\s+(?:the\s+)?(.{2,60}?)\s*:\s*(.{15,})$/i;
-    const defAsRe = /^(.{2,70}?)\s+is defined as\s+(.{15,})$/i;
-    const defAsPlRe = /^(.{2,70}?)\s+are defined as\s+(.{15,})$/i;
-    const refersRe = /^(.{2,70}?)\s+refers to\s+(.{15,})$/i;
+    const defAsRe = /^(.{2,70}?)\s+is defined as\s+(.{5,})$/i;
+    const defAsPlRe = /^(.{2,70}?)\s+are defined as\s+(.{5,})$/i;
+    const refersRe = /^(.{2,70}?)\s+refers to\s+(.{5,})$/i;
     const enumRe = /^(.{2,60}?)\s+is\s+(a|an)\s+([^:;]{10,120}?)\s+with\s+(two|three|four|five|six|seven|eight|\d+)\s+parts?\s*:\s*(.{20,})$/i;
-    const isARe = /^(.{2,70}?)\s+(is|was)\s+(a|an)\s+(.{15,})$/i;
-    const areRe = /^(.{2,70}?)\s+(are|were)\s+(.{15,})$/i;
-    const isTheRe = /^(.{2,70}?)\s+(is|was)\s+(the|a|an|our|their|his|her|its)\s+(.{15,})$/i;
-    const knownAsRe = /^(.{2,60}?)\s+(is|was|are|were)\s+(known as|called)\s+(.{15,})$/i;
-    const isOneRe = /^(.{2,70}?)\s+is\s+one\s+(that|who|which)\s+(.{15,})$/i;
-    const knownForRe = /^(.{2,60}?)\s+(is|was|are|were)\s+((?:known|responsible)\s+for)\s+(.{15,})$/i;
+    const isARe = /^(.{2,70}?)\s+(is|was)\s+(a|an)\s+(.{5,})$/i;
+    const areRe = /^(.{2,70}?)\s+(are|were)\s+(.{5,})$/i;
+    const isTheRe = /^(.{2,70}?)\s+(is|was)\s+(the|a|an|our|their|his|her|its)\s+(.{5,})$/i;
+    const knownAsRe = /^(.{2,60}?)\s+(is|was|are|were)\s+(known as|called)\s+(.{5,})$/i;
+    const isOneRe = /^(.{2,70}?)\s+is\s+one\s+(that|who|which)\s+(.{5,})$/i;
+    const knownForRe = /^(.{2,60}?)\s+(is|was|are|were)\s+((?:known|responsible)\s+for)\s+(.{5,})$/i;
     const nameLike = "[A-Z][\\w.]*(?:\\s+[A-Z][\\w.]*){0,2}\\s*(?:\\(\\s*\\d{4}\\s*[\\u2013\\u2014-]?\\s*\\d{0,4}\\s*\\))?";
     const personSubj = "(" + nameLike + "(?:\\s+and\\s+" + nameLike + ")?)";
     const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded)\\s+(.{15,})$");
-    const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed)\s+(.{15,})$/i;
+    const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed)\s+(.{5,})$/i;
     const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed)\s+by\s+(.{5,})$/i;
     for (const s of units) {
       // Definition patterns as a retryable unit: after trying the whole
@@ -1081,6 +1081,54 @@ function generateQuiz(drafts, count = 20) {
   return questions;
 }
 
+
+/* CHAPTER EXPORT: Generate core-cards.js in TRSS chapter format */
+function draftToChapterCard(d, idx, prefix) {
+  const num = String(idx + 1).padStart(3, "0");
+  const term = d.term || "";
+  const def = d.simple || d.definition || "";
+  
+  // Generate cue: "Think: " + key concept
+  let cue = "Think: " + term;
+  // Try to extract key phrase from definition
+  const defWords = def.replace(/^[A-Z][a-z]+\s+[A-Z][a-z]+\s+/, "").slice(0, 60);
+  if (defWords.length > 10) cue = "Think: " + defWords.split(/\s+/).slice(0, 6).join(" ");
+  
+  // Generate example: rephrase definition as a scenario
+  const example = def.charAt(0).toUpperCase() + def.slice(1);
+  
+  // Generate apply question
+  let apply = "Explain " + term + " in your own words.";
+  if (/^[A-Z][a-z]+\s+[A-Z]/.test(term)) {
+    // Person: "Who...?" or "What did X do?"
+    const verbMatch = def.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted)\b\s+(.{5,40})/i);
+    if (verbMatch) {
+      apply = "Who " + verbMatch[1].toLowerCase() + " " + verbMatch[2].replace(/[.]+$/, "") + "?";
+    }
+  } else {
+    // Concept: "What is...?"
+    apply = "What is " + term + "?";
+  }
+  
+  return {
+    id: prefix.toLowerCase() + "-core-" + num,
+    term: term,
+    type: "book-term",
+    category: d.src || d.category || "General",
+    cue: cue,
+    simple: def,
+    examples: [example],
+    apply: [apply],
+  };
+}
+
+function exportChapterCards(drafts, chapterNum, prefix) {
+  const ranked = rankDrafts(drafts);
+  const cards = ranked.map((d, i) => draftToChapterCard(d, i, prefix));
+  const js = "win" + "dow." + prefix + "_CORE_CARDS = " + JSON.stringify(cards, null, 2) + ";\n";
+  return { js, count: cards.length };
+}
+
 /* AUTO-DRAFT PURE END */
 
 
@@ -1114,6 +1162,7 @@ $("autodraft").addEventListener("click", async () => {
     $("step-drafts").hidden = false;
     $("draft-best").hidden = false;
     $("quiz-gen").hidden = false;
+    $("chapter-export").hidden = false;
     $("step-drafts").scrollIntoView({ behavior: "smooth", block: "start" });
     log("Drafted " + drafts.length + " card(s) for review — nothing saved yet. " +
         "Keep the good ones, edit or delete the rest.");
@@ -1199,6 +1248,26 @@ $("quiz-regen").addEventListener("click", () => {
 $("quiz-clear").addEventListener("click", () => {
   currentQuiz = [];
   $("step-quiz").hidden = true;
+});
+
+// Export as chapter-format JS
+$("chapter-export").addEventListener("click", () => {
+  if (!currentDrafts.length) {
+    log("No drafts to export — auto-draft first.");
+    return;
+  }
+  // Ask for chapter number/prefix
+  const num = prompt("Chapter number (e.g., 7):", "7");
+  if (!num) return;
+  const prefix = "CH" + num;
+  const { js, count } = exportChapterCards(currentDrafts, num, prefix);
+  const blob = new Blob([js], { type: "text/javascript" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "core-cards.js";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  log("Exported " + count + " cards as " + prefix + "_CORE_CARDS chapter format.");
 });
 
 function draftPreset(d) {
