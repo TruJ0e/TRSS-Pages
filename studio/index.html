@@ -105,6 +105,8 @@
     <strong>Make flashcard</strong> — or let the studio draft the cards for you.</p>
     <div style="margin:10px 0">
       <button class="primary" id="autodraft">&#10024; Auto-draft flashcards</button>
+      <button id="draft-best" hidden>⭐ Show best first</button>
+      <button id="quiz-gen" hidden>📝 Generate quiz</button>
       <span class="hint" style="margin-left:8px">Finds term&ndash;definition pairs in the text. You review every draft before anything is saved.</span>
     </div>
     <div id="reader" aria-label="Extracted document text"></div>
@@ -128,7 +130,15 @@
       <button id="clear" class="danger">Clear all</button>
     </div>
     <div id="card-list" style="margin-top:8px"></div>
-  </section>
+  
+    <section id="step-quiz" hidden style="margin-top:14px;border-top:1px solid #ccc;padding-top:14px">
+      <h3>Generated Quiz</h3>
+      <div id="quiz-questions"></div>
+      <div style="margin-top:10px">
+        <button id="quiz-regen">🔄 Regenerate</button>
+        <button id="quiz-clear">Discard quiz</button>
+      </div>
+    </section></section>
 
   <button id="offer" hidden>✏️ Make flashcard</button>
 

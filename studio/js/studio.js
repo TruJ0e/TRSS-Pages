@@ -822,8 +822,8 @@ function extractDrafts(pages) {
     const nameLike = "[A-Z][\\w.]*(?:\\s+[A-Z][\\w.]*){0,2}\\s*(?:\\(\\s*\\d{4}\\s*[\\u2013\\u2014-]?\\s*\\d{0,4}\\s*\\))?";
     const personSubj = "(" + nameLike + "(?:\\s+and\\s+" + nameLike + ")?)";
     const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded)\\s+(.{15,})$");
-    const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed|contains|elucidated|won|explains|established)\s+(.{15,})$/i;
-    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed|elucidated)\s+by\s+(.{5,})$/i;
+    const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed)\s+(.{15,})$/i;
+    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed)\s+by\s+(.{5,})$/i;
     for (const s of units) {
       // Definition patterns as a retryable unit: after trying the whole
       // sentence, a leading "Label: " (textbook key-term header) is stripped
@@ -887,12 +887,10 @@ function extractDrafts(pages) {
       if (!done && (m = isOneRe.exec(str))) done = push(m[1], m[1] + " is one " + m[2] + " " + m[3], p);
       if (!done && (m = knownForRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3].toLowerCase() + " " + m[4], p);
       if (!done && (m = personRe.exec(str))) {
-        const cleanP1 = m[1].replace(/^[Ii]n\s+(?:(?:17|18|19|20)\d{2})\s*,\s*/, "").trim().replace(/\s+(?:first|also|later)\s*$/i, "").trim();
-        const pdef = (cleanP1 || m[1]) + " " + m[2].toLowerCase() + " " + m[3];
+        const pdef = m[1] + " " + m[2].toLowerCase() + " " + m[3];
         const cm = new RegExp("^(.+?)\\s+and\\s+(" + nameLike + ")$").exec(m[1].trim());
-        const useTerm = cleanP1 || m[1];
         if (cm) { const r1 = push(cm[1], pdef, p); const r2 = push(cm[2], pdef, p); done = r1 || r2; }
-        else done = push(useTerm, pdef, p);
+        else done = push(m[1], pdef, p);
       }
       // "X emerged through the work of PERSON (and PERSON)"
       if (!done) {
@@ -939,7 +937,7 @@ function extractDrafts(pages) {
         const nameOnly = new RegExp("^" + nameLike + "$");
         let any = false;
         for (const person of m[3].split(/\s+and\s+|,\s*/)) {
-          const pn = person.trim().replace(/[.]+$/, "").replace(/\s+in\s+(?:(?:17|18|19|20)\d{2})\s*$/, "").trim();
+          const pn = person.trim().replace(/[.]+$/, "");
           // Complete sentence with subject: "Wilhelm Wundt developed structuralism."
           const pdef = pn + " " + verb + (topic ? " " + topic.toLowerCase() : "") + ".";
           if (pn && nameOnly.test(pn)) any = push(pn, pdef, p) || any;
@@ -950,10 +948,7 @@ function extractDrafts(pages) {
         // Preserve a leading "In <year>, " on the back (baseTerm strips it
         // from the front) — "In 1953, Aserinsky and Kleitman discovered ..."
         const ym = /^[Ii]n\s+((?:19|20)\d{2})\s*,\s*/.exec(m[1]);
-        let cleanM1 = m[1].replace(/^[Ii]n\s+(?:(?:17|18|19|20)\d{2})\s*,\s*/, "").trim();
-        // Strip trailing lowercase adverbs ("first", "also", "later")
-        cleanM1 = cleanM1.replace(/\s+(?:first|also|later|then|now|still|just|even)\s*$/i, "").trim();
-        done = push(cleanM1 || m[1], (cleanM1 || m[1]) + " " + m[2].toLowerCase() + " " + m[3] + (ym ? " [" + ym[1] + "]" : ""), p);
+        done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + (ym ? " [" + ym[1] + "]" : ""), p);
       }
       if (!done && (m = knownAsRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
       if (!done) {
@@ -984,6 +979,108 @@ function extractDrafts(pages) {
   }
   return drafts.slice(0, AUTODRAFT_CAP);
 }
+
+/* RANKING: Score drafts by importance for chapter-scale filtering */
+function scoreDraft(d) {
+  let score = 5; // base
+  const term = d.term || "";
+  const def = d.simple || d.definition || "";
+  
+  // Person + specific contribution = highest value
+  if (/^[A-Z][a-z]+\s+[A-Z]/.test(term)) {
+    score += 3; // person name
+    if (/(developed|founded|created|proposed|introduced|discovered|published)\s+\w+/.test(def)) score += 2;
+  }
+  // Key term (capitalized concept)
+  else if (/^[A-Z]/.test(term) && term.split(/\s+/).length <= 4) {
+    score += 2;
+  }
+  // Definition specificity: longer, more specific = better
+  const words = def.split(/\s+/).length;
+  if (words >= 8 && words <= 25) score += 2;
+  else if (words > 25) score += 1;
+  // Penalize vague definitions
+  if (/^(is|are|was|were)\s+(a|an|the)\s+\w+\.?$/.test(def)) score -= 3;
+  // Penalize very short definitions
+  if (words < 5) score -= 2;
+  
+  return Math.max(0, score);
+}
+
+function rankDrafts(drafts) {
+  // Deduplicate by normalized term
+  const seen = new Map();
+  for (const d of drafts) {
+    const key = (d.term || "").toLowerCase().trim();
+    if (!key) continue;
+    if (!seen.has(key) || scoreDraft(d) > scoreDraft(seen.get(key))) {
+      seen.set(key, d);
+    }
+  }
+  const unique = [...seen.values()];
+  // Score and sort
+  return unique.map(d => ({ ...d, _score: scoreDraft(d) }))
+    .sort((a, b) => b._score - a._score);
+}
+
+/* QUIZ: Generate multiple-choice questions from top-ranked drafts */
+function generateQuiz(drafts, count = 20) {
+  const ranked = rankDrafts(drafts);
+  const top = ranked.slice(0, Math.min(count * 2, ranked.length));
+  const questions = [];
+  const usedTerms = new Set();
+  
+  for (const d of top) {
+    if (questions.length >= count) break;
+    const term = d.term;
+    const def = d.simple || d.definition;
+    if (usedTerms.has(term.toLowerCase())) continue;
+    usedTerms.add(term.toLowerCase());
+    
+    // Get distractors: other terms (for term->def) or other defs (for def->term)
+    const others = ranked.filter(x => x.term.toLowerCase() !== term.toLowerCase());
+    if (others.length < 3) continue;
+    
+    // Randomly choose direction: 50% term->definition, 50% definition->term
+    const termToDef = Math.random() < 0.5;
+    let question, correct, choices;
+    
+    if (termToDef) {
+      question = `What is "${term}"?`;
+      correct = def;
+      // Distractors: definitions from other cards (similar length)
+      const distractors = others
+        .filter(x => Math.abs((x.simple || x.definition).split(/\s+/).length - def.split(/\s+/).length) <= 8)
+        .slice(0, 3)
+        .map(x => x.simple || x.definition);
+      if (distractors.length < 3) continue;
+      choices = [correct, ...distractors];
+    } else {
+      // Definition -> term: "Which term matches this definition?"
+      question = `Which term matches: "${def}"?`;
+      correct = term;
+      const distractors = others.slice(0, 3).map(x => x.term);
+      if (distractors.length < 3) continue;
+      choices = [correct, ...distractors];
+    }
+    
+    // Shuffle choices
+    for (let i = choices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [choices[i], choices[j]] = [choices[j], choices[i]];
+    }
+    
+    questions.push({
+      question,
+      choices,
+      correct: choices.indexOf(correct),
+      term, // for reference
+    });
+  }
+  
+  return questions;
+}
+
 /* AUTO-DRAFT PURE END */
 
 
@@ -1015,12 +1112,93 @@ $("autodraft").addEventListener("click", async () => {
     currentDrafts = drafts;
     renderDrafts();
     $("step-drafts").hidden = false;
+    $("draft-best").hidden = false;
+    $("quiz-gen").hidden = false;
     $("step-drafts").scrollIntoView({ behavior: "smooth", block: "start" });
     log("Drafted " + drafts.length + " card(s) for review — nothing saved yet. " +
         "Keep the good ones, edit or delete the rest.");
   } finally {
     btn.disabled = false;
   }
+});
+
+// Show best first: rank drafts by importance score
+$("draft-best").addEventListener("click", () => {
+  if (!currentDrafts.length) return;
+  currentDrafts = rankDrafts(currentDrafts);
+  renderDrafts();
+  log("Drafts sorted by importance — best first. Top scores are key people and concepts.");
+});
+
+// Generate quiz from top drafts
+$("quiz-gen").addEventListener("click", () => {
+  if (!currentDrafts.length) {
+    log("No drafts to quiz on — auto-draft first.");
+    return;
+  }
+  const questions = generateQuiz(currentDrafts, 20);
+  if (!questions.length) {
+    log("Could not generate quiz — need at least 4 drafts.");
+    return;
+  }
+  currentQuiz = questions;
+  renderQuiz();
+  $("step-quiz").hidden = false;
+  $("step-quiz").scrollIntoView({ behavior: "smooth", block: "start" });
+  log("Generated " + questions.length + "-question quiz from your best drafts.");
+});
+
+let currentQuiz = [];
+
+function renderQuiz() {
+  const qd = $("quiz-questions");
+  qd.innerHTML = "";
+  currentQuiz.forEach((q, qi) => {
+    const div = document.createElement("div");
+    div.className = "quizq";
+    div.style.cssText = "margin:12px 0;padding:12px;border:1px solid #ddd;border-radius:8px";
+    const h = document.createElement("div");
+    h.style.fontWeight = "bold";
+    h.textContent = (qi + 1) + ". " + q.question;
+    div.appendChild(h);
+    q.choices.forEach((c, ci) => {
+      const label = document.createElement("label");
+      label.style.cssText = "display:block;margin:6px 0;cursor:pointer";
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "quiz-" + qi;
+      radio.value = ci;
+      radio.addEventListener("change", () => {
+        // Clear previous
+        div.querySelectorAll("label").forEach(l => l.style.background = "");
+        if (ci === q.correct) {
+          label.style.background = "#d4edda";
+          label.style.borderRadius = "4px";
+        } else {
+          label.style.background = "#f8d7da";
+          label.style.borderRadius = "4px";
+          // Highlight correct
+          div.querySelectorAll("label")[q.correct].style.background = "#d4edda";
+        }
+      });
+      label.appendChild(radio);
+      label.appendChild(document.createTextNode(" " + c));
+      div.appendChild(label);
+    });
+    qd.appendChild(div);
+  });
+}
+
+$("quiz-regen").addEventListener("click", () => {
+  if (!currentDrafts.length) return;
+  currentQuiz = generateQuiz(currentDrafts, 20);
+  renderQuiz();
+  log("Quiz regenerated with new questions.");
+});
+
+$("quiz-clear").addEventListener("click", () => {
+  currentQuiz = [];
+  $("step-quiz").hidden = true;
 });
 
 function draftPreset(d) {
