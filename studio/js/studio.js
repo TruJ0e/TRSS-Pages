@@ -514,6 +514,19 @@ function autodraftTermOk(term) {
   if (/\b(that|which|who|whom|whose)\b/i.test(term)) return false;    // relative-clause fragment
   if (words.length > 4 && /\bas\b/i.test(term)) return false;         // section header, not a term
   if (/^(many|several|numerous)\s/i.test(term)) return false; // generic quantifier phrase, not a term
+  if (/^(actually|because|however|therefore|moreover|furthermore|although|though)\b/i.test(term)) return false; // sentence fragment starter
+  if (/\b(flashcards?|available|website|www\.)\b/i.test(term)) return false; // publisher boilerplate
+  if (/^(potential|possible|various)\s+(followers|members|people|students)/i.test(term)) return false; // vague group, not a concept
+  if (/\bpsychologists?$/i.test(term) && !/^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(term)) return false; // generic "X psychologists", not a person
+  if (/\b(trends?|patterns?|findings?|results?)$/i.test(term)) return false; // generic research terms
+  if (/^(in|on|at|what|when|where|how|why)\b/i.test(term)) return false; // question fragment
+  if (/\bmany\b/i.test(term) && /\bpsychologists/i.test(term)) return false; // "many psychologists"
+  if (/^(among|according|notable|and|or|but)\b/i.test(term)) return false; // fragment starter
+  if (/^[A-Z][a-z]+$/ .test(term) && term.length < 10) {
+    // Single short capitalized word: only allow if it's a known concept suffix
+    if (!/(ism|tion|ence|ics|ogy|phy|ing|ess)$/i.test(term)) return false;
+  }
+  if (/\u0099|\u2019What/i.test(term)) return false; // encoding artifact + "What"
   if (/\bvarious\b/i.test(term)) return false;                      // "Scientists from various fields"
   if (/^[A-Z][a-z]+\s+and\s+[a-z]+$/.test(term)) return false;      // "Geology and psychology": two nouns, no head
   if (/^\d+$/.test(term.replace(/\s/g, ""))) return false; // bare number
@@ -535,6 +548,7 @@ function autodraftTermOk(term) {
 function autodraftDefOk(def) {
   const d = String(def == null ? "" : def).replace(/\s+/g, " ").trim();
   if (d.length < 15 || d.length > 500) return false;
+  if (/www\.|\.com\/|https?:/i.test(d)) return false; // publisher URL in definition
   // Quiz/answer-key debris, not study content.
   if (/^(feedback|correct answers?|incorrect|true|false)\b/i.test(d)) return false;
   return true;
@@ -986,22 +1000,34 @@ function scoreDraft(d) {
   const term = d.term || "";
   const def = d.simple || d.definition || "";
   
+  // Penalize truncated terms (ending mid-word, comma cutoff)
+  if (/[,\-]$/.test(term) || /\b\w{1,3}$/.test(term) && term.length > 20) score -= 3;
+  if (/,\s*the\s+first/i.test(term)) score -= 2; // "X, the first..." is a description, not a term
+  
   // Person + specific contribution = highest value
-  if (/^[A-Z][a-z]+\s+[A-Z]/.test(term)) {
-    score += 3; // person name
+  if (/^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(term)) {
+    score += 3; // clean person name (2 words)
     if (/(developed|founded|created|proposed|introduced|discovered|published)\s+\w+/.test(def)) score += 2;
+  } else if (/^[A-Z][a-z]+\s+[A-Z]/.test(term)) {
+    score += 1; // person-like but messy
   }
-  // Key term (capitalized concept)
-  else if (/^[A-Z]/.test(term) && term.split(/\s+/).length <= 4) {
+  // Key term (capitalized concept, 1-3 words, no comma)
+  else if (/^[A-Z][A-Za-z\-]*$/.test(term)) {
+    score += 3; // single-word concept like "Gestalt", "Psychology"
+  }
+  else if (/^[A-Z]/.test(term) && term.split(/\s+/).length <= 3 && !/,/.test(term)) {
     score += 2;
   }
-  // Definition specificity: longer, more specific = better
+  // Penalize vague section headers
+  if (/\b(applications?|introduction|overview|summary|chapter)\b/i.test(term)) score -= 3;
+  // Penalize single proper nouns that aren't concepts (places, orgs)
+  if (/^[A-Z][a-z]+$/.test(term) && !/(psychology|ism|tion|ence|ics)$/i.test(term)) score -= 2;
+  
+  // Definition specificity
   const words = def.split(/\s+/).length;
   if (words >= 8 && words <= 25) score += 2;
   else if (words > 25) score += 1;
-  // Penalize vague definitions
   if (/^(is|are|was|were)\s+(a|an|the)\s+\w+\.?$/.test(def)) score -= 3;
-  // Penalize very short definitions
   if (words < 5) score -= 2;
   
   return Math.max(0, score);
