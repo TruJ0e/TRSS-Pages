@@ -822,8 +822,8 @@ function extractDrafts(pages) {
     const nameLike = "[A-Z][\\w.]*(?:\\s+[A-Z][\\w.]*){0,2}\\s*(?:\\(\\s*\\d{4}\\s*[\\u2013\\u2014-]?\\s*\\d{0,4}\\s*\\))?";
     const personSubj = "(" + nameLike + "(?:\\s+and\\s+" + nameLike + ")?)";
     const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded)\\s+(.{15,})$");
-    const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed)\s+(.{15,})$/i;
-    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed)\s+by\s+(.{5,})$/i;
+    const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed|contains|elucidated|won|explains|established)\s+(.{15,})$/i;
+    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed|elucidated)\s+by\s+(.{5,})$/i;
     for (const s of units) {
       // Definition patterns as a retryable unit: after trying the whole
       // sentence, a leading "Label: " (textbook key-term header) is stripped
@@ -887,10 +887,12 @@ function extractDrafts(pages) {
       if (!done && (m = isOneRe.exec(str))) done = push(m[1], m[1] + " is one " + m[2] + " " + m[3], p);
       if (!done && (m = knownForRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3].toLowerCase() + " " + m[4], p);
       if (!done && (m = personRe.exec(str))) {
-        const pdef = m[1] + " " + m[2].toLowerCase() + " " + m[3];
+        const cleanP1 = m[1].replace(/^[Ii]n\s+(?:(?:17|18|19|20)\d{2})\s*,\s*/, "").trim().replace(/\s+(?:first|also|later)\s*$/i, "").trim();
+        const pdef = (cleanP1 || m[1]) + " " + m[2].toLowerCase() + " " + m[3];
         const cm = new RegExp("^(.+?)\\s+and\\s+(" + nameLike + ")$").exec(m[1].trim());
+        const useTerm = cleanP1 || m[1];
         if (cm) { const r1 = push(cm[1], pdef, p); const r2 = push(cm[2], pdef, p); done = r1 || r2; }
-        else done = push(m[1], pdef, p);
+        else done = push(useTerm, pdef, p);
       }
       // "X emerged through the work of PERSON (and PERSON)"
       if (!done) {
@@ -937,7 +939,7 @@ function extractDrafts(pages) {
         const nameOnly = new RegExp("^" + nameLike + "$");
         let any = false;
         for (const person of m[3].split(/\s+and\s+|,\s*/)) {
-          const pn = person.trim().replace(/[.]+$/, "");
+          const pn = person.trim().replace(/[.]+$/, "").replace(/\s+in\s+(?:(?:17|18|19|20)\d{2})\s*$/, "").trim();
           // Complete sentence with subject: "Wilhelm Wundt developed structuralism."
           const pdef = pn + " " + verb + (topic ? " " + topic.toLowerCase() : "") + ".";
           if (pn && nameOnly.test(pn)) any = push(pn, pdef, p) || any;
@@ -948,7 +950,10 @@ function extractDrafts(pages) {
         // Preserve a leading "In <year>, " on the back (baseTerm strips it
         // from the front) — "In 1953, Aserinsky and Kleitman discovered ..."
         const ym = /^[Ii]n\s+((?:19|20)\d{2})\s*,\s*/.exec(m[1]);
-        done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + (ym ? " [" + ym[1] + "]" : ""), p);
+        let cleanM1 = m[1].replace(/^[Ii]n\s+(?:(?:17|18|19|20)\d{2})\s*,\s*/, "").trim();
+        // Strip trailing lowercase adverbs ("first", "also", "later")
+        cleanM1 = cleanM1.replace(/\s+(?:first|also|later|then|now|still|just|even)\s*$/i, "").trim();
+        done = push(cleanM1 || m[1], (cleanM1 || m[1]) + " " + m[2].toLowerCase() + " " + m[3] + (ym ? " [" + ym[1] + "]" : ""), p);
       }
       if (!done && (m = knownAsRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
       if (!done) {
