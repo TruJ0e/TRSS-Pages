@@ -1136,34 +1136,46 @@ function draftToChapterCard(d, idx, prefix) {
   let example = simple;
   const isPerson = /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(term);
   if (isPerson) {
-    const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established)\b\s+(.+?)[.]*$/i);
-    if (vm) example = "For example, " + term + "'s work " + vm[1].toLowerCase() + " " + vm[2] + ".";
-    else example = "For example, " + term + " " + simple;
+    const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established|identified|described)\b\s+(.+?)[.]*$/i);
+    if (vm) {
+      example = term + " " + vm[1].toLowerCase() + " " + vm[2].trim() + ".";
+    } else {
+      example = term + " " + simple;
+    }
   } else {
-    example = /^(a|an)\s+/i.test(simple) ? "For example, " + simple.charAt(0).toLowerCase() + simple.slice(1) : "Consider: " + simple;
+    if (/^(a|an)\s+/i.test(simple)) {
+      example = "For instance, " + simple.charAt(0).toLowerCase() + simple.slice(1);
+    } else {
+      example = "For instance, " + simple;
+    }
   }
   
   let apply;
   if (isPerson) {
-    const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established)\b\s+(.+?)[.]*$/i);
-    apply = vm ? "Who " + vm[1].toLowerCase() + " " + vm[2].trim() + "?" : "Which psychologist is described as: " + simple + "?";
+    const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established|identified|described)\b\s+(.+?)[.]*$/i);
+    if (vm) {
+      let what = vm[2].trim();
+      apply = "Who " + vm[1].toLowerCase() + " " + what + "?";
+    } else {
+      apply = "Who is " + term + "?";
+    }
   } else {
-    apply = "Which term is described as: " + simple + "?";
+    apply = "What is " + term + "?";
   }
   
   let category = "General";
   const ld = (term + " " + simple).toLowerCase();
-  if (/\bdevelop|child|piaget|vygotsky|erikson/.test(ld)) category = "Development";
-  else if (/memory|forget|recall|cognit/.test(ld)) category = "Cognition and memory";
-  else if (/disorder|therapy|depress|anxiety|schizophrenia/.test(ld)) category = "Psychological disorders";
-  else if (/brain|neuron|cortex|amygdala|hippocampus/.test(ld)) category = "Biological psychology";
-  else if (/social|conform|obedience|prejudice|group/.test(ld)) category = "Social psychology";
-  else if (/personality|trait/.test(ld)) category = "Personality";
+  if (/\bdevelop|child|piaget|vygotsky|erikson|attachment/.test(ld)) category = "Development";
+  else if (/memory|forget|recall|cognit|think/.test(ld)) category = "Cognition and memory";
+  else if (/disorder|therapy|depress|anxiety|schizophrenia|phobia/.test(ld)) category = "Psychological disorders";
+  else if (/brain|neuron|synap|axon|dendrite|cortex|amygdala|hippocampus|lobe|broca|wernicke/.test(ld)) category = "Biological psychology";
+  else if (/social|conform|obedience|prejudice|group|bystander/.test(ld)) category = "Social psychology";
+  else if (/personality|trait|big five/.test(ld)) category = "Personality";
   else if (/intelligence|\biq\b/.test(ld)) category = "Intelligence";
   else if (/stress|coping|health/.test(ld)) category = "Stress and health";
   else if (/consciousness|sleep|dream|hypnosis/.test(ld)) category = "Consciousness";
   else if (/learning|conditioning|reinforc/.test(ld)) category = "Learning";
-  else if (/wundt|titchener|functionalism|behaviorism|psychoanalysis|structuralism/.test(ld)) category = "History and approaches";
+  else if (/wundt|titchener|james|watson|skinner|freud|functionalism|behaviorism|psychoanalysis|structuralism/.test(ld)) category = "History and approaches";
   
   return {
     id: prefix.toLowerCase() + "-core-" + num,
