@@ -1057,7 +1057,7 @@ function rankDrafts(drafts) {
 }
 
 /* QUIZ: Generate multiple-choice questions from top-ranked drafts */
-function generateQuiz(drafts, count = 20) {
+function generateQuiz(drafts, count = 20, seed = 0) {
   const ranked = rankDrafts(drafts);
   const top = ranked.slice(0, Math.min(count * 2, ranked.length));
   const questions = [];
@@ -1074,8 +1074,8 @@ function generateQuiz(drafts, count = 20) {
     const others = ranked.filter(x => x.term.toLowerCase() !== term.toLowerCase());
     if (others.length < 3) continue;
     
-    // Randomly choose direction: 50% term->definition, 50% definition->term
-    const termToDef = Math.random() < 0.5;
+    // Deterministic direction: alternate, offset by seed
+    const termToDef = ((questions.length + seed) % 2 === 0);
     let question, correct, choices;
     
     if (termToDef) {
@@ -1097,11 +1097,10 @@ function generateQuiz(drafts, count = 20) {
       choices = [correct, ...distractors];
     }
     
-    // Shuffle choices
-    for (let i = choices.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [choices[i], choices[j]] = [choices[j], choices[i]];
-    }
+    // Deterministic shuffle: rotate by question index + seed
+    const rot = (questions.length + seed) % choices.length;
+    const shuffled = [...choices.slice(rot), ...choices.slice(0, rot)];
+    choices = shuffled;
     
     questions.push({
       question,
@@ -1305,9 +1304,11 @@ function renderQuiz() {
   });
 }
 
+let quizSeed = 0;
 $("quiz-regen").addEventListener("click", () => {
   if (!currentDrafts.length) return;
-  currentQuiz = generateQuiz(currentDrafts, 20);
+  quizSeed++;
+  currentQuiz = generateQuiz(currentDrafts, 20, quizSeed);
   renderQuiz();
   log("Quiz regenerated with new questions.");
 });
