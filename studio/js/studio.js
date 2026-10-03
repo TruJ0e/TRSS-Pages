@@ -522,10 +522,7 @@ function autodraftTermOk(term) {
   if (/^(in|on|at|what|when|where|how|why)\b/i.test(term)) return false; // question fragment
   if (/\bmany\b/i.test(term) && /\bpsychologists/i.test(term)) return false; // "many psychologists"
   if (/^(among|according|notable|and|or|but)\b/i.test(term)) return false; // fragment starter
-  if (/^[A-Z][a-z]+$/ .test(term) && term.length < 10) {
-    // Single short capitalized word: only allow if it's a known concept suffix
-    if (!/(ism|tion|ence|ics|ogy|phy|ing|ess)$/i.test(term)) return false;
-  }
+  // Single-word terms allowed (Melatonin, Gestalt, etc.) - ranking will sort by quality
   if (/\u0099|\u2019What/i.test(term)) return false; // encoding artifact + "What"
   if (/\bvarious\b/i.test(term)) return false;                      // "Scientists from various fields"
   if (/^[A-Z][a-z]+\s+and\s+[a-z]+$/.test(term)) return false;      // "Geology and psychology": two nouns, no head
@@ -1112,37 +1109,59 @@ function generateQuiz(drafts, count = 20) {
 function draftToChapterCard(d, idx, prefix) {
   const num = String(idx + 1).padStart(3, "0");
   const term = d.term || "";
-  const def = d.simple || d.definition || "";
+  const rawDef = d.simple || d.definition || "";
   
-  // Generate cue: "Think: " + key concept
-  let cue = "Think: " + term;
-  // Try to extract key phrase from definition
-  const defWords = def.replace(/^[A-Z][a-z]+\s+[A-Z][a-z]+\s+/, "").slice(0, 60);
-  if (defWords.length > 10) cue = "Think: " + defWords.split(/\s+/).slice(0, 6).join(" ");
-  
-  // Generate example: rephrase definition as a scenario
-  const example = def.charAt(0).toUpperCase() + def.slice(1);
-  
-  // Generate apply question
-  let apply = "Explain " + term + " in your own words.";
-  if (/^[A-Z][a-z]+\s+[A-Z]/.test(term)) {
-    // Person: "Who...?" or "What did X do?"
-    const verbMatch = def.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted)\b\s+(.{5,40})/i);
-    if (verbMatch) {
-      apply = "Who " + verbMatch[1].toLowerCase() + " " + verbMatch[2].replace(/[.]+$/, "") + "?";
-    }
-  } else {
-    // Concept: "What is...?"
-    apply = "What is " + term + "?";
+  let simple = rawDef.trim();
+  const termEsc = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  simple = simple.replace(new RegExp("^" + termEsc + "\\s+(?:is|are|was|were)\\s+"), "");
+  simple = simple.replace(new RegExp("^" + termEsc + "\\s+"), "");
+  if (/^[A-Z]/.test(simple) && !/^[A-Z][a-z]+\s+[A-Z]/.test(simple)) {
+    simple = simple.charAt(0).toLowerCase() + simple.slice(1);
   }
+  if (!/[.]$/.test(simple)) simple += ".";
+  
+  let cueContent = simple.replace(/^(a|an|the)\s+/i, "").split(/\s+/).slice(0, 7).join(" ").replace(/[.]+$/, "");
+  const cue = "Think: " + cueContent;
+  
+  let example = simple;
+  const isPerson = /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(term);
+  if (isPerson) {
+    const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established)\b\s+(.+?)[.]*$/i);
+    if (vm) example = "For example, " + term + "'s work " + vm[1].toLowerCase() + " " + vm[2] + ".";
+    else example = "For example, " + term + " " + simple;
+  } else {
+    example = /^(a|an)\s+/i.test(simple) ? "For example, " + simple.charAt(0).toLowerCase() + simple.slice(1) : "Consider: " + simple;
+  }
+  
+  let apply;
+  if (isPerson) {
+    const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established)\b\s+(.+?)[.]*$/i);
+    apply = vm ? "Who " + vm[1].toLowerCase() + " " + vm[2].trim() + "?" : "Which psychologist is described as: " + simple + "?";
+  } else {
+    apply = "Which term is described as: " + simple + "?";
+  }
+  
+  let category = "General";
+  const ld = (term + " " + simple).toLowerCase();
+  if (/\bdevelop|child|piaget|vygotsky|erikson/.test(ld)) category = "Development";
+  else if (/memory|forget|recall|cognit/.test(ld)) category = "Cognition and memory";
+  else if (/disorder|therapy|depress|anxiety|schizophrenia/.test(ld)) category = "Psychological disorders";
+  else if (/brain|neuron|cortex|amygdala|hippocampus/.test(ld)) category = "Biological psychology";
+  else if (/social|conform|obedience|prejudice|group/.test(ld)) category = "Social psychology";
+  else if (/personality|trait/.test(ld)) category = "Personality";
+  else if (/intelligence|\biq\b/.test(ld)) category = "Intelligence";
+  else if (/stress|coping|health/.test(ld)) category = "Stress and health";
+  else if (/consciousness|sleep|dream|hypnosis/.test(ld)) category = "Consciousness";
+  else if (/learning|conditioning|reinforc/.test(ld)) category = "Learning";
+  else if (/wundt|titchener|functionalism|behaviorism|psychoanalysis|structuralism/.test(ld)) category = "History and approaches";
   
   return {
     id: prefix.toLowerCase() + "-core-" + num,
     term: term,
     type: "book-term",
-    category: d.src || d.category || "General",
+    category: category,
     cue: cue,
-    simple: def,
+    simple: simple,
     examples: [example],
     apply: [apply],
   };
