@@ -475,11 +475,17 @@ function autodraftSentences(text) {
 }
 
 function autodraftCleanTerm(t) {
-  return String(t == null ? "" : t)
+  let s = String(t == null ? "" : t)
     .replace(/\s+/g, " ").trim()
-    .replace(/^[("“‘'#\[]+/, "")
-    .replace(/[)"”’'.,;:!?-]+$/, "")
+    .replace(/^[("\u201c\u2018'#\[]+/, "")
+    .replace(/[)"\u201d\u2019'.,;:!?-]+$/, "")
     .replace(/\*\*/g, "");
+  if (/^[A-Z\s\-]{2,}$/.test(s) && s === s.toUpperCase()) {
+    s = s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  }
+  s = s.replace(/^[-•*]\s*/, "").trim();
+  s = s.replace(/^(Dr|Prof|Mr|Ms|Mrs)\.\s+/i, "").trim();
+  return s;
 }
 
 // Shared term cleanup: strip articles, leading ordinals ("Third,"), trailing
@@ -522,6 +528,9 @@ function autodraftTermOk(term) {
   if (/^(in|on|at|what|when|where|how|why)\b/i.test(term)) return false; // question fragment
   if (/\bmany\b/i.test(term) && /\bpsychologists/i.test(term)) return false; // "many psychologists"
   if (/^(among|according|notable|and|or|but)\b/i.test(term)) return false; // fragment starter
+  if (/^(from|by|with|for)\s+/i.test(term)) return false;
+  if (/^\d+\s+/i.test(term)) return false; // "6 main characteristics" list header
+  if (/^all\s+\w+$/i.test(term)) return false;
   // Single-word terms allowed (Melatonin, Gestalt, etc.) - ranking will sort by quality
   if (/\u0099|\u2019What/i.test(term)) return false; // encoding artifact + "What"
   if (/\bvarious\b/i.test(term)) return false;                      // "Scientists from various fields"
@@ -832,15 +841,16 @@ function extractDrafts(pages) {
     const knownForRe = /^(.{2,60}?)\s+(is|was|are|were)\s+((?:known|responsible)\s+for)\s+(.{5,})$/i;
     const nameLike = "[A-Z][\\w.]*(?:\\s+[A-Z][\\w.]*){0,2}\\s*(?:\\(\\s*\\d{4}\\s*[\\u2013\\u2014-]?\\s*\\d{0,4}\\s*\\))?";
     const personSubj = "(" + nameLike + "(?:\\s+and\\s+" + nameLike + ")?)";
-    const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded)\\s+(.{15,})$");
+    const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded|identified)\\s+(.{15,})$");
     const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed)\s+(.{5,})$/i;
-    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed)\s+by\s+(.{5,})$/i;
+    const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed|elucidated|described)\s+by\s+(.{5,})$/i;
     for (const s of units) {
       // Definition patterns as a retryable unit: after trying the whole
       // sentence, a leading "Label: " (textbook key-term header) is stripped
       // and the remainder is tried too, so
       // "Functionalism: William James (1842–1910) developed ..." yields [William James].
-      const tryOne = (str) => {
+      const tryOne = (rawStr) => {
+        const str = rawStr.replace(/^(Dr|Prof|Mr|Ms|Mrs)\.\s+/i, "");
         let m; let done = false;
       // "X documented the Y: Z" — the discovery becomes the card, not the clause.
       if (!done && (m = docRe.exec(str))) {
