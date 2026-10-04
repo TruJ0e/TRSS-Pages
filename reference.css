@@ -1,32 +1,32 @@
 :root {
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --bg: #f3f5f9;
-  --surface: #ffffff;
-  --surface-alt: #f8fafc;
-  --border: #e2e8f0;
+  --bg: #23262e;
+  --surface: #2e323d;
+  --surface-alt: #282c36;
+  --border: #3d4351;
   --border-focus: #3b82f6;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --text-inverse: #ffffff;
+  --text-main: #e8eaf0;
+  --text-muted: #9aa3b5;
+  --text-inverse: #23262e;
   
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-soft: #eff6ff;
+  --primary: #6b9dff;
+  --primary-hover: #5b8def;
+  --primary-soft: #2a3450;
   
-  --accent: #4f46e5;
-  --accent-soft: #eef2ff;
+  --accent: #8b85f5;
+  --accent-soft: #2e2a50;
   
-  --success: #15803d;
-  --success-bg: #f0fdf4;
-  --success-border: #86efac;
+  --success: #4ade80;
+  --success-bg: #1a2e1f;
+  --success-border: #2d5a35;
   
-  --warn: #b45309;
-  --warn-bg: #fffbeb;
-  --warn-border: #fde68a;
+  --warn: #fbbf24;
+  --warn-bg: #2e2415;
+  --warn-border: #5a4a25;
 
-  --danger: #b91c1c;
-  --danger-bg: #fef2f2;
-  --danger-border: #fca5a5;
+  --danger: #f87171;
+  --danger-bg: #2e1a1a;
+  --danger-border: #5a2d2d;
 
   --radius-lg: 18px;
   --radius-md: 12px;
@@ -126,7 +126,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 
 .site-logo-badge {
   background: var(--primary);
-  color: #ffffff;
+  color: #23262e;
   font-weight: 900;
   font-size: 0.84rem;
   padding: 2px 7px;
@@ -174,7 +174,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 }
 
 .breadcrumb-sep {
-  color: #94a3b8;
+  color: #9aa3b5;
   font-size: 0.74rem;
   user-select: none;
 }
@@ -203,8 +203,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 }
 
 .topbar-nav-btn:hover {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
+  background: #3d4351;
+  border-color: #4a5160;
 }
 
 /* Site Content Container */
@@ -405,7 +405,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 .course-card-desc,
 .chapter-card-desc {
   font-size: 0.86rem;
-  color: #475569;
+  color: #b0b8c8;
   margin: 0;
   line-height: 1.48;
   flex: 1;
@@ -430,7 +430,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #334155;
+  color: #d0d6e2;
 }
 
 .course-card-cta,
@@ -486,7 +486,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 
 .launcher-desc {
   font-size: 0.88rem;
-  color: #475569;
+  color: #b0b8c8;
   margin: 0;
   line-height: 1.5;
   flex: 1;
@@ -519,7 +519,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   padding: 8px 12px;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #334155;
+  color: #d0d6e2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -729,7 +729,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 }
 
 .action-btn:hover {
-  background: #e2e8f0;
+  background: #3d4351;
 }
 
 .action-btn.ghost {
@@ -932,7 +932,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 
 .dropdown-option:hover,
 .dropdown-option:focus {
-  background: #f1f5f9;
+  background: #2a2f3a;
   outline: none;
 }
 
@@ -1117,7 +1117,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 
 .card-back {
   transform: rotateY(180deg);
-  background: #ffffff;
+  background: #23262e;
 }
 
 /* Card Header inside Faces */
@@ -1153,8 +1153,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 }
 
 .badge-accent {
-  background: #fef3c7;
-  color: #92400e;
+  background: #2e2a50;
+  color: #fbbf24;
 }
 
 .card-counter {
@@ -1217,7 +1217,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 
 .flip-prompt kbd {
   background: var(--surface);
-  border: 1px solid #cbd5e1;
+  border: 1px solid #4a5160;
   border-radius: 4px;
   padding: 2px 6px;
   font-size: 0.78rem;
@@ -1292,7 +1292,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   margin: 0;
   padding-left: 20px;
   font-size: 0.93rem;
-  color: #334155;
+  color: #d0d6e2;
 }
 
 .examples-list li + li, .apply-list li + li {
@@ -1306,7 +1306,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.88rem;
-  color: #334155;
+  color: #d0d6e2;
 }
 
 .flip-back-prompt {
@@ -1365,7 +1365,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 }
 
 .btn-nav:hover {
-  background: #e2e8f0;
+  background: #3d4351;
 }
 
 .btn-primary {
@@ -1582,16 +1582,16 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex="0"]:
 .feedback-meaning {
   margin: 0;
   font-size: 0.95rem;
-  color: #334155;
+  color: #d0d6e2;
 }
 
 .feedback-compare {
   margin-top: 4px;
   padding: 6px 10px;
-  background: #f1f5f9;
+  background: #2a2f3a;
   border-radius: 6px;
   font-size: 0.85rem;
-  color: #475569;
+  color: #b0b8c8;
 }
 
 /* Quiz Actions */
