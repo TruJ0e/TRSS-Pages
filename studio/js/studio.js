@@ -429,7 +429,7 @@ $("paste-use").addEventListener("click", () => {
  * one in the review list. All client-side, zero network. */
 
 /* AUTO-DRAFT PURE BEGIN */
-const AUTODRAFT_CAP = 100;
+const AUTODRAFT_CAP = 500;
 // Single vague nouns that are never flashcard terms on their own
 // ("Efforts are being made…" is throat-clearing, not a concept).
 const AUTODRAFT_VAGUE = new Set(
@@ -998,12 +998,53 @@ function extractDrafts(pages) {
     }
     if (drafts.length >= AUTODRAFT_CAP) break;
   }
+  
+  // FALLBACK PASS: for sentences that didn't match patterns,
+  // extract capitalized key terms (2-4 words) as potential cards
+  // These score lower, so "Show best first" still surfaces the best
+  if (drafts.length < AUTODRAFT_CAP) {
+    const seenTerms = new Set(drafts.map(d => d.term.toLowerCase()));
+    for (const page of pages) {
+      const sentences = page.text.split(/(?<=[.!?])\s+/);
+      for (const sent of sentences) {
+        if (drafts.length >= AUTODRAFT_CAP) break;
+        const clean = sent.trim();
+        if (clean.length < 30 || clean.length > 300) continue;
+        // Find capitalized phrases (2-4 words)
+        const matches = clean.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b/g);
+        if (!matches) continue;
+        for (let term of matches.slice(0, 2)) {
+          term = term.replace(/\s+/g, " ").trim();
+          const key = term.toLowerCase();
+          if (seenTerms.has(key)) continue;
+          // Must be near the start (key term position)
+          const pos = clean.indexOf(term);
+          if (pos > 50) continue;
+          // Basic validation
+          if (/^(The|A|An|This|That|These|Those|It|They|We|You|His|Her|Their)\b/.test(term)) continue;
+          // Must be 2+ words (single words are too generic for fallback)
+          if (term.split(/\s+/).length < 2) continue;
+          seenTerms.add(key);
+          drafts.push({
+            term: term,
+            simple: clean,
+            src: page.src || ("Page " + page.n),
+            _fallback: true,
+          });
+          if (drafts.length >= AUTODRAFT_CAP) break;
+        }
+      }
+      if (drafts.length >= AUTODRAFT_CAP) break;
+    }
+  }
+  
   return drafts.slice(0, AUTODRAFT_CAP);
 }
 
 /* RANKING: Score drafts by importance for chapter-scale filtering */
 function scoreDraft(d) {
   let score = 5; // base
+  if (d._fallback) score -= 5; // fallback extractions rank below pattern matches
   const term = d.term || "";
   const def = d.simple || d.definition || "";
   
