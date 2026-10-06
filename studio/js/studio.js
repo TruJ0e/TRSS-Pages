@@ -548,6 +548,9 @@ function autodraftTermOk(term) {
     ? [firstWord.replace(/[^a-z]/g, "")]
     : firstWord.split(/[^a-z]+/).filter(Boolean);
   if (firstToks.some((t) => AUTODRAFT_STOP.has(t))) return false;
+  // Concatenation artifact: lowercase->UPPERCASE mid-word ("mitoAlbert")
+  // from chunk boundaries or missing spaces
+  if (/[a-z][A-Z]/.test(term)) return false;
   return true;
 }
 
@@ -1008,7 +1011,7 @@ function extractDrafts(pages) {
   if (drafts.length < AUTODRAFT_CAP) {
     const seenTerms = new Set(drafts.map(d => d.term.toLowerCase()));
     for (const page of pages) {
-      const sentences = page.text.split(/(?<=[.!?])\s+/);
+      const sentences = page.text.split(/(?<=[.!?])(?:\s+|(?=[A-Z]))/);
       for (const sent of sentences) {
         if (drafts.length >= AUTODRAFT_CAP) break;
         const clean = sent.trim();
@@ -1184,7 +1187,7 @@ function draftToChapterCard(d, idx, prefix, pages) {
     const termWords = termLower.split(/\s+/).filter(w => w.length > 3);
     const markers = /\b(for example|for instance|consider|imagine|suppose|e\.g\.|such as)\b/i;
     for (const page of pages) {
-      const sentences = page.text.split(/(?<=[.!?])\s+/).map(s => s.trim().replace(/\s+/g, " "));
+      const sentences = page.text.split(/(?<=[.!?])(?:\s+|(?=[A-Z]))/).map(s => s.trim().replace(/\s+/g, " "));
       // Find where the definition sentence is, then look at neighbors
       let defIdx = -1;
       if (srcSentence) {
