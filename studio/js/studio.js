@@ -729,10 +729,10 @@ function extractDrafts(pages) {
     const attr = splitAttribution(autodraftBaseTerm(term));
     const t = attr.term;
     let simple = (String(def == null ? "" : def).replace(/\s+/g, " ").trim() + attr.note).trim();
-    // THEORY EXPANSION: if term is a theory/concept, capture following elaboration
-    // sentences (verbatim from source, not summarized)
-    const isTheoryLike = /\b(theory|model|approach|perspective|framework|principle|law|effect)\b/i.test(t);
-    if (isTheoryLike && nextSentences && nextSentences.length) {
+    // ELABORATION CAPTURE: for any card, capture following sentences that
+    // clearly elaborate on the term (verbatim from source, not summarized).
+    // This handles theories, concepts, and processes that span multiple sentences.
+    if (nextSentences && nextSentences.length) {
       const termWords = t.toLowerCase().split(/\s+/).filter(w => w.length > 3);
       const elaborations = [];
       for (const ns of nextSentences.slice(0, 3)) {
