@@ -693,9 +693,12 @@ function extractDrafts(pages) {
   // "Working memory, proposed by Baddeley" -> term "Working memory"; the
   // attribution is folded into the definition so the fact isn't lost.
   const splitAttribution = (term) => {
-    const m = /^(.*?),\s*(proposed|introduced|described|developed|created|founded|discovered|named)\s+by\s+([^,;]+?)\s*,?\s*$/i.exec(term);
-    if (!m) return { term, note: "" };
-    return { term: m[1].trim(), note: " (" + m[2].toLowerCase() + " by " + m[3].trim() + ")" };
+    let m = /^(.*?),\s*(proposed|introduced|described|developed|created|founded|discovered|named)\s+by\s+([^,;]+?)\s*,?\s*$/i.exec(term);
+    if (m) return { term: m[1].trim(), note: " (" + m[2].toLowerCase() + " by " + m[3].trim() + ")" };
+    // "Carl Jung, founder of analytic psychology" -> term "Carl Jung", note "(founder of analytic psychology)"
+    m = /^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s*(founder of|creator of|father of|mother of|pioneer of|author of)(.+?)\s*$/i.exec(term);
+    if (m) return { term: m[1].trim(), note: " (" + m[2].toLowerCase() + m[3].trim() + ")" };
+    return { term, note: "" };
   };
   // Returns true when a card was kept, so a rejected match falls through to
   // the next pattern instead of silently dropping the sentence.
@@ -723,7 +726,7 @@ function extractDrafts(pages) {
       if (prev) {
         if (t.split(/\s+/).length > prev.term.split(/\s+/).length) {
           seen.delete(prev.key);
-          drafts[prev.idx] = { term: t, simple: simple, src: srcOf(p) };
+          drafts[prev.idx] = { term: t, simple: simple, src: srcOf(p), srcSentence: String(def == null ? "" : def).replace(/\s+/g, " ").trim() };
           seen.add(key);
           personCards.set(pl, { key: key, idx: prev.idx, term: t });
           return true;
@@ -732,7 +735,7 @@ function extractDrafts(pages) {
       }
     }
     seen.add(key);
-    drafts.push({ term: t, simple: simple, src: srcOf(p) });
+    drafts.push({ term: t, simple: simple, src: srcOf(p), srcSentence: String(def == null ? "" : def).replace(/\s+/g, " ").trim() });
     if (pl) personCards.set(pl, { key: key, idx: drafts.length - 1, term: t });
     return true;
   };
@@ -1030,6 +1033,7 @@ function extractDrafts(pages) {
             simple: clean,
             src: page.src || ("Page " + page.n),
             _fallback: true,
+            srcSentence: clean,
           });
           if (drafts.length >= AUTODRAFT_CAP) break;
         }
@@ -1156,67 +1160,150 @@ function generateQuiz(drafts, count = 20, seed = 0) {
 
 
 /* CHAPTER EXPORT: Generate core-cards.js in TRSS chapter format */
-function draftToChapterCard(d, idx, prefix) {
+function draftToChapterCard(d, idx, prefix, pages) {
   const num = String(idx + 1).padStart(3, "0");
   const term = d.term || "";
   const rawDef = d.simple || d.definition || "";
-  
+  const srcSentence = d.srcSentence || rawDef;
+
+  // --- simple: clean definition ---
   let simple = rawDef.trim();
   const termEsc = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   simple = simple.replace(new RegExp("^" + termEsc + "\\s+(?:is|are|was|were)\\s+"), "");
   simple = simple.replace(new RegExp("^" + termEsc + "\\s+"), "");
+  // Strip definition scaffolding: "refers to", "is defined as", etc.
+  simple = simple.replace(/^(?:refers to|is defined as|can be defined as|is described as|is known as)\s+/i, "");
   if (/^[A-Z]/.test(simple) && !/^[A-Z][a-z]+\s+[A-Z]/.test(simple)) {
     simple = simple.charAt(0).toLowerCase() + simple.slice(1);
   }
   if (!/[.]$/.test(simple)) simple += ".";
-  
-  let cueContent = simple.replace(/^(a|an|the)\s+/i, "").split(/\s+/).slice(0, 7).join(" ").replace(/[.]+$/, "");
+
+  function findExampleSentences(term, pages, srcSentence) {
+    const examples = [];
+    const termLower = term.toLowerCase();
+    const termWords = termLower.split(/\s+/).filter(w => w.length > 3);
+    const markers = /\b(for example|for instance|consider|imagine|suppose|e\.g\.|such as)\b/i;
+    for (const page of pages) {
+      const sentences = page.text.split(/(?<=[.!?])\s+/).map(s => s.trim().replace(/\s+/g, " "));
+      // Find where the definition sentence is, then look at neighbors
+      let defIdx = -1;
+      if (srcSentence) {
+        const srcClean = srcSentence.trim().replace(/\s+/g, " ").slice(0, 60).toLowerCase();
+        defIdx = sentences.findIndex(s => s.toLowerCase().includes(srcClean.slice(0, 40)));
+      }
+      for (let i = 0; i < sentences.length; i++) {
+        const clean = sentences[i];
+        if (clean.length < 20 || clean.length > 250) continue;
+        if (!markers.test(clean)) continue;
+        const sl = clean.toLowerCase();
+        const mentionsTerm = sl.includes(termLower) || termWords.some(w => sl.includes(w));
+        // Prefer examples AFTER the definition (textbook style), within 3 sentences
+        // Mentions-term always wins regardless of position
+        const afterDef = defIdx >= 0 && i > defIdx && (i - defIdx) <= 3;
+        if (mentionsTerm || afterDef) {
+          examples.push(clean);
+          if (examples.length >= 2) break;
+        }
+      }
+      if (examples.length >= 2) break;
+    }
+    return examples;
+  }
+
+  // --- cue: extract the core concept phrase (not just first 7 words) ---
+  let cueContent = simple;
+  // Remove leading articles
+  cueContent = cueContent.replace(/^(a|an|the)\s+/i, "");
+  // Try to find the key noun phrase: look for "of", "for", "in" constructions
+  // or take the most informative chunk
+  const keyPhrase = cueContent.match(/^(.+?)(?:\.|,|;|\s+which|\s+that|\s+and\s)/);
+  if (keyPhrase && keyPhrase[1].split(/\s+/).length <= 10) {
+    cueContent = keyPhrase[1].trim();
+  } else {
+    cueContent = cueContent.split(/\s+/).slice(0, 7).join(" ").replace(/[.]+$/, "");
+  }
   const cue = "Think: " + cueContent;
-  
-  let example = simple;
-  const isPerson = /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(term);
-  if (isPerson) {
+
+  // --- Determine card type for tailored generation ---
+  const isPerson = /^[A-Z][a-z]+\s+[A-Z][a-z]+/.test(term) && !/\b(the|of|and)\b/i.test(term);
+  const ld = (term + " " + simple).toLowerCase();
+  const isProcess = /\b(process|mechanism|occurs when|involves|steps?|stages?)\b/.test(ld);
+  const isTheory = /\b(theory|model|approach|perspective|framework)\b/.test(ld);
+
+  // --- examples: concrete scenario, not restated definition ---
+  let example;
+  const srcExamples = (pages && pages.length) ? findExampleSentences(term, pages, srcSentence) : [];
+  if (srcExamples.length > 0) {
+    example = srcExamples[0];
+  } else if (isPerson) {
     const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established|identified|described)\b\s+(.+?)[.]*$/i);
     if (vm) {
-      example = term + " " + vm[1].toLowerCase() + " " + vm[2].trim() + ".";
+      const contribution = vm[2].trim().replace(/^(the|a|an)\s+/i, "");
+      example = term + " " + vm[1].toLowerCase() + " " + contribution + ", shaping how we understand it today.";
     } else {
-      example = term + " " + simple;
+      example = "Students learn about " + term + "'s contributions when studying " + simple.replace(/[.]+$/, "") + ".";
     }
+  } else if (isProcess) {
+    // For processes: describe it happening
+    const coreAction = simple.replace(/^(a|an|the)\s+/i, "").split(/[.]/)[0];
+    example = "For example, when " + coreAction.charAt(0).toLowerCase() + coreAction.slice(1) + ", you can observe this in action.";
+  } else if (isTheory) {
+    example = "Researchers apply this when " + simple.replace(/^(a|an|the)\s+/i, "").replace(/[.]+$/, "") + " explains observed behavior.";
   } else {
-    if (/^(a|an)\s+/i.test(simple)) {
-      example = "For instance, " + simple.charAt(0).toLowerCase() + simple.slice(1);
+    // For concepts: natural illustrative sentence
+    // Strip leading article for embedding, keep rest intact
+    const bare = simple.replace(/^(a|an|the)\s+/i, "").replace(/[.]+$/, "");
+    const bareLower = bare.charAt(0).toLowerCase() + bare.slice(1);
+    if (/\b(disorder|condition|syndrome)\b/i.test(term + " " + simple)) {
+      example = "A patient showing " + bareLower + " may be diagnosed with " + term.toLowerCase() + ".";
+    } else if (/\b(effect|bias|phenomenon)\b/i.test(term)) {
+      example = term + " occurs when " + bareLower + ".";
     } else {
-      example = "For instance, " + simple;
+      example = term + ": " + bareLower + ".";
     }
   }
-  
+
+  // --- apply: scenario-based question requiring discrimination ---
   let apply;
   if (isPerson) {
     const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established|identified|described)\b\s+(.+?)[.]*$/i);
     if (vm) {
-      let what = vm[2].trim();
-      apply = "Who " + vm[1].toLowerCase() + " " + what + "?";
+      const what = vm[2].trim().replace(/[.]+$/, "");
+      apply = "A textbook credits someone with " + what.charAt(0).toLowerCase() + what.slice(1) + ". Who is this?";
     } else {
-      apply = "Who is " + term + "?";
+      apply = "Which figure is associated with: " + simple.replace(/[.]+$/, "") + "?";
     }
   } else {
-    apply = "What is " + term + "?";
+    const core = simple.replace(/^(a|an|the)\s+/i, "").replace(/[.]+$/, "");
+    // Create a scenario that requires applying the concept
+    if (/\b(disorder|condition|syndrome)\b/i.test(term)) {
+      apply = "Someone shows signs of " + core + ". What might a clinician consider?";
+    } else if (isProcess) {
+      apply = "You observe " + core + " happening. Which process is this?";
+    } else {
+      const bareQ = simple.replace(/^(a|an|the)\s+/i, "").replace(/[.]+$/, "");
+      const bareQLower = bareQ.charAt(0).toLowerCase() + bareQ.slice(1);
+      apply = "What is " + bareQLower + "?";
+    }
   }
-  
+
+  // --- category: expanded keyword matching ---
   let category = "General";
-  const ld = (term + " " + simple).toLowerCase();
-  if (/\bdevelop|child|piaget|vygotsky|erikson|attachment/.test(ld)) category = "Development";
-  else if (/memory|forget|recall|cognit|think/.test(ld)) category = "Cognition and memory";
-  else if (/disorder|therapy|depress|anxiety|schizophrenia|phobia/.test(ld)) category = "Psychological disorders";
-  else if (/brain|neuron|synap|axon|dendrite|cortex|amygdala|hippocampus|lobe|broca|wernicke/.test(ld)) category = "Biological psychology";
-  else if (/social|conform|obedience|prejudice|group|bystander/.test(ld)) category = "Social psychology";
-  else if (/personality|trait|big five/.test(ld)) category = "Personality";
-  else if (/intelligence|\biq\b/.test(ld)) category = "Intelligence";
-  else if (/stress|coping|health/.test(ld)) category = "Stress and health";
-  else if (/consciousness|sleep|dream|hypnosis/.test(ld)) category = "Consciousness";
-  else if (/learning|conditioning|reinforc/.test(ld)) category = "Learning";
-  else if (/wundt|titchener|james|watson|skinner|freud|functionalism|behaviorism|psychoanalysis|structuralism/.test(ld)) category = "History and approaches";
-  
+  if (/\bdevelop|child|adolescen|piaget|vygotsky|erikson|attachment|puberty/.test(ld)) category = "Development";
+  else if (/memory|forget|recall|cognit|think|reason|judg|decision|problem.solv/.test(ld)) category = "Cognition and memory";
+  else if (/disorder|therapy|depress|anxiety|schizophrenia|phobia|ocd|ptsd|bipolar/.test(ld)) category = "Psychological disorders";
+  else if (/brain|neuron|synap|axon|dendrite|cortex|amygdala|hippocampus|lobe|broca|wernicke|neurotransmitter|dopamine|serotonin/.test(ld)) category = "Biological psychology";
+  else if (/social|conform|obedience|prejudice|group|bystander|attribution|persuasion/.test(ld)) category = "Social psychology";
+  else if (/personality|trait|big five|introver|extrover/.test(ld)) category = "Personality";
+  else if (/intelligence|\biq\b|aptitude/.test(ld)) category = "Intelligence";
+  else if (/stress|coping|health|immune/.test(ld)) category = "Stress and health";
+  else if (/consciousness|sleep|dream|hypnosis|meditation/.test(ld)) category = "Consciousness";
+  else if (/learning|conditioning|reinforc|punish|extinction/.test(ld)) category = "Learning";
+  else if (/sensation|perception|vision|hearing|smell|taste|touch/.test(ld)) category = "Sensation and perception";
+  else if (/motivat|emotion|drive|incentive/.test(ld)) category = "Motivation and emotion";
+  else if (/wundt|titchener|james|watson|skinner|freud|functionalism|behaviorism|psychoanalysis|structuralism|gestalt|humanistic/.test(ld)) category = "History and approaches";
+  else if (/research|experiment|variable|hypothesis|correlation|method/.test(ld)) category = "Research methods";
+
   return {
     id: prefix.toLowerCase() + "-core-" + num,
     term: term,
@@ -1229,9 +1316,9 @@ function draftToChapterCard(d, idx, prefix) {
   };
 }
 
-function exportChapterCards(drafts, chapterNum, prefix) {
+function exportChapterCards(drafts, chapterNum, prefix, pages) {
   const ranked = rankDrafts(drafts);
-  const cards = ranked.map((d, i) => draftToChapterCard(d, i, prefix));
+  const cards = ranked.map((d, i) => draftToChapterCard(d, i, prefix, pages));
   const js = "win" + "dow." + prefix + "_CORE_CARDS = " + JSON.stringify(cards, null, 2) + ";\n";
   return { js, count: cards.length };
 }
@@ -1369,7 +1456,7 @@ $("chapter-export").addEventListener("click", () => {
   const num = prompt("Chapter number (e.g., 7):", "7");
   if (!num) return;
   const prefix = "CH" + num;
-  const { js, count } = exportChapterCards(currentDrafts, num, prefix);
+  const { js, count } = exportChapterCards(currentDrafts, num, prefix, lastPages);
   const blob = new Blob([js], { type: "text/javascript" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
