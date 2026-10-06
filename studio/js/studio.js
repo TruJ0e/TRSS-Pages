@@ -1260,18 +1260,20 @@ function draftToChapterCard(d, idx, prefix, pages) {
   const rawDef = d.simple || d.definition || "";
   const srcSentence = d.srcSentence || rawDef;
 
-  // --- simple: clean definition ---
+  // --- simple: cleaned extraction (not authored) ---
+  // Only strips scaffolding, never adds words
   let simple = rawDef.trim();
   const termEsc = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   simple = simple.replace(new RegExp("^" + termEsc + "\\s+(?:is|are|was|were)\\s+"), "");
   simple = simple.replace(new RegExp("^" + termEsc + "\\s+"), "");
-  // Strip definition scaffolding: "refers to", "is defined as", etc.
   simple = simple.replace(/^(?:refers to|is defined as|can be defined as|is described as|is known as)\s+/i, "");
   if (/^[A-Z]/.test(simple) && !/^[A-Z][a-z]+\s+[A-Z]/.test(simple)) {
     simple = simple.charAt(0).toLowerCase() + simple.slice(1);
   }
   if (!/[.]$/.test(simple)) simple += ".";
 
+  // --- examples: ONLY source-extracted, never templated ---
+  // If the source has no example sentences, examples stays empty
   function findExampleSentences(term, pages, srcSentence) {
     const examples = [];
     const termLower = term.toLowerCase();
@@ -1279,7 +1281,6 @@ function draftToChapterCard(d, idx, prefix, pages) {
     const markers = /\b(for example|for instance|consider|imagine|suppose|e\.g\.|such as)\b/i;
     for (const page of pages) {
       const sentences = page.text.split(/(?<=[.!?])(?:\s+|(?=[A-Z]))/).map(s => s.trim().replace(/\s+/g, " "));
-      // Find where the definition sentence is, then look at neighbors
       let defIdx = -1;
       if (srcSentence) {
         const srcClean = srcSentence.trim().replace(/\s+/g, " ").slice(0, 60).toLowerCase();
@@ -1291,8 +1292,6 @@ function draftToChapterCard(d, idx, prefix, pages) {
         if (!markers.test(clean)) continue;
         const sl = clean.toLowerCase();
         const mentionsTerm = sl.includes(termLower) || termWords.some(w => sl.includes(w));
-        // Prefer examples AFTER the definition (textbook style), within 3 sentences
-        // Mentions-term always wins regardless of position
         const afterDef = defIdx >= 0 && i > defIdx && (i - defIdx) <= 3;
         if (mentionsTerm || afterDef) {
           examples.push(clean);
@@ -1303,86 +1302,11 @@ function draftToChapterCard(d, idx, prefix, pages) {
     }
     return examples;
   }
+  const examples = (pages && pages.length) ? findExampleSentences(term, pages, srcSentence) : [];
 
-  // --- cue: extract the core concept phrase (not just first 7 words) ---
-  let cueContent = simple;
-  // Remove leading articles
-  cueContent = cueContent.replace(/^(a|an|the)\s+/i, "");
-  // Try to find the key noun phrase: look for "of", "for", "in" constructions
-  // or take the most informative chunk
-  const keyPhrase = cueContent.match(/^(.+?)(?:\.|,|;|\s+which|\s+that|\s+and\s)/);
-  if (keyPhrase && keyPhrase[1].split(/\s+/).length <= 10) {
-    cueContent = keyPhrase[1].trim();
-  } else {
-    cueContent = cueContent.split(/\s+/).slice(0, 7).join(" ").replace(/[.]+$/, "");
-  }
-  const cue = "Think: " + cueContent;
-
-  // --- Determine card type for tailored generation ---
-  const isPerson = /^[A-Z][a-z]+\s+[A-Z][a-z]+/.test(term) && !/\b(the|of|and)\b/i.test(term);
-  const ld = (term + " " + simple).toLowerCase();
-  const isProcess = /\b(process|mechanism|occurs when|involves|steps?|stages?)\b/.test(ld);
-  const isTheory = /\b(theory|model|approach|perspective|framework)\b/.test(ld);
-
-  // --- examples: concrete scenario, not restated definition ---
-  let example;
-  const srcExamples = (pages && pages.length) ? findExampleSentences(term, pages, srcSentence) : [];
-  if (srcExamples.length > 0) {
-    example = srcExamples[0];
-  } else if (isPerson) {
-    const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established|identified|described)\b\s+(.+?)[.]*$/i);
-    if (vm) {
-      const contribution = vm[2].trim().replace(/^(the|a|an)\s+/i, "");
-      example = term + " " + vm[1].toLowerCase() + " " + contribution + ", shaping how we understand it today.";
-    } else {
-      example = "Students learn about " + term + "'s contributions when studying " + simple.replace(/[.]+$/, "") + ".";
-    }
-  } else if (isProcess) {
-    // For processes: describe it happening
-    const coreAction = simple.replace(/^(a|an|the)\s+/i, "").split(/[.]/)[0];
-    example = "For example, when " + coreAction.charAt(0).toLowerCase() + coreAction.slice(1) + ", you can observe this in action.";
-  } else if (isTheory) {
-    example = "Researchers apply this when " + simple.replace(/^(a|an|the)\s+/i, "").replace(/[.]+$/, "") + " explains observed behavior.";
-  } else {
-    // For concepts: natural illustrative sentence
-    // Strip leading article for embedding, keep rest intact
-    const bare = simple.replace(/^(a|an|the)\s+/i, "").replace(/[.]+$/, "");
-    const bareLower = bare.charAt(0).toLowerCase() + bare.slice(1);
-    if (/\b(disorder|condition|syndrome)\b/i.test(term + " " + simple)) {
-      example = "A patient showing " + bareLower + " may be diagnosed with " + term.toLowerCase() + ".";
-    } else if (/\b(effect|bias|phenomenon)\b/i.test(term)) {
-      example = term + " occurs when " + bareLower + ".";
-    } else {
-      example = term + ": " + bareLower + ".";
-    }
-  }
-
-  // --- apply: scenario-based question requiring discrimination ---
-  let apply;
-  if (isPerson) {
-    const vm = simple.match(/\b(developed|founded|created|proposed|introduced|discovered|published|conducted|established|identified|described)\b\s+(.+?)[.]*$/i);
-    if (vm) {
-      const what = vm[2].trim().replace(/[.]+$/, "");
-      apply = "A textbook credits someone with " + what.charAt(0).toLowerCase() + what.slice(1) + ". Who is this?";
-    } else {
-      apply = "Which figure is associated with: " + simple.replace(/[.]+$/, "") + "?";
-    }
-  } else {
-    const core = simple.replace(/^(a|an|the)\s+/i, "").replace(/[.]+$/, "");
-    // Create a scenario that requires applying the concept
-    if (/\b(disorder|condition|syndrome)\b/i.test(term)) {
-      apply = "Someone shows signs of " + core + ". What might a clinician consider?";
-    } else if (isProcess) {
-      apply = "You observe " + core + " happening. Which process is this?";
-    } else {
-      const bareQ = simple.replace(/^(a|an|the)\s+/i, "").replace(/[.]+$/, "");
-      const bareQLower = bareQ.charAt(0).toLowerCase() + bareQ.slice(1);
-      apply = "What is " + bareQLower + "?";
-    }
-  }
-
-  // --- category: expanded keyword matching ---
+  // --- category: keyword classification (organizing, not authoring) ---
   let category = "General";
+  const ld = (term + " " + simple).toLowerCase();
   if (/\bdevelop|child|adolescen|piaget|vygotsky|erikson|attachment|puberty/.test(ld)) category = "Development";
   else if (/memory|forget|recall|cognit|think|reason|judg|decision|problem.solv/.test(ld)) category = "Cognition and memory";
   else if (/disorder|therapy|depress|anxiety|schizophrenia|phobia|ocd|ptsd|bipolar/.test(ld)) category = "Psychological disorders";
@@ -1403,10 +1327,11 @@ function draftToChapterCard(d, idx, prefix, pages) {
     term: term,
     type: "book-term",
     category: category,
-    cue: cue,
     simple: simple,
-    examples: [example],
-    apply: [apply],
+    examples: examples,
+    // No cue, no apply: those require authoring. Student or teacher adds them.
+    // Source sentence preserved for traceability.
+    _source: srcSentence,
   };
 }
 
