@@ -1102,6 +1102,20 @@ function scoreDraft(d) {
 // High: pattern-matched, clean term, complete definition - trust it
 // Medium: fallback or minor issues - worth reviewing
 // Low: fragments, uncertain - definitely review before keeping
+// Returns specific accuracy issues for a draft, empty array = clean
+function draftIssues(d) {
+  const issues = [];
+  const term = d.term || "";
+  const def = d.simple || d.definition || "";
+  if (d._fallback) issues.push("auto-detected");
+  if (/^(and|or|but|so|because)\b/i.test(def)) issues.push("fragment definition");
+  if (def.split(/\s+/).length < 8) issues.push("definition too short");
+  if (/[,\-]$/.test(term)) issues.push("term cut off");
+  if (/^(a|an|the|this|that)\b/i.test(term)) issues.push("unclear term");
+  if (!/\b(is|are|was|were|refers|means|involves)\b/i.test(def)) issues.push("unclear definition");
+  return issues;
+}
+
 function draftConfidence(d) {
   const score = d._score !== undefined ? d._score : scoreDraft(d);
   const term = d.term || "";
@@ -1533,14 +1547,18 @@ function renderDrafts() {
       "display:flex;gap:8px;align-items:flex-start;flex:1;cursor:pointer";
     const cb = document.createElement("input");
     cb.type = "checkbox";
-    cb.checked = true;
+    // Smart default: auto-check confident cards, leave flagged ones unchecked
+    // Student opts IN to uncertain cards, not out of them
+    const _conf = draftConfidence(d);
+    cb.checked = _conf !== "low";
     cb.style.marginTop = "4px";
     cb.setAttribute("aria-label", "Keep draft: " + d.term);
     const span = document.createElement("span");
     const strong = document.createElement("strong");
     strong.textContent = d.term;
-    // Confidence badge
-    const conf = draftConfidence(d);
+    // Confidence badge with specific issues
+    const conf = _conf;
+    const issues = draftIssues(d);
     const badge = document.createElement("span");
     badge.className = "badge";
     badge.style.marginLeft = "8px";
@@ -1548,18 +1566,18 @@ function renderDrafts() {
       badge.textContent = "✓ Confident";
       badge.style.background = "#e6f4ea";
       badge.style.color = "#137333";
+      badge.title = "This looks accurate — extracted cleanly from your text.";
     } else if (conf === "medium") {
-      badge.textContent = "~ Review";
+      badge.textContent = issues.length ? "~ " + issues[0] : "~ Review";
       badge.style.background = "#fef7e0";
       badge.style.color = "#8a5a00";
+      badge.title = "Worth a quick review: " + (issues.join(", ") || "may need tweaking.");
     } else {
-      badge.textContent = "! Check me";
+      badge.textContent = issues.length ? "! " + issues[0] : "! Check me";
       badge.style.background = "#fce8e6";
       badge.style.color = "#c5221f";
+      badge.title = "Please review: " + (issues.join(", ") || "might be incomplete.");
     }
-    badge.title = conf === "high" ? "This looks accurate — extracted cleanly from your text."
-      : conf === "medium" ? "Worth a quick review — may need tweaking."
-      : "Please review carefully — this might be incomplete or inaccurate.";
     const hint = document.createElement("span");
     hint.className = "hint";
     hint.textContent = d.simple.length > 140
@@ -1610,6 +1628,20 @@ $("draft-keep").addEventListener("click", async () => {
   await renderList();
   log("Added " + added + " drafted card(s) to My Cards" +
       (skipped ? " (" + skipped + " skipped by validation)" : "") + ".");
+});
+
+$("draft-drop-flagged").addEventListener("click", () => {
+  const dl = $("draft-list");
+  let dropped = 0;
+  for (const row of Array.from(dl.children)) {
+    if (!row._draft) continue;
+    if (draftConfidence(row._draft) === "low") {
+      removeDraft(row._draft);
+      dropped++;
+    }
+  }
+  renderDrafts();
+  log("Dropped " + dropped + " flagged draft(s) — kept the confident ones.");
 });
 
 $("draft-clear").addEventListener("click", () => {
