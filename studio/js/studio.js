@@ -725,10 +725,36 @@ function extractDrafts(pages) {
   };
   // Returns true when a card was kept, so a rejected match falls through to
   // the next pattern instead of silently dropping the sentence.
-  const push = (term, def, p) => {
+  const push = (term, def, p, nextSentences) => {
     const attr = splitAttribution(autodraftBaseTerm(term));
     const t = attr.term;
     let simple = (String(def == null ? "" : def).replace(/\s+/g, " ").trim() + attr.note).trim();
+    // THEORY EXPANSION: if term is a theory/concept, capture following elaboration
+    // sentences (verbatim from source, not summarized)
+    const isTheoryLike = /\b(theory|model|approach|perspective|framework|principle|law|effect)\b/i.test(t);
+    if (isTheoryLike && nextSentences && nextSentences.length) {
+      const termWords = t.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const elaborations = [];
+      for (const ns of nextSentences.slice(0, 3)) {
+        const clean = ns.replace(/\*\*/g, "").trim();
+        if (clean.length < 15 || clean.length > 300) continue;
+        const lower = clean.toLowerCase();
+        // Elaboration: refers back to theory (It, This, The process) or mentions key words
+        const refersBack = /^(it|this|these|the process|the theory|this process)\b/i.test(clean);
+        const mentionsTerm = termWords.some(w => lower.includes(w));
+        // Avoid examples (those go in examples field, not definition)
+        const isExample = /\b(for example|for instance|consider|imagine)\b/i.test(clean);
+        if ((refersBack || mentionsTerm) && !isExample) {
+          elaborations.push(clean);
+          if (elaborations.length >= 2) break;
+        } else if (!refersBack && !mentionsTerm) {
+          break; // Stop at unrelated sentence
+        }
+      }
+      if (elaborations.length) {
+        simple = simple.replace(/[.]+$/, "") + ". " + elaborations.join(" ");
+      }
+    }
     if (!/[.!?]$/.test(simple)) simple += ".";
     if (!autodraftTermOk(t) || !autodraftDefOk(simple)) return false;
     const key = t.toLowerCase();
@@ -775,30 +801,30 @@ function extractDrafts(pages) {
     const lm = /^(in|during)\s+([^,]{2,60}?)\s*,\s*/i.exec(s);
     return lm ? { text: lm[2].trim(), rest: s.slice(lm[0].length) } : { text: "", rest: s };
   };
-  const factBranch = (r, L, p) => {
+  const factBranch = (r, L, p, nextSentences) => {
     let m;
     if ((m = new RegExp("^(.{2,60}?)\\s+(" + STUDY_VERBS + ")\\s+that\\s+(.{15,})$", "i").exec(r))) {
       const yr = (/\b((?:19|20)\d{2})\b/.exec(L.text) || [])[1];
-      return push(m[1], m[2].toLowerCase() + " that " + m[3] + (yr ? " [" + yr + " study]" : ""), p);
+      return push(m[1], m[2].toLowerCase() + " that " + m[3] + (yr ? " [" + yr + " study]" : ""), p, nextSentences);
     }
     if ((m = /^(.{2,60}?)\s+([a-z]+ed)\s+(.{10,})$/.exec(r))) {
       const nyr = (/\b((?:19|20)\d{2})\b/.exec(L.text) || [])[1];
       if (nyr || /\bstud(y|ies)\b/i.test(L.text)) {
-        return push(m[1], m[2].toLowerCase() + " " + m[3] + (nyr ? " [" + nyr + "]" : ""), p);
+        return push(m[1], m[2].toLowerCase() + " " + m[3] + (nyr ? " [" + nyr + "]" : ""), p, nextSentences);
       }
     }
     if ((m = new RegExp("^(.{2,60}?)\\s+(" + CLAIM_VERBS + ")\\s+that\\s+(.{15,})$", "i").exec(r))) {
-      return push(m[1], m[2].toLowerCase() + " that " + m[3], p);
+      return push(m[1], m[2].toLowerCase() + " that " + m[3], p, nextSentences);
     }
     if ((m = /^(.{2,60}?)\s+(happens|occurs)\s+when\s+(.{15,})$/i.exec(r))) {
-      return push(m[1], m[2].toLowerCase() + " when " + m[3], p);
+      return push(m[1], m[2].toLowerCase() + " when " + m[3], p, nextSentences);
     }
     if ((m = /^(.{2,60}?)\s+(occurs|takes place)\s+during\s+(.{15,})$/i.exec(r))) {
-      return push(m[1], m[2].toLowerCase() + " during " + m[3], p);
+      return push(m[1], m[2].toLowerCase() + " during " + m[3], p, nextSentences);
     }
     if ((m = new RegExp("^(.{2,60}?)\\s+(" + FACT_VERBS + ")\\s+(.{15,})$", "i").exec(r))) {
       const lead = L.text.length >= 8 ? L.text + ", " : "";
-      return push(m[1], lead + m[2].toLowerCase().replace(/\s+/g, " ") + " " + m[3], p);
+      return push(m[1], lead + m[2].toLowerCase().replace(/\s+/g, " ") + " " + m[3], p, nextSentences);
     }
     return false;
   };
@@ -903,7 +929,7 @@ function extractDrafts(pages) {
           }
           // Validate: term is clean, definition is substantial
           if (term && !/[*]/.test(term) && def.length >= 15) {
-            done = push(term, def, p);
+            done = push(term, def, p, nextSentences);
             if (done) {
               const added = drafts[drafts.length - 1];
               if (added) {
@@ -921,14 +947,14 @@ function extractDrafts(pages) {
         const yl = /^in\s+(\d{4})\s*,\s*(.+)$/i.exec(who);
         const yrNote = yl ? " [" + yl[1] + "]" : "";
         if (yl) who = yl[2];
-        done = push(m[3], m[2].toLowerCase() + " by " + who + ": " + m[4] + yrNote, p);
+        done = push(m[3], m[2].toLowerCase() + " by " + who + ": " + m[4] + yrNote, p, nextSentences);
       }
-      if (!done && (m = defAsRe.exec(str))) done = push(m[1], m[1] + " is defined as " + m[2], p);
-      if (!done && (m = defAsPlRe.exec(str))) done = push(m[1], m[1] + " are defined as " + m[2], p);
-      if (!done && (m = refersRe.exec(str))) done = push(m[1], m[1] + " refers to " + m[2], p);
+      if (!done && (m = defAsRe.exec(str))) done = push(m[1], m[1] + " is defined as " + m[2], p, nextSentences);
+      if (!done && (m = defAsPlRe.exec(str))) done = push(m[1], m[1] + " are defined as " + m[2], p, nextSentences);
+      if (!done && (m = refersRe.exec(str))) done = push(m[1], m[1] + " refers to " + m[2], p, nextSentences);
       // "X is a Y with N parts: a, b, c" — main card plus one card per part.
       if (!done && (m = enumRe.exec(str))) {
-        done = push(m[1], "is " + m[2] + " " + m[3] + " with " + m[4] + " parts: " + m[5], p);
+        done = push(m[1], "is " + m[2] + " " + m[3] + " with " + m[4] + " parts: " + m[5], p, nextSentences);
         const base = autodraftBaseTerm(m[1]);
         const am = /^(.*?),\s*(proposed|introduced|described|developed|created|founded|discovered|named)\s+by\s+[^,;]+,?\s*$/i.exec(base);
         const mainTerm = am ? am[1].trim() : base;
@@ -940,7 +966,7 @@ function extractDrafts(pages) {
             const im = /^(.*?)\s+(with|for|that|which|who|where|when)\s+(.+)$/i.exec(it);
             const iname = (im ? im[1] : it).replace(/^(the|a|an|and)\s+/i, "").trim();
             const idesc = im ? im[3].replace(/[.!?]+$/, "") : "";
-            push(iname, im ? im[2].toLowerCase() + " " + idesc + " (part of " + mainTerm + ")" : "part of " + mainTerm, p);
+            push(iname, im ? im[2].toLowerCase() + " " + idesc + " (part of " + mainTerm + ")" : "part of " + mainTerm, p, nextSentences);
           }
         }
       }
@@ -953,28 +979,28 @@ function extractDrafts(pages) {
           const items2 = (raw2.includes(",") ? raw2.split(/\s*;\s*|,\s*(?:and\s+)?/) : raw2.split(/\s*;\s*|\s+and\s+/))
             .map((x) => x.trim()).filter((x) => x && x.length <= 90);
           if (items2.length >= 2 && mainTerm2) {
-            done = push(mainTerm2, "has " + me[2] + " " + me[3] + ": " + me[4].trim(), p);
+            done = push(mainTerm2, "has " + me[2] + " " + me[3] + ": " + me[4].trim(), p, nextSentences);
             for (const it of items2) {
               const im2 = /^(.*?)\s+(with|for|that|which|who|where|when)\s+(.+)$/i.exec(it);
               const iname2 = (im2 ? im2[1] : it).replace(/^(the|a|an|and)\s+/i, "").trim();
               const idesc2 = im2 ? im2[3].replace(/[.!?]+$/, "") : "";
-              push(iname2, im2 ? im2[2].toLowerCase() + " " + idesc2 + " (part of " + mainTerm2 + ")" : "part of " + mainTerm2, p);
+              push(iname2, im2 ? im2[2].toLowerCase() + " " + idesc2 + " (part of " + mainTerm2 + ")" : "part of " + mainTerm2, p, nextSentences);
             }
           }
         }
       }
-      if (!done && (m = isARe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
-      if (!done && (m = areRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3], p);
+      if (!done && (m = isARe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p, nextSentences);
+      if (!done && (m = areRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3], p, nextSentences);
       // "X is the <anything>" — the noun is kept so the back stays grammatical
       // ("retrieval" / "is the process of getting information out of storage").
-      if (!done && (m = isTheRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
-      if (!done && (m = isOneRe.exec(str))) done = push(m[1], m[1] + " is one " + m[2] + " " + m[3], p);
-      if (!done && (m = knownForRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3].toLowerCase() + " " + m[4], p);
+      if (!done && (m = isTheRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p, nextSentences);
+      if (!done && (m = isOneRe.exec(str))) done = push(m[1], m[1] + " is one " + m[2] + " " + m[3], p, nextSentences);
+      if (!done && (m = knownForRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3].toLowerCase() + " " + m[4], p, nextSentences);
       if (!done && (m = personRe.exec(str))) {
         const pdef = m[1] + " " + m[2].toLowerCase() + " " + m[3];
         const cm = new RegExp("^(.+?)\\s+and\\s+(" + nameLike + ")$").exec(m[1].trim());
-        if (cm) { const r1 = push(cm[1], pdef, p); const r2 = push(cm[2], pdef, p); done = r1 || r2; }
-        else done = push(m[1], pdef, p);
+        if (cm) { const r1 = push(cm[1], pdef, p, nextSentences); const r2 = push(cm[2], pdef, p, nextSentences); done = r1 || r2; }
+        else done = push(m[1], pdef, p, nextSentences);
       }
       // "X emerged through the work of PERSON (and PERSON)"
       if (!done) {
@@ -986,10 +1012,10 @@ function extractDrafts(pages) {
           for (const person of m2[2].split(/\s+and\s+|,\s*/)) {
             const pn2 = person.trim().replace(/[.]+$/, "");
             const pdef2 = pn2 + " contributed to " + (topic2 ? topic2.toLowerCase() : "psychology") + ".";
-            if (pn2 && nameOnly2.test(pn2)) any2 = push(pn2, pdef2, p) || any2;
+            if (pn2 && nameOnly2.test(pn2)) any2 = push(pn2, pdef2, p, nextSentences) || any2;
           }
           // Also create a card for the topic itself
-          if (topic2) push(topic2, m2[1].trim().replace(/[.]+$/, "") + " emerged through the work of " + m2[2].trim().replace(/[.]+$/, "") + ".", p);
+          if (topic2) push(topic2, m2[1].trim().replace(/[.]+$/, "") + " emerged through the work of " + m2[2].trim().replace(/[.]+$/, "") + ".", p, nextSentences);
           done = any2;
         }
       }
@@ -1009,9 +1035,9 @@ function extractDrafts(pages) {
           for (const [pnRaw, vb] of [[lm[3], verbL], [lm[5], verbL2]]) {
             const pnL = pnRaw.trim().replace(/[.]+$/, "");
             const pdefL = pnL + " " + vb + (topicL ? " " + topicL.toLowerCase() : "") + ".";
-            if (pnL && nameOnlyL.test(pnL)) anyL = push(pnL, pdefL, p) || anyL;
+            if (pnL && nameOnlyL.test(pnL)) anyL = push(pnL, pdefL, p, nextSentences) || anyL;
           }
-          if (topicL) push(topicL, lm[1].trim() + " was " + verbL + " by " + lm[3].trim() + ".", p);
+          if (topicL) push(topicL, lm[1].trim() + " was " + verbL + " by " + lm[3].trim() + ".", p, nextSentences);
           done = anyL;
         }
       }
@@ -1024,7 +1050,7 @@ function extractDrafts(pages) {
           const pn = person.trim().replace(/[.]+$/, "");
           // Complete sentence with subject: "Wilhelm Wundt developed structuralism."
           const pdef = pn + " " + verb + (topic ? " " + topic.toLowerCase() : "") + ".";
-          if (pn && nameOnly.test(pn)) any = push(pn, pdef, p) || any;
+          if (pn && nameOnly.test(pn)) any = push(pn, pdef, p, nextSentences) || any;
         }
         done = any;
       }
@@ -1032,12 +1058,12 @@ function extractDrafts(pages) {
         // Preserve a leading "In <year>, " on the back (baseTerm strips it
         // from the front) — "In 1953, Aserinsky and Kleitman discovered ..."
         const ym = /^[Ii]n\s+((?:19|20)\d{2})\s*,\s*/.exec(m[1]);
-        done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + (ym ? " [" + ym[1] + "]" : ""), p);
+        done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + (ym ? " [" + ym[1] + "]" : ""), p, nextSentences);
       }
-      if (!done && (m = knownAsRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p);
+      if (!done && (m = knownAsRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p, nextSentences);
       if (!done) {
         const L = leaderOf(str);
-        done = factBranch(L.rest, L, p);
+        done = factBranch(L.rest, L, p, nextSentences);
       }
         return done;
       };
