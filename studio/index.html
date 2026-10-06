@@ -70,10 +70,10 @@
 </head>
 <body>
   <h1>📥 TRSS Upload Studio</h1>
-  <p class="sub">Drop in a PDF, photos, a Word doc, slides, an ebook, a zip of
-  readings, or a whole folder — read it here, select any text to make a flashcard.
-  Everything runs in your browser — your file never leaves this device.
-  Cards export as JSON in the TRSS base-model schema.</p>
+  <p class="sub">Drop in your study material — a PDF, photos of textbook pages,
+  a Word doc, slides, or just paste text. Read it here, then make flashcards
+  from anything you select. Everything runs in your browser —
+  your files never leave this device.</p>
 
   <section class="panel" id="step-upload">
     <h2>1 · Load your material</h2>
@@ -81,34 +81,33 @@
       <input type="file" id="file" multiple aria-label="Study material files"
              accept=".pdf,.txt,.md,.markdown,.docx,.pptx,.epub,.zip,.png,.jpg,.jpeg,.webp,.gif,.bmp,.mp3,.wav,.m4a,.ogg,.webm,.mp4">
     </div>
-    <button class="primary" id="extract">Process files</button>
+    <button class="primary" id="extract" disabled>Process files</button>
+    <p class="hint" id="extract-hint" style="margin:4px 0 0">Choose a file above to get started.</p>
     <button id="folder">📁 Upload folder</button>
     <input type="file" id="folder-input" webkitdirectory hidden aria-label="Upload a folder of study files">
     <button id="paste">📋 Paste text</button>
     <div id="paste-fallback" hidden style="margin-top:12px">
-      <p class="hint">Clipboard read was blocked &mdash; long-press in the box and paste manually, then tap &ldquo;Use this text&rdquo;.</p>
+      <p class="hint">Clipboard access was blocked &mdash; paste your text in the box below, then click &ldquo;Use this text&rdquo;.</p>
       <textarea id="paste-text" rows="6" style="width:100%;box-sizing:border-box;padding:9px;font-size:0.95rem;border:1px solid #bbb;border-radius:8px;font-family:inherit" placeholder="Paste your study text here&hellip;"></textarea>
       <div><button class="primary" id="paste-use" style="margin-top:8px">Use this text</button></div>
     </div>
-    <p class="hint">PDF · images (OCR) · Word · PowerPoint · EPUB books ·
-    lecture audio · plain text · <strong>zip archives</strong> (every readable file inside
-    is processed) · <strong>folders</strong> via the Upload folder button. Tip: PDFs with
-    selectable text work best — scanned pages work better dropped in as images. OCR reads
-    printed text well; handwriting is best-effort. Lecture transcription runs on-device
-    (first run downloads a ~75MB model, one-time).</p>
+    <p class="hint">Works with: PDFs, photos of pages, Word docs, PowerPoint slides,
+    ebooks, audio lectures, plain text, and zip files. Tip: if your PDF has selectable
+    text, that works best. For scanned pages, drop them in as images.</p>
     <div id="log" aria-live="polite">Starting…</div>
   </section>
 
-  <section class="panel" id="step-read" hidden>
-    <h2>2 · Read &amp; select text</h2>
+  <section class="panel" id="step-read">
+    <h2>2 · Read &amp; review</h2>
+    <p class="hint" id="step-read-empty">Your text will appear here after you load material above.</p>
     <p class="hint">Highlight any term or phrase below, then tap
     <strong>Make flashcard</strong> — or let the studio draft the cards for you.</p>
     <div style="margin:10px 0">
       <button class="primary" id="autodraft">&#10024; Auto-draft flashcards</button>
-      <button id="draft-best" hidden>⭐ Show best first</button>
+      <button id="draft-best" hidden>⭐ Sort by importance</button>
       <button id="quiz-gen" hidden>📝 Generate quiz</button>
-      <button id="chapter-export" hidden>📦 Export as chapter</button>
-      <span class="hint" style="margin-left:8px">Finds term&ndash;definition pairs in the text. You review every draft before anything is saved.</span>
+      <button id="chapter-export" hidden>📦 Save as study chapter</button>
+      <span class="hint" style="margin-left:8px">Automatically finds key terms in your text. You review each one before anything is saved.</span>
     </div>
     <div id="reader" aria-label="Extracted document text"></div>
     <section id="step-drafts" hidden style="margin-top:14px;border-top:1px solid #e3e3e3;padding-top:10px">
@@ -123,7 +122,7 @@
   </section>
 
   <section class="panel" id="step-cards">
-    <h2>3 · Your cards <span class="cat" id="card-count">no cards yet</span></h2>
+    <h2>3 · My Cards <span class="cat" id="card-count">no cards yet</span></h2>
     <div class="toolbar">
       <button id="export">⬇ Export JSON</button>
       <button id="import">⬆ Import JSON</button>
@@ -184,7 +183,7 @@
     </form>
   </dialog>
 
-  <script type="module" src="js/studio.js?v=fix20261005"></script>
+  <script type="module" src="js/studio.js?v=ux20261005"></script>
 
   <!-- TRSS Ad Slot: footer/bottom placement only. -->
   <div class="trss-ad-slot" id="trssAdSlot" style="max-width:728px;margin:28px auto 0;padding:0 16px;text-align:center;">

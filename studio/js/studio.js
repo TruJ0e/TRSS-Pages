@@ -173,6 +173,8 @@ function pageTitle(p) {
 let lastPages = []; // pages most recently rendered, for auto-draft
 
 function renderReader(pages) {
+  const emptyMsg = document.getElementById('step-read-empty');
+  if (emptyMsg) emptyMsg.hidden = true;
   lastPages = Array.isArray(pages) ? pages : [];
   readerEl.innerHTML = "";
   // Long documents get a jump-to-section dropdown.
@@ -220,10 +222,18 @@ drop.addEventListener("drop", (e) => {
   if (e.dataTransfer.files.length) {
     fileInput.files = e.dataTransfer.files;
     log("Picked: " + e.dataTransfer.files[0].name);
+    $("extract").disabled = false;
+    const hint = $("extract-hint");
+    if (hint) hint.textContent = "Ready — click Process files to read your material.";
   }
 });
 fileInput.addEventListener("change", () => {
-  if (fileInput.files.length) log("Picked: " + fileInput.files[0].name);
+  if (fileInput.files.length) {
+    log("Picked: " + fileInput.files[0].name);
+    $("extract").disabled = false;
+    const hint = $("extract-hint");
+    if (hint) hint.textContent = "Ready — click Process files to read your material.";
+  }
 });
 
 /* ── file intake: every supported type funnels to {pages:[{n,text}]} ── */
@@ -1088,6 +1098,26 @@ function scoreDraft(d) {
   return Math.max(0, score);
 }
 
+// Confidence levels for accuracy transparency
+// High: pattern-matched, clean term, complete definition - trust it
+// Medium: fallback or minor issues - worth reviewing
+// Low: fragments, uncertain - definitely review before keeping
+function draftConfidence(d) {
+  const score = d._score !== undefined ? d._score : scoreDraft(d);
+  const term = d.term || "";
+  const def = d.simple || d.definition || "";
+  
+  // Low confidence signals
+  if (d._fallback) return "medium"; // fallback extractions are decent but not certain
+  if (/^(and|or|but|the|a)\b/i.test(def)) return "low"; // fragment definition
+  if (def.split(/\s+/).length < 6) return "low"; // too short to be complete
+  if (/[,\-]$/.test(term)) return "low"; // truncated term
+  
+  if (score >= 8) return "high";
+  if (score >= 5) return "medium";
+  return "low";
+}
+
 function rankDrafts(drafts) {
   // Deduplicate by normalized term
   const seen = new Map();
@@ -1509,11 +1539,33 @@ function renderDrafts() {
     const span = document.createElement("span");
     const strong = document.createElement("strong");
     strong.textContent = d.term;
+    // Confidence badge
+    const conf = draftConfidence(d);
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.style.marginLeft = "8px";
+    if (conf === "high") {
+      badge.textContent = "✓ Confident";
+      badge.style.background = "#e6f4ea";
+      badge.style.color = "#137333";
+    } else if (conf === "medium") {
+      badge.textContent = "~ Review";
+      badge.style.background = "#fef7e0";
+      badge.style.color = "#8a5a00";
+    } else {
+      badge.textContent = "! Check me";
+      badge.style.background = "#fce8e6";
+      badge.style.color = "#c5221f";
+    }
+    badge.title = conf === "high" ? "This looks accurate — extracted cleanly from your text."
+      : conf === "medium" ? "Worth a quick review — may need tweaking."
+      : "Please review carefully — this might be incomplete or inaccurate.";
     const hint = document.createElement("span");
     hint.className = "hint";
     hint.textContent = d.simple.length > 140
       ? d.simple.slice(0, 140) + "…" : d.simple;
     span.appendChild(strong);
+    span.appendChild(badge);
     span.appendChild(document.createElement("br"));
     span.appendChild(hint);
     label.appendChild(cb);
