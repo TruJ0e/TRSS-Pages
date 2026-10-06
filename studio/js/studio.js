@@ -870,7 +870,10 @@ function extractDrafts(pages) {
     const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded|identified)\\s+(.{15,})$");
     const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed)\s+(.{5,})$/i;
     const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed|elucidated|described)\s+by\s+(.{5,})$/i;
-    for (const s of units) {
+    for (let ui = 0; ui < units.length; ui++) {
+      const s = units[ui];
+      // Next 2 sentences for cross-boundary stitching (slideshow/transcript fragments)
+      const nextSentences = [units[ui+1], units[ui+2]].filter(Boolean);
       // Definition patterns as a retryable unit: after trying the whole
       // sentence, a leading "Label: " (textbook key-term header) is stripped
       // and the remainder is tried too, so
@@ -881,18 +884,33 @@ function extractDrafts(pages) {
       // BOLD TERM pattern (Gemini layout approach): **Term** followed by definition
       // This is near-100% confidence - bold in source = key term by author intent
       if (!done) {
-        const boldRe = /\*\*([^*]{2,60}?)\*\*\s*[:\-–—]?\s*(.{15,300}?)(?=\*\*|$)/;
+        const boldRe = /\*\*([^*]{2,60}?)\*\*\s*[:\-–—]?\s*(.{0,300}?)(?=\*\*|$)/;
         const bm = boldRe.exec(str);
         if (bm) {
           const term = bm[1].trim();
-          const def = bm[2].trim();
+          let def = bm[2].trim();
+          // CROSS-BOUNDARY STITCHING: if no definition in same sentence,
+          // look at next 1-2 sentences (slideshow bullets, transcript elaboration)
+          if (def.length < 15 && nextSentences.length) {
+            const stitched = nextSentences
+              .map(ns => ns.replace(/\*\*/g, "").trim())
+              .filter(ns => ns.length >= 10 && ns.length <= 300)
+              .slice(0, 2)
+              .join(" ");
+            if (stitched.length >= 15) {
+              def = stitched;
+            }
+          }
           // Validate: term is clean, definition is substantial
           if (term && !/[*]/.test(term) && def.length >= 15) {
             done = push(term, def, p);
             if (done) {
-              // Mark as layout-derived for highest confidence
               const added = drafts[drafts.length - 1];
-              if (added) added._layoutBold = true;
+              if (added) {
+                added._layoutBold = true;
+                // Mark stitched definitions for slightly lower confidence
+                if (bm[2].trim().length < 15) added._stitched = true;
+              }
             }
           }
         }
@@ -1329,9 +1347,8 @@ function draftToChapterCard(d, idx, prefix, pages) {
     category: category,
     simple: simple,
     examples: examples,
-    // No cue, no apply: those require authoring. Student or teacher adds them.
-    // Source sentence preserved for traceability.
-    _source: srcSentence,
+    // No cue, no apply, no _source: those are authoring or internal.
+    // Verification happens in extractDrafts, student just sees clean cards.
   };
 }
 
