@@ -225,6 +225,9 @@ function docxHtmlToParagraphs(html) {
     let inner = m[2]
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/t[dh]>\s*<t[dh]\b[^>]*>/gi, ' | ') // table cells on one line
+      // Preserve bold as **markers** for extraction (Gemini layout approach)
+      .replace(/<(strong|b)\b[^>]*>/gi, '**')
+      .replace(/<\/(strong|b)\s*>/gi, '**')
       .replace(/<[^>]+>/g, '');
     inner = decodeEntities(inner).replace(/[ \t]+/g, ' ').trim();
     if (!inner) continue;
@@ -339,15 +342,31 @@ const SLIDE_PATH_RE = /^ppt\/slides\/slide(\d+)\.xml$/;
 export function slideTextFromXml(xmlString) {
   if (typeof xmlString !== 'string' || !xmlString) return '';
   const paras = [];
-  // Split on paragraph close tags to preserve paragraph breaks; runs (<a:t>)
-  // inside a paragraph join without added spaces (spacing lives in the runs).
   const chunks = xmlString.split(/<\/a:p\s*>/i);
-  const runRe = /<a:t\b[^>]*>([\s\S]*?)<\/a:t\s*>/gi;
+  // Match runs with their properties to detect bold
+  const runRe = /<a:r\b[^>]*>([\s\S]*?)<\/a:r\s*>/gi;
+  const tRe = /<a:t\b[^>]*>([\s\S]*?)<\/a:t\s*>/i;
+  const boldRe = /<a:rPr\b[^>]*\bb\s*=\s*["']?1["']?/i;
   for (const chunk of chunks) {
     const runs = [];
     let m;
     runRe.lastIndex = 0;
-    while ((m = runRe.exec(chunk)) !== null) runs.push(decodeEntities(m[1]));
+    while ((m = runRe.exec(chunk)) !== null) {
+      const runXml = m[1];
+      const tMatch = tRe.exec(runXml);
+      if (!tMatch) continue;
+      const text = decodeEntities(tMatch[1]);
+      // Check if this run is bold
+      const isBold = boldRe.test(m[0]);
+      runs.push(isBold ? '**' + text + '**' : text);
+    }
+    // Fallback: if no <a:r> structure, try direct <a:t> (old behavior)
+    if (!runs.length) {
+      const directRe = /<a:t\b[^>]*>([\s\S]*?)<\/a:t\s*>/gi;
+      let dm;
+      directRe.lastIndex = 0;
+      while ((dm = directRe.exec(chunk)) !== null) runs.push(decodeEntities(dm[1]));
+    }
     const para = runs.join('').replace(/\s+/g, ' ').trim();
     if (para) paras.push(para);
   }

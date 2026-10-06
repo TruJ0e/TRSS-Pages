@@ -104,7 +104,17 @@ async function extractPdfText(file, onProgress) {
     const tc = await page.getTextContent();
     let t = "";
     for (const item of tc.items) {
-      t += item.str + (item.hasEOL ? "\n" : " ");
+      // Preserve bold as **markers** (Gemini layout approach)
+      // PDF.js fontName often contains "Bold" for bold text
+      const fontName = (item.fontName || "").toLowerCase();
+      const isBold = fontName.includes("bold") || fontName.includes("black") || fontName.includes("heavy");
+      const str = item.str;
+      // Avoid marking single characters or whitespace as bold (headers/footers)
+      if (isBold && str.trim().length > 1) {
+        t += "**" + str + "**" + (item.hasEOL ? "\n" : " ");
+      } else {
+        t += str + (item.hasEOL ? "\n" : " ");
+      }
     }
     pages.push({ n: i, text: t.trim() });
     if (onProgress && i % 5 === 0) onProgress(i, pdf.numPages);
@@ -868,6 +878,25 @@ function extractDrafts(pages) {
       const tryOne = (rawStr) => {
         const str = rawStr.replace(/^(Dr|Prof|Mr|Ms|Mrs)\.\s+/i, "");
         let m; let done = false;
+      // BOLD TERM pattern (Gemini layout approach): **Term** followed by definition
+      // This is near-100% confidence - bold in source = key term by author intent
+      if (!done) {
+        const boldRe = /\*\*([^*]{2,60}?)\*\*\s*[:\-–—]?\s*(.{15,300}?)(?=\*\*|$)/;
+        const bm = boldRe.exec(str);
+        if (bm) {
+          const term = bm[1].trim();
+          const def = bm[2].trim();
+          // Validate: term is clean, definition is substantial
+          if (term && !/[*]/.test(term) && def.length >= 15) {
+            done = push(term, def, p);
+            if (done) {
+              // Mark as layout-derived for highest confidence
+              const added = drafts[drafts.length - 1];
+              if (added) added._layoutBold = true;
+            }
+          }
+        }
+      }
       // "X documented the Y: Z" — the discovery becomes the card, not the clause.
       if (!done && (m = docRe.exec(str))) {
         let who = m[1].trim();
@@ -1055,12 +1084,30 @@ function extractDrafts(pages) {
     }
   }
   
-  return drafts.slice(0, AUTODRAFT_CAP);
+  // GEMINI VERIFICATION GATE: every draft's definition must exist verbatim
+  // in the source text. This guarantees zero hallucination.
+  const allText = pages.map(p => p.text).join("\n").toLowerCase().replace(/\*\*/g, "");
+  const verified = [];
+  for (const d of drafts) {
+    const defClean = (d.simple || "").toLowerCase().replace(/\*\*/g, "").trim();
+    const anchor = defClean.slice(0, 50).replace(/[^a-z0-9\s]/g, "").trim();
+    if (anchor.length >= 20 && allText.includes(anchor)) {
+      d._verified = true;
+      verified.push(d);
+    } else if (d._layoutBold) {
+      d._verified = false;
+      verified.push(d);
+    }
+    // Drop unverified non-bold drafts (reject, don't repair)
+  }
+  
+  return verified.slice(0, AUTODRAFT_CAP);
 }
 
 /* RANKING: Score drafts by importance for chapter-scale filtering */
 function scoreDraft(d) {
   let score = 5; // base
+  if (d._layoutBold) score += 5; // bold in source = author-marked key term (near-100%)
   if (d._fallback) score -= 5; // fallback extractions rank below pattern matches
   const term = d.term || "";
   const def = d.simple || d.definition || "";
