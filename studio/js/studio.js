@@ -571,6 +571,20 @@ function autodraftTermOk(term) {
   // Concatenation artifact: lowercase->UPPERCASE mid-word ("mitoAlbert")
   // from chunk boundaries or missing spaces
   if (/[a-z][A-Z]/.test(term)) return false;
+  // FRAGMENT REJECTION (2026-10-06): structural tells of sentence fragments
+  // Present participle starter: "Accompanying the criticism..." is a clause
+  if (/^[A-Za-z]+ing\b/.test(words[0]) && words.length > 1) return false;
+  // Extended preposition starters: "within more individualist..."
+  if (/^(within|between|among|through|during|without|under|over|against|across|along|toward|towards|despite|including)\b/i.test(term)) return false;
+  // -ly adverb starter (lowercase): "roughly comparable..." is a qualifier
+  if (/^[a-z]+ly\s/i.test(term)) return false;
+  // Descriptive "X of this/that/these/those": "leader of this new..." is a description
+  if (/\bof\s+(this|that|these|those)\b/i.test(term)) return false;
+  // Dangling lowercase single letter at end: "specialty area i" (truncated)
+  if (/\s[a-z]$/.test(term)) return false;
+  // Demonstratives mid-term: "leader of this new..." ("this/that/these/those" signal a clause)
+  // PRONOUNS already covers it/they/etc; STOP only checked first word to avoid killing "Table manners"
+  if (toks.some((w) => w === "this" || w === "that" || w === "these" || w === "those")) return false;
   return true;
 }
 
