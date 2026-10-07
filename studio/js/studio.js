@@ -758,12 +758,21 @@ function extractDrafts(pages) {
         const clean = ns.replace(/\*\*/g, "").trim();
         if (clean.length < 15 || clean.length > 300) continue;
         const lower = clean.toLowerCase();
-        // Elaboration: refers back to theory (It, This, The process) or mentions key words
-        const refersBack = /^(it|this|these|the process|the theory|this process)\b/i.test(clean);
-        const mentionsTerm = termWords.some(w => lower.includes(w));
-        // Avoid examples (those go in examples field, not definition)
-        const isExample = /\b(for example|for instance|consider|imagine)\b/i.test(clean);
-        if ((refersBack || mentionsTerm) && !isExample) {
+        // Elaboration: refers back (GPT Signal A - expanded from just It/This)
+        const refersBack = /^(it|this|these|those|such|such a|such an|this form|this type|this kind|this approach|this method|this phenomenon|this theory|this idea|this view|this process|the process|the theory|the phenomenon|the concept)\b/i.test(clean);
+        // GPT Signal B: keyword overlap scoring (not just exact term words)
+        // Build keyword set: term words + related concept words from definition
+        const defWords = simple.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+        const allKeywords = new Set([...termWords, ...defWords.slice(0, 10)]);
+        const nextWords = lower.split(/\s+/).filter(w => w.length > 3);
+        const overlap = nextWords.filter(w => allKeywords.has(w)).length;
+        const overlapRatio = nextWords.length > 0 ? overlap / nextWords.length : 0;
+        const mentionsTerm = termWords.some(w => lower.includes(w)) || (overlap >= 2 && overlapRatio > 0.08);
+        // GPT Signal C: definition continuation markers
+        const isContinuation = /\b(is characterized by|includes|involves|consists of|refers to|means|occurs when|happens when|is based on|is associated with|typically|usually|often|specifically|in other words)\b/i.test(clean);
+        // GPT Signal F: examples SHOULD be appended to definitions (were excluded before)
+        const isExample = /\b(for example|for instance|such as|including|one example|an example)\b/i.test(clean);
+        if (refersBack || mentionsTerm || isContinuation || isExample) {
           elaborations.push(clean);
           if (elaborations.length >= 2) break;
         } else if (!refersBack && !mentionsTerm) {
@@ -860,6 +869,29 @@ function extractDrafts(pages) {
     if ((m = /^(.{2,40}?)\s*,\s*also\s+known\s+as\s+(?:the|a|an\s+)?([A-Z][A-Za-z\s\-]{2,40}?)\s*,/.exec(r))) {
       const term = m[2].trim();
       const def = m[1].trim() + ", also known as " + term;
+      if (autodraftTermOk(term)) return push(term, def, p, nextSentences);
+    }
+    // GPT Pattern 2: "The concept of X" / "The idea of X" / "The theory of X"
+    if ((m = /\b(the concept of|the idea of|the theory of|the process of|the study of)\s+([A-Za-z][A-Za-z\s\-]{2,40}?)(?:\s+is|\s+was|\s+refers|\s+explains|\s+describes|[.,;])/i.exec(r))) {
+      const term = m[2].trim().replace(/\s+/g, " ");
+      // Capitalize first letter for term
+      const capTerm = term.charAt(0).toUpperCase() + term.slice(1);
+      if (autodraftTermOk(capTerm) && term.split(/\s+/).length <= 4) {
+        return push(capTerm, r.trim(), p, nextSentences);
+      }
+    }
+    // GPT Pattern 3: Parenthetical definitions "Term (definition)"
+    if ((m = /\b([A-Z][A-Za-z\s\-]{2,35}?)\s+\(([^)]{20,150})\)/.exec(r))) {
+      const term = m[1].trim();
+      const def = m[2].trim();
+      if (autodraftTermOk(term) && !/^(see|cf|e\.g|i\.e)/i.test(def)) {
+        return push(term, def, p, nextSentences);
+      }
+    }
+    // GPT Pattern 4: Appositives "Sigmund Freud, the founder of psychoanalysis,"
+    if ((m = /^([A-Z][a-z]+\s+[A-Z][a-z]+)\s*,\s*(a|an|the)\s+([^,.]{10,80}?)\s*,/.exec(r))) {
+      const term = m[1].trim();
+      const def = m[2] + " " + m[3].trim();
       if (autodraftTermOk(term)) return push(term, def, p, nextSentences);
     }
     return false;
