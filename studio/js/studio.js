@@ -1123,8 +1123,8 @@ function extractDrafts(pages) {
           // Must be near the start (key term position)
           const pos = clean.indexOf(term);
           if (pos > 50) continue;
-          // Basic validation
-          if (/^(The|A|An|This|That|These|Those|It|They|We|You|His|Her|Their)\b/.test(term)) continue;
+          // Full term validation (was basic check, let "Had Dave" and "Psychology Is" through)
+          if (!autodraftTermOk(term)) continue;
           // Must be 2+ words (single words are too generic for fallback)
           if (term.split(/\s+/).length < 2) continue;
           seenTerms.add(key);
@@ -1159,6 +1159,74 @@ function extractDrafts(pages) {
     // Drop unverified non-bold drafts (reject, don't repair)
   }
   
+  // PERSON PASS (2026-10-06): high-frequency capitalized pairs become cards.
+  // "Wilhelm Wundt" (9x) is clearly important even if no pattern matched.
+  // Simpler than person-context heuristics which kept missing real people.
+  const finalTerms2 = new Set(verified.map(d => d.term.toLowerCase()));
+  if (verified.length < AUTODRAFT_CAP) {
+    const fullText2 = pages.map(p => p.text).join("\n");
+    const normText = fullText2.toLowerCase().replace(/\s+/g, " ");
+    const pairFreq = {};
+    const pairSent = {};
+    const NON_PERSON2 = /^(African American|Wikimedia Commons|Divine Light|Light Mission|New Age|United States|American Psychological|Psychological Association|Most Psychologists|Many Psychologists|Harvard University|Psychoanalysis Examined|Unconscious Mind)\b/i;
+    // Common non-name second words (verbs, generic nouns)
+    const NON_NAME2 = /^(Examined|Mind|University|Study|Studies|Theory|Psychology|Association|Commons|States)\b/i;
+    const allSents = fullText2.match(/[^.!?]+[.!?]+/g) || [];
+    for (const sent of allSents) {
+      const clean = sent.trim();
+      if (clean.length < 30 || clean.length > 350) continue;
+      const pairs = clean.match(/\b([A-Z][a-z]{2,}\s+[A-Z][a-z]{2,})\b/g) || [];
+      for (const pr of pairs) {
+        const p = pr.trim();
+        if (NON_PERSON2.test(p)) continue;
+        const w2 = p.split(/\s+/)[1] || "";
+        if (NON_NAME2.test(w2)) continue;
+        if (!autodraftTermOk(p)) continue;
+        pairFreq[p] = (pairFreq[p] || 0) + 1;
+        // Store up to 5 candidate sentences, scored by descriptiveness
+        // (headings like "Early Pioneers" score low; "X, the founder of..." scores high)
+        if (!pairSent[p]) pairSent[p] = [];
+        if (pairSent[p].length < 10) {
+          let score = 0;
+          if (/\b(the|a|an)\s+\w+\s+of\b/i.test(clean)) score += 3; // "the founder of"
+          if (/\(.*\d{4}.*\)/.test(clean)) score += 2; // birth/death years
+          if (/\b(developed|proposed|founded|discovered|known for|called)\b/i.test(clean)) score += 2;
+          if (/^[0-9.\s]*[A-Z][a-z]+\s+[A-Z]/.test(clean) && clean.length < 80) score -= 3; // heading-like
+          pairSent[p].push({ text: clean, score });
+          pairSent[p].sort((a, b) => b.score - a.score);
+        }
+      }
+    }
+    const topPairs = Object.entries(pairFreq)
+      .filter(([p, c]) => c >= 4 && !finalTerms2.has(p.toLowerCase()))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15);
+    for (const [pr, freq] of topPairs) {
+      if (verified.length >= AUTODRAFT_CAP) break;
+      const cands = pairSent[pr] || [];
+      let goodSent = null;
+      for (const c of cands) {
+        const sent = c.text || c; // handle both formats
+        const nameIdx = sent.toLowerCase().indexOf(pr.toLowerCase());
+        const anchorSrc = nameIdx >= 0 ? sent.slice(nameIdx, nameIdx + 30) : sent.slice(0, 30);
+        const anchor = anchorSrc.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+        if (anchor.length >= 10 && normText.includes(anchor)) { goodSent = sent; break; }
+      }
+      if (!goodSent) continue;
+      finalTerms2.add(pr.toLowerCase());
+      // Strip leading debris: "2 Early Pioneers..." -> "Early Pioneers...", "r Wilhelm..." -> "Wilhelm..."
+      let cleanDef = goodSent.trim().replace(/\s+/g, " ").replace(/^[0-9.\s]+/, "").replace(/^[a-z]\s+(?=[A-Z])/, "");
+      verified.push({
+        term: pr,
+        simple: cleanDef,
+        src: pages[0] ? (pages[0].src || ("Page " + pages[0].n)) : "",
+        _verified: true,
+        _personFreq: freq,
+        srcSentence: goodSent.trim(),
+      });
+    }
+  }
+
   return verified.slice(0, AUTODRAFT_CAP);
 }
 
