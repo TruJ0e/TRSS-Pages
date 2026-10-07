@@ -582,6 +582,9 @@ function autodraftTermOk(term) {
   if (/\bof\s+(this|that|these|those)\b/i.test(term)) return false;
   // Dangling lowercase single letter at end: "specialty area i" (truncated)
   if (/\s[a-z]$/.test(term)) return false;
+  // Single letter debris at start: "g Psychology's..." (PDF artifact)
+  if (/^[a-z]\s+[A-Z]/.test(term)) return false;
+  if (/^[0-9]+\s+[a-z]\s+[A-Z]/.test(term)) return false; // "2 a Wilhelm..." 
   // Demonstratives mid-term: "leader of this new..." ("this/that/these/those" signal a clause)
   // PRONOUNS already covers it/they/etc; STOP only checked first word to avoid killing "Table manners"
   if (toks.some((w) => w === "this" || w === "that" || w === "these" || w === "those")) return false;
@@ -740,6 +743,8 @@ function extractDrafts(pages) {
   // Returns true when a card was kept, so a rejected match falls through to
   // the next pattern instead of silently dropping the sentence.
   const push = (term, def, p, nextSentences) => {
+    // Strip trailing verb phrases: "Psychology's Subfields Tend to" -> "Psychology's Subfields"
+    term = String(term || "").replace(/\s+(tend|tends|seem|seems|appear|appears|begin|begins|continue|continues|start|starts)\s+to$/i, "").trim();
     const attr = splitAttribution(autodraftBaseTerm(term));
     const t = attr.term;
     let simple = (String(def == null ? "" : def).replace(/\s+/g, " ").trim() + attr.note).trim();
@@ -839,6 +844,23 @@ function extractDrafts(pages) {
     if ((m = new RegExp("^(.{2,60}?)\\s+(" + FACT_VERBS + ")\\s+(.{15,})$", "i").exec(r))) {
       const lead = L.text.length >= 8 ? L.text + ", " : "";
       return push(m[1], lead + m[2].toLowerCase().replace(/\s+/g, " ") + " " + m[3], p, nextSentences);
+    }
+    // INVERTED: "This phenomenon is called X" / "X, known as Y" (term comes after)
+    if ((m = /^(.{10,80}?)\s+is\s+called\s+([A-Z][A-Za-z\s\-]{2,40}?)\s*[.,;]/.exec(r))) {
+      const term = m[2].trim();
+      const def = m[1].trim() + " is called " + term;
+      if (autodraftTermOk(term)) return push(term, def, p, nextSentences);
+    }
+    if ((m = /^(.{10,80}?)\s+are\s+called\s+([A-Z][A-Za-z\s\-]{2,40}?)\s*[.,;]/.exec(r))) {
+      const term = m[2].trim();
+      const def = m[1].trim() + " are called " + term;
+      if (autodraftTermOk(term)) return push(term, def, p, nextSentences);
+    }
+    // "X, also known as Y," -> term Y (allow "the/a/an" before Y)
+    if ((m = /^(.{2,40}?)\s*,\s*also\s+known\s+as\s+(?:the|a|an\s+)?([A-Z][A-Za-z\s\-]{2,40}?)\s*,/.exec(r))) {
+      const term = m[2].trim();
+      const def = m[1].trim() + ", also known as " + term;
+      if (autodraftTermOk(term)) return push(term, def, p, nextSentences);
     }
     return false;
   };
