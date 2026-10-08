@@ -854,9 +854,13 @@ function extractDrafts(pages) {
     if (nextSentences && nextSentences.length) {
       const termWords = t.toLowerCase().split(/\s+/).filter(w => w.length > 3);
       const elaborations = [];
+      const simpleNorm = simple.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
       for (const ns of nextSentences.slice(0, 3)) {
         const clean = ns.replace(/\*\*/g, "").trim();
         if (clean.length < 15 || clean.length > 300) continue;
+        // Skip if already in definition (PowerPoint repeats bullets across slides - Truman 2026-10-08)
+        const cleanNorm = clean.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+        if (simpleNorm.includes(cleanNorm.slice(0, 40)) || cleanNorm.length < 10) continue;
         const lower = clean.toLowerCase();
         // Elaboration: refers back (GPT Signal A - expanded from just It/This)
         const refersBack = /^(it|this|these|those|such|such a|such an|this form|this type|this kind|this approach|this method|this phenomenon|this theory|this idea|this view|this process|the process|the theory|the phenomenon|the concept)\b/i.test(clean);
@@ -1298,7 +1302,7 @@ function extractDrafts(pages) {
   
   // GEMINI VERIFICATION GATE: every draft's definition must exist verbatim
   // in the source text. This guarantees zero hallucination.
-  const allText = pages.map(p => p.text).join("\n").toLowerCase().replace(/\*\*/g, "");
+  const allText = pages.map(p => p.text).join("\n").toLowerCase().replace(/\*\*/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ");
   const verified = [];
   for (const d of drafts) {
     const defClean = (d.simple || "").toLowerCase().replace(/\*\*/g, "").trim();
