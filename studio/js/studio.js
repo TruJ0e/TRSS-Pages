@@ -452,9 +452,10 @@ $("paste-use").addEventListener("click", () => {
 // Capture the full explanation block for a term (2026-10-08).
 // Finds where the term is defined, captures following related sentences
 // up to page/heading break. Deduplicates against initialDef.
-function captureExplanationBlock(pageText, term, initialDef) {
+function captureExplanationBlock(pageText, term, initialDef, pageTextLower) {
   if (!pageText || !term || !initialDef) return null;
   const termLower = term.toLowerCase();
+  const searchText = pageTextLower || pageText.toLowerCase();
   const termWords = termLower.split(/\s+/).filter(w => w.length > 3);
   if (!termWords.length) return null;
 
@@ -465,7 +466,7 @@ function captureExplanationBlock(pageText, term, initialDef) {
   );
 
   // Find term occurrence
-  const termStart = pageText.toLowerCase().indexOf(termLower);
+  const termStart = searchText.indexOf(termLower);
   if (termStart < 0) return null;
 
   // Get following text (up to 2500 chars to allow cross-page scanning for PDF).
@@ -828,6 +829,9 @@ function extractDrafts(pages) {
     if (m) return { term: m[1].trim(), note: " (" + m[2].toLowerCase() + m[3].trim() + ")" };
     return { term, note: "" };
   };
+  // Cache joined page text for cross-page block capture (computed once, not per-card)
+  const allPageTextCache = (pages || []).map(pg => String((pg && pg.text) || "")).join("\n\n");
+  const allPageTextLowerCache = allPageTextCache.toLowerCase();
   // Returns true when a card was kept, so a rejected match falls through to
   // the next pattern instead of silently dropping the sentence.
   const push = (term, def, p, nextSentences) => {
@@ -839,8 +843,7 @@ function extractDrafts(pages) {
     // EXPLANATION-BLOCK (2026-10-08): try full block capture, fall back on error
     try {
       if (p && p.text && t && simple && simple.length > 20) {
-        const allPageText = (pages || []).map(pg => String((pg && pg.text) || "")).join("\n\n");
-        const blockDef = captureExplanationBlock(allPageText, t, simple);
+        const blockDef = captureExplanationBlock(allPageTextCache, t, simple, allPageTextLowerCache);
         if (blockDef && blockDef.length > simple.length && blockDef.length <= 1200) {
           simple = blockDef;
         }
