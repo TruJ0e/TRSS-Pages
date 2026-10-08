@@ -487,6 +487,18 @@ function captureExplanationBlock(pageText, term, initialDef) {
   for (const raw of rawSents.slice(0, 40)) {
     const clean = raw.trim().replace(/\s+/g, " ");
     if (clean.length < 20 || clean.length > 400) continue;
+    // HARD STOP on standalone header lines (Truman 2026-10-08):
+    // "bolder header (not bold words, a full header that's normally a fragmented
+    // sentence as it's a topic)" - this is where topic change occurs.
+    // Header signals: short, title case, no ending punctuation, fragment (no verb)
+    const wcount = clean.split(/\s+/).length;
+    const isTitleCase = /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$/.test(clean.replace(/[^A-Za-z\s]/g, "").trim());
+    const noEndPunct = !/[.!?]$/.test(clean.trim());
+    const hasVerb = /\b(is|are|was|were|has|have|had|will|would|can|could|should|may|might|must|do|does|did)\b/i.test(clean);
+    const mentionsTermHere = termWords.some(w => clean.toLowerCase().includes(w));
+    if (wcount >= 2 && wcount <= 8 && isTitleCase && noEndPunct && !hasVerb && !mentionsTermHere) {
+      break; // Standalone header = new topic, stop block capture
+    }
     const normSent = clean.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
     // Skip if already in initialDef (deduplication)
     let isDup = false;
