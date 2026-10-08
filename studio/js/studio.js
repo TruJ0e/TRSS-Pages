@@ -478,8 +478,13 @@ function captureExplanationBlock(pageText, term, initialDef) {
   const rawSents = textBlock.match(/[^.!?]+[.!?]+/g) || [];
   const related = [];
   const backrefRe = /^(it|this|these|those|such|this form|this type|this kind|the process|the theory|the phenomenon|the concept)\b/i;
+  const newRefRe = /^(this|that)\s+(new|other|another)\b/i; // "this new perspective" = different concept
 
-  for (const raw of rawSents.slice(0, 12)) {
+  // Scan up to 40 sentences ahead for tie-backs (Truman 2026-10-08:
+  // "it may be farther down that ties back to the topic")
+  // Don't stop at first unrelated; collect related ones in source order.
+  let unrelatedStreak = 0;
+  for (const raw of rawSents.slice(0, 40)) {
     const clean = raw.trim().replace(/\s+/g, " ");
     if (clean.length < 20 || clean.length > 400) continue;
     const normSent = clean.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
@@ -497,13 +502,20 @@ function captureExplanationBlock(pageText, term, initialDef) {
     // For multi-word terms, full phrase mention is strong
     const fullPhrase = termWords.length > 1 && lower.includes(termLower);
     const singleMention = termWords.length === 1 && termWords.some(w => lower.includes(w));
-    const isBackref = backrefRe.test(clean);
+    const isBackref = backrefRe.test(clean) && !newRefRe.test(clean);
+    // Comparative: "more X than [term]" / "better than the traditional X" = contrasting, not elaborating
+    const isComparative = /\bthan\s+(is\s+)?(the\s+)?(traditional\s+)?/i.test(clean) && termWords.some(w => clean.toLowerCase().includes(w));
     const isCont = /\b(is characterized by|includes|involves|consists of|typically|usually|often|for example|for instance)\b/i.test(clean);
     const mentions = fullPhrase || (isBackref && singleMention) || (isCont && singleMention);
+    if (isComparative) continue; // contrasting, not elaborating
     if (!mentions && !isBackref && !isCont) {
-      if (related.length >= 2) break; // stop after 2 related found
+      unrelatedStreak++;
+      // Stop only after 5 consecutive unrelated (likely moved on for good)
+      // Allows tie-backs farther down with unrelated content between
+      if (unrelatedStreak >= 5) break;
       continue;
     }
+    unrelatedStreak = 0; // reset on related sentence
     related.push(clean);
     const totalLen = initialDef.length + related.join(" ").length;
     if (totalLen > 1000) break;
