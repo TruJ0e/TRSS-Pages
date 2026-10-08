@@ -1385,6 +1385,80 @@ function extractDrafts(pages) {
     }
   }
 
+  // TERM-FREQUENCY PASS (2026-10-08, Truman: "52 is too few, 4 pages should give 100+ questions"):
+  // High-frequency important terms that weren't caught by definition patterns.
+  // If a term appears repeatedly, it's important - find its best explanatory sentence.
+  const finalTerms3 = new Set(verified.map(d => d.term.toLowerCase()));
+  if (verified.length < AUTODRAFT_CAP) {
+    const fullText3 = pages.map(p => p.text).join("\n");
+    const normText3 = fullText3.toLowerCase().replace(/\s+/g, " ");
+    const termFreq = {};
+    const termSent = {};
+    const allSents3 = fullText3.match(/[^.!?]+[.!?]+/g) || [];
+    // Extract candidate terms: bold terms, capitalized phrases, key noun phrases
+    for (const sent of allSents3) {
+      const clean = sent.trim();
+      if (clean.length < 30 || clean.length > 400) continue;
+      // Bold terms: **Term**
+      const bolds = clean.match(/\*\*([^*]{2,40}?)\*\*/g) || [];
+      // Capitalized 2-3 word phrases (concepts, theories, processes)
+      const caps = clean.match(/\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,}){1,2})\b/g) || [];
+      const candidates = [...bolds.map(b => b.replace(/\*\*/g, "").trim()), ...caps.map(c => c.trim())];
+      for (const term of candidates) {
+        const t = term.trim();
+        if (t.length < 4 || t.length > 50) continue;
+        if (!autodraftTermOk(t)) continue;
+        if (finalTerms3.has(t.toLowerCase())) continue;
+        // Skip if it's already a person (caught by person pass)
+        termFreq[t] = (termFreq[t] || 0) + 1;
+        if (!termSent[t]) termSent[t] = [];
+        if (termSent[t].length < 8) {
+          // Score by how definitional the sentence is
+          let score = 0;
+          const lower = clean.toLowerCase();
+          const tLower = t.toLowerCase();
+          // Sentence starts with or early-contains the term
+          const termPos = lower.indexOf(tLower);
+          if (termPos >= 0 && termPos < 30) score += 3;
+          // Has definition verbs
+          if (/\b(is|are|was|were|refers to|means|involves|includes|consists of)\b/i.test(clean)) score += 2;
+          // Has explanatory content (longer, substantive)
+          if (clean.length > 80) score += 1;
+          // Penalty for heading-like
+          if (/^[0-9.\s]*[A-Z][a-z]+\s+[A-Z]/.test(clean) && clean.length < 80) score -= 3;
+          termSent[t].push({ text: clean, score });
+          termSent[t].sort((a, b) => b.score - a.score);
+        }
+      }
+    }
+    const topTerms = Object.entries(termFreq)
+      .filter(([t, c]) => c >= 3 && !finalTerms3.has(t.toLowerCase()))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 30);
+    for (const [term, freq] of topTerms) {
+      if (verified.length >= AUTODRAFT_CAP) break;
+      const cands = termSent[term] || [];
+      let goodSent = null;
+      for (const c of cands) {
+        if (c.score < 2) continue; // Need at least some definitional signal
+        const sent = c.text;
+        const anchor = sent.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim().slice(0, 50);
+        if (anchor.length >= 20 && normText3.includes(anchor)) { goodSent = sent; break; }
+      }
+      if (!goodSent) continue;
+      finalTerms3.add(term.toLowerCase());
+      let cleanDef = goodSent.trim().replace(/\s+/g, " ").replace(/^[0-9.\s]+/, "");
+      verified.push({
+        term: term,
+        simple: cleanDef,
+        src: pages[0] ? (pages[0].src || ("Page " + pages[0].n)) : "",
+        _verified: true,
+        _termFreq: freq,
+        srcSentence: goodSent.trim(),
+      });
+    }
+  }
+
   return verified.slice(0, AUTODRAFT_CAP);
 }
 
