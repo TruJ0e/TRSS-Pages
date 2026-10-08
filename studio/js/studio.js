@@ -468,11 +468,11 @@ function captureExplanationBlock(pageText, term, initialDef) {
   const termStart = pageText.toLowerCase().indexOf(termLower);
   if (termStart < 0) return null;
 
-  // Get following text (up to 1500 chars to allow filtering)
-  const after = pageText.slice(termStart, termStart + 1500);
-  // Stop at page break
-  const pageBreakIdx = after.search(/\f/);
-  const textBlock = pageBreakIdx >= 0 ? after.slice(0, pageBreakIdx) : after;
+  // Get following text (up to 2500 chars to allow cross-page scanning for PDF).
+  // Page breaks (\f) do NOT stop the scan - Truman 2026-10-08: "sometimes pdf continue".
+  // Topic boundaries are headers and unrelated-streak, not physical pages.
+  const after = pageText.slice(termStart, termStart + 2500);
+  const textBlock = after;
 
   // Split into sentences
   const rawSents = textBlock.match(/[^.!?]+[.!?]+/g) || [];
@@ -839,7 +839,8 @@ function extractDrafts(pages) {
     // EXPLANATION-BLOCK (2026-10-08): try full block capture, fall back on error
     try {
       if (p && p.text && t && simple && simple.length > 20) {
-        const blockDef = captureExplanationBlock(p.text, t, simple);
+        const allPageText = (pages || []).map(pg => String((pg && pg.text) || "")).join("\n\n");
+        const blockDef = captureExplanationBlock(allPageText, t, simple);
         if (blockDef && blockDef.length > simple.length && blockDef.length <= 1200) {
           simple = blockDef;
         }
