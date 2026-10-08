@@ -449,6 +449,70 @@ $("paste-use").addEventListener("click", () => {
  * one in the review list. All client-side, zero network. */
 
 /* AUTO-DRAFT PURE BEGIN */
+// Capture the full explanation block for a term (2026-10-08).
+// Finds where the term is defined, captures following related sentences
+// up to page/heading break. Deduplicates against initialDef.
+function captureExplanationBlock(pageText, term, initialDef) {
+  if (!pageText || !term || !initialDef) return null;
+  const termLower = term.toLowerCase();
+  const termWords = termLower.split(/\s+/).filter(w => w.length > 3);
+  if (!termWords.length) return null;
+
+  // Normalize initialDef for dedup comparison
+  const normInit = initialDef.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+  const initSentences = new Set(
+    initialDef.split(/[.?!]+/).map(s => s.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim()).filter(s => s.length > 10)
+  );
+
+  // Find term occurrence
+  const termStart = pageText.toLowerCase().indexOf(termLower);
+  if (termStart < 0) return null;
+
+  // Get following text (up to 1500 chars to allow filtering)
+  const after = pageText.slice(termStart, termStart + 1500);
+  // Stop at page break
+  const pageBreakIdx = after.search(/\f/);
+  const textBlock = pageBreakIdx >= 0 ? after.slice(0, pageBreakIdx) : after;
+
+  // Split into sentences
+  const rawSents = textBlock.match(/[^.!?]+[.!?]+/g) || [];
+  const related = [];
+  const backrefRe = /^(it|this|these|those|such|this form|this type|this kind|the process|the theory|the phenomenon|the concept)\b/i;
+
+  for (const raw of rawSents.slice(0, 12)) {
+    const clean = raw.trim().replace(/\s+/g, " ");
+    if (clean.length < 20 || clean.length > 400) continue;
+    const normSent = clean.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+    // Skip if already in initialDef (deduplication)
+    let isDup = false;
+    for (const initSent of initSentences) {
+      if (normSent.length > 20 && (initSent.includes(normSent.slice(0, 30)) || normSent.includes(initSent.slice(0, 30)))) {
+        isDup = true; break;
+      }
+    }
+    if (isDup) continue;
+
+    const lower = clean.toLowerCase();
+    // For single-word terms, require backref or continuation (bare mention is too weak)
+    // For multi-word terms, full phrase mention is strong
+    const fullPhrase = termWords.length > 1 && lower.includes(termLower);
+    const singleMention = termWords.length === 1 && termWords.some(w => lower.includes(w));
+    const isBackref = backrefRe.test(clean);
+    const isCont = /\b(is characterized by|includes|involves|consists of|typically|usually|often|for example|for instance)\b/i.test(clean);
+    const mentions = fullPhrase || (isBackref && singleMention) || (isCont && singleMention);
+    if (!mentions && !isBackref && !isCont) {
+      if (related.length >= 2) break; // stop after 2 related found
+      continue;
+    }
+    related.push(clean);
+    const totalLen = initialDef.length + related.join(" ").length;
+    if (totalLen > 1000) break;
+  }
+
+  if (!related.length) return null;
+  return (initialDef.replace(/[.\s]+$/, "") + ". " + related.join(" ")).trim();
+}
+
 const AUTODRAFT_CAP = 500;
 // Single vague nouns that are never flashcard terms on their own
 // ("Efforts are being made…" is throat-clearing, not a concept).
@@ -593,7 +657,7 @@ function autodraftTermOk(term) {
 
 function autodraftDefOk(def) {
   const d = String(def == null ? "" : def).replace(/\s+/g, " ").trim();
-  if (d.length < 15 || d.length > 500) return false;
+  if (d.length < 15 || d.length > 1200) return false; // 1200 for explanation blocks (2026-10-08)
   if (/www\.|\.com\/|https?:/i.test(d)) return false; // publisher URL in definition
   // Quiz/answer-key debris, not study content.
   if (/^(feedback|correct answers?|incorrect|true|false)\b/i.test(d)) return false;
@@ -748,9 +812,17 @@ function extractDrafts(pages) {
     const attr = splitAttribution(autodraftBaseTerm(term));
     const t = attr.term;
     let simple = (String(def == null ? "" : def).replace(/\s+/g, " ").trim() + attr.note).trim();
+    // EXPLANATION-BLOCK (2026-10-08): try full block capture, fall back on error
+    try {
+      if (p && p.text && t && simple && simple.length > 20) {
+        const blockDef = captureExplanationBlock(p.text, t, simple);
+        if (blockDef && blockDef.length > simple.length && blockDef.length <= 1200) {
+          simple = blockDef;
+        }
+      }
+    } catch (e) { /* fall through to standard elaboration */ }
     // ELABORATION CAPTURE: for any card, capture following sentences that
     // clearly elaborate on the term (verbatim from source, not summarized).
-    // This handles theories, concepts, and processes that span multiple sentences.
     if (nextSentences && nextSentences.length) {
       const termWords = t.toLowerCase().split(/\s+/).filter(w => w.length > 3);
       const elaborations = [];
