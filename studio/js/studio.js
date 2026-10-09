@@ -1661,25 +1661,34 @@ function extractDrafts(pages) {
     }
     return false;
   });
-  // STAGE N POST-PASS (2026-10-09): Sweep for "Stage N2"/"Stage N3" missed in paragraph context
+  // ADAPTABLE POST-PASS (2026-10-09, Truman: "malleable and adaptable to any upload"):
+  // General sweep for missed definitional sentences. Not benchmark-specific.
+  // Finds ANY "[Term] [verb] [definition]" pattern where the term wasn't captured.
+  // Works for Stage N2, NREM sleep, Biopsychosocial Model, or any other term.
   try {
-    const stageSeen = new Set(finalFiltered.map(d => d.term.toLowerCase()));
+    const missedSeen = new Set(finalFiltered.map(d => d.term.toLowerCase()));
     const fullText = pages.map(p => String(p.text || "")).join("\n");
-    const stageRe = /\b(Stage\s+N\d+)\s+(is|involves|includes|consists of)\s+([^.!?]{8,200}[.!?])/gi;
-    let sm;
-    const stageCards = [];
-    while ((sm = stageRe.exec(fullText)) !== null) {
-      const st = sm[1].trim();
-      if (stageSeen.has(st.toLowerCase())) continue;
-      if (!autodraftTermOk(st)) continue;
-      const sdef = sm[0].trim();
-      if (!autodraftDefOk(sdef)) continue;
-      stageCards.push({ term: st, simple: sdef, src: "Page 1", srcSentence: sdef });
-      stageSeen.add(st.toLowerCase());
+    // General definitional verbs (same as FACT_VERBS, but as a sweep pattern)
+    const defVerbs = "is|are|was|were|involves?|includes?|consists of|refers to|means|contains|describes";
+    const genRe = new RegExp("\\b([A-Z][A-Za-z0-9\\s-]{2,50}?)\\s+(" + defVerbs + ")\\s+([^.!?]{10,200}[.!?])", "gi");
+    let gm;
+    const missedCards = [];
+    while ((gm = genRe.exec(fullText)) !== null) {
+      const gt = gm[1].trim().replace(/^(the|a|an)\s+/i, "");
+      if (gt.length < 3 || gt.length > 50) continue;
+      if (missedSeen.has(gt.toLowerCase())) continue;
+      if (!autodraftTermOk(gt)) continue;
+      const gdef = gm[0].trim();
+      if (!autodraftDefOk(gdef)) continue;
+      // Must look like a term (capitalized or multi-word, not a sentence fragment)
+      if (!/^[A-Z]/.test(gt)) continue;
+      if (gt.split(/\s+/).length > 5) continue;
+      missedCards.push({ term: gt, simple: gdef, src: "Page 1", srcSentence: gdef });
+      missedSeen.add(gt.toLowerCase());
+      if (missedCards.length >= 50) break; // safety cap for post-pass
     }
-    // Add stage cards to the results
-    for (const sc of stageCards) {
-      if (finalFiltered.length < AUTODRAFT_CAP) finalFiltered.push(sc);
+    for (const mc of missedCards) {
+      if (finalFiltered.length < AUTODRAFT_CAP) finalFiltered.push(mc);
     }
   } catch (e) { /* post-pass failed */ }
   return finalFiltered.slice(0, AUTODRAFT_CAP);
