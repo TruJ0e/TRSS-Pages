@@ -837,6 +837,31 @@ function extractDrafts(pages) {
   const push = (term, def, p, nextSentences) => {
     // Strip trailing verb phrases: "Psychology's Subfields Tend to" -> "Psychology's Subfields"
     term = String(term || "").replace(/\s+(tend|tends|seem|seems|appear|appears|begin|begins|continue|continues|start|starts)\s+to$/i, "").trim();
+    // Strip trailing modals: "Mirror neurons may" -> "Mirror neurons" (actionRe captures modal in term)
+    term = term.replace(/\s+(may|can|will|must|should)$/i, "").trim();
+    // Aggressive header-dedupe: if term contains a repeated word (case-insensitive),
+    // keep only up to the first occurrence. "Memory Systems Memory" -> "Memory Systems".
+    // "Operant Conditioning Operant" -> "Operant Conditioning".
+    const twords = term.split(/\s+/);
+    const seenWords = new Set();
+    let cutIdx = twords.length;
+    for (let wi = 0; wi < twords.length; wi++) {
+      const lw = twords[wi].toLowerCase().replace(/[^a-z]/g, "");
+      if (lw.length > 2 && seenWords.has(lw)) { cutIdx = wi; break; }
+      seenWords.add(lw);
+    }
+    if (cutIdx < twords.length && cutIdx >= 1) {
+      term = twords.slice(0, cutIdx).join(" ");
+    }
+    // Dedupe exact repeated term: "Classical Conditioning Classical conditioning" -> "Classical Conditioning"
+    // Only when the two halves are identical (case-insensitive)
+    const tw = term.split(/\s+/);
+    if (tw.length >= 2 && tw.length % 2 === 0) {
+      const h = tw.length / 2;
+      if (tw.slice(0, h).join(" ").toLowerCase() === tw.slice(h).join(" ").toLowerCase()) {
+        term = tw.slice(0, h).join(" ");
+      }
+    }
     const attr = splitAttribution(autodraftBaseTerm(term));
     const t = attr.term;
     let simple = (String(def == null ? "" : def).replace(/\s+/g, " ").trim() + attr.note).trim();
@@ -1060,6 +1085,8 @@ function extractDrafts(pages) {
     const isARe = /^(.{2,70}?)\s+(is|was)\s+(a|an)\s+(.{5,})$/i;
     const areRe = /^(.{2,70}?)\s+(are|were)\s+(.{5,})$/i;
     const isTheRe = /^(.{2,70}?)\s+(is|was)\s+(the|a|an|our|their|his|her|its)\s+(.{5,})$/i;
+    const isGenRe = /^(.{2,70}?)\s+(is|was)\s+(.{5,})$/i; // "X is Y" generic (no article required)
+    const actionRe = /^([A-Z][a-z-]+(?:\s+[a-z]+){0,2})\s+(?:may |can |will )?((adds|decreases|increases|involves|requires|produces|creates|triggers|activates|regulates|controls|mediates|facilitates|inhibits|enhances|reduces|eliminates|prevents|causes|leads to|results in|removes|plays?|allows?|enables?|rewards?|strengthens?|weakens?|holds?|contains?|lasts?|stores?|encodes?))\s+(.{10,})$/i; // "X verbs Y" definitional
     const knownAsRe = /^(.{2,60}?)\s+(is|was|are|were)\s+(known as|called)\s+(.{5,})$/i;
     const isOneRe = /^(.{2,70}?)\s+is\s+one\s+(that|who|which)\s+(.{5,})$/i;
     const knownForRe = /^(.{2,60}?)\s+(is|was|are|were)\s+((?:known|responsible)\s+for)\s+(.{5,})$/i;
@@ -1110,6 +1137,35 @@ function extractDrafts(pages) {
                 if (bm[2].trim().length < 15) added._stitched = true;
               }
             }
+          }
+        }
+      }
+      // PARENTHETICAL TERM: "food (unconditioned stimulus)" -> term "unconditioned stimulus"
+      // The parenthetical defines a key term
+      if (!done) {
+        const parenRe = /\(([^)]{3,40})\)/;
+        const pm = parenRe.exec(str);
+        if (pm) {
+          const pterm = pm[1].trim();
+          // Parenthetical is a term if it's 1-4 words, no verbs, and the sentence defines it
+          const pwords = pterm.split(/\s+/).length;
+          const isKeyTerm = (pwords >= 2 && pwords <= 4) || /^[A-Z]/.test(pterm);
+          if (isKeyTerm && /^[a-z\s-]+$/i.test(pterm) && !/\b(is|are|was|were)\b/i.test(pterm) && !/^\d/.test(pterm)) {
+            // Use the full sentence as definition, term is the parenthetical
+            if (autodraftTermOk(pterm)) {
+              done = push(pterm, str.trim(), p, nextSentences);
+            }
+          }
+        }
+      }
+      // QUOTED TERM: '"Skinner box"' -> term "Skinner box"
+      if (!done) {
+        const quoteRe = /"([^"]{3,40})"/;
+        const qm = quoteRe.exec(str);
+        if (qm) {
+          const qterm = qm[1].trim();
+          if (qterm.split(/\s+/).length <= 4 && autodraftTermOk(qterm)) {
+            done = push(qterm, str.trim(), p, nextSentences);
           }
         }
       }
@@ -1166,6 +1222,8 @@ function extractDrafts(pages) {
       // "X is the <anything>" — the noun is kept so the back stays grammatical
       // ("retrieval" / "is the process of getting information out of storage").
       if (!done && (m = isTheRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3] + " " + m[4], p, nextSentences);
+      if (!done && (m = isGenRe.exec(str))) done = push(m[1], m[1] + " " + m[2] + " " + m[3], p, nextSentences);
+      if (!done && (m = actionRe.exec(str))) done = push(m[1], m[1] + " " + m[2] + " " + m[4], p, nextSentences);
       if (!done && (m = isOneRe.exec(str))) done = push(m[1], m[1] + " is one " + m[2] + " " + m[3], p, nextSentences);
       if (!done && (m = knownForRe.exec(str))) done = push(m[1], m[1] + " " + m[2].toLowerCase() + " " + m[3].toLowerCase() + " " + m[4], p, nextSentences);
       if (!done && (m = personRe.exec(str))) {
@@ -1306,7 +1364,7 @@ function extractDrafts(pages) {
   const verified = [];
   for (const d of drafts) {
     const defClean = (d.simple || "").toLowerCase().replace(/\*\*/g, "").trim();
-    const anchor = defClean.slice(0, 50).replace(/[^a-z0-9\s]/g, "").trim();
+    const anchor = defClean.slice(0, 50).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
     if (anchor.length >= 20 && allText.includes(anchor)) {
       d._verified = true;
       verified.push(d);
