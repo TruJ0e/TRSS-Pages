@@ -803,6 +803,66 @@ function extractGlossaryDrafts(fullText, push, srcPage) {
 function extractDrafts(pages) {
   const drafts = [];
   const seen = new Set();
+
+  // ══════════════════════════════════════════════════════════════
+  // STAGE 1: NOUN-FIRST EXTRACTION (Truman 2026-10-09)
+  // "Noun then verb then compare for no duplicates"
+  // Find ALL noun phrases first, independent of verb patterns.
+  // ══════════════════════════════════════════════════════════════
+  // NOUN-FIRST POST-PASS (2026-10-09, Truman: "noun identification is key...
+  // if its not a verb, adverb, or something else then its a noun"):
+  // Find ALL capitalized noun phrases, not just those matching verb patterns.
+  // This is domain-agnostic: nouns are nouns in any field.
+  try {
+    // Stage 1 uses the shared 'seen' set for deduplication
+    const fullTextN = pages.map(p => String(p.text || "")).join("\n");
+    // Find capitalized 1-4 word phrases
+    const capRe = /\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,}){0,3})\b/g;
+    const capFreq = {};
+    let cm;
+    while ((cm = capRe.exec(fullTextN)) !== null) {
+      const phrase = cm[1].trim();
+      if (phrase.length < 4 || phrase.length > 50) continue;
+      if (seen.has(phrase.toLowerCase())) continue;
+      // Skip single-word adjectives (Prokaryotic, Eukaryotic) - they're fragments, not terms
+      // Truman: "if its not a verb, adverb, or something else then its a noun"
+      // Adjectives ending in -ic, -al, -ous are not standalone terms
+      if (!phrase.includes(" ") && /(ic|al|ous|ive|ary)$/i.test(phrase)) continue;
+      // Skip if it's a verb, adverb, or stopword (Truman's process of elimination)
+      if (!autodraftTermOk(phrase)) continue;
+      capFreq[phrase] = (capFreq[phrase] || 0) + 1;
+    }
+    // For phrases, find best definitional sentence (Truman: nouns are key, even if once)
+    for (const [phrase, freq] of Object.entries(capFreq)) {
+      // Single-occurrence terms allowed if they have a strong definitional sentence
+      if (freq < 1) continue;
+      if (seen.has(phrase.toLowerCase())) continue;
+      // Find sentence containing the phrase
+      const sents = fullTextN.match(/[^.!?]+[.!?]+/g) || [];
+      let bestSent = null;
+      let bestScore = 0;
+      for (const s of sents) {
+        if (!s.toLowerCase().includes(phrase.toLowerCase())) continue;
+        if (s.length < 20 || s.length > 300) continue;
+        let score = 0;
+        // Phrase at start = likely the term being defined
+        if (s.trim().toLowerCase().startsWith(phrase.toLowerCase().substring(0, 10))) score += 3;
+        // Has a verb (any verb, not just our list)
+        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?)\b/i.test(s)) score += 2;
+        if (score > bestScore) {
+          bestScore = score;
+          bestSent = s.trim();
+        }
+      }
+      if (bestSent && bestScore >= 3) {
+        if (drafts.length < AUTODRAFT_CAP) {
+          drafts.push({ term: phrase, simple: bestSent, src: "Page 1", srcSentence: bestSent });
+          seen.add(phrase.toLowerCase());
+        }
+      }
+      if (drafts.length >= AUTODRAFT_CAP) break;
+    }
+  } catch (e) { /* noun-first pass failed */ }
   const personCards = new Map(); // last-name key → { key, idx, term }
   // Person-like term → canonical last-name key, else null. Multi-word needs
   // every word capitalized ("Gestalt psychology" is not a person);
@@ -1145,6 +1205,11 @@ function extractDrafts(pages) {
     const personRe = new RegExp("^" + personSubj + "\\s+(rejected|proposed|pioneered|established|emphasized|believed|argued|introduced|developed|discovered|founded|identified)\\s+(.{15,})$");
     const madeRe = /^(.{2,60}?)\s+(developed|discovered|founded|introduced|created|published|conducted|demonstrated|argued|proposed)\s+(.{5,})$/i;
     const developedByRe = /^(.{2,70}?)\s+(?:was\s+)?(developed|founded|created|established|introduced|proposed|elucidated|described)\s+by\s+(.{5,})$/i;
+  // ══════════════════════════════════════════════════════════════
+  // STAGE 2: VERB-FIRST EXTRACTION (Truman 2026-10-09)
+  // Pattern-based: "X verb Y" -> X is the term.
+  // Skips terms already found in Stage 1 (via shared 'seen' set).
+  // ══════════════════════════════════════════════════════════════
     for (let ui = 0; ui < units.length; ui++) {
       const s = units[ui];
       // Next 2 sentences for cross-boundary stitching (slideshow/transcript fragments)
@@ -1661,60 +1726,8 @@ function extractDrafts(pages) {
     }
     return false;
   });
-  // NOUN-FIRST POST-PASS (2026-10-09, Truman: "noun identification is key...
-  // if its not a verb, adverb, or something else then its a noun"):
-  // Find ALL capitalized noun phrases, not just those matching verb patterns.
-  // This is domain-agnostic: nouns are nouns in any field.
-  try {
-    const nounSeen = new Set(finalFiltered.map(d => d.term.toLowerCase()));
-    const fullTextN = pages.map(p => String(p.text || "")).join("\n");
-    // Find capitalized 1-4 word phrases
-    const capRe = /\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,}){0,3})\b/g;
-    const capFreq = {};
-    let cm;
-    while ((cm = capRe.exec(fullTextN)) !== null) {
-      const phrase = cm[1].trim();
-      if (phrase.length < 4 || phrase.length > 50) continue;
-      if (nounSeen.has(phrase.toLowerCase())) continue;
-      // Skip single-word adjectives (Prokaryotic, Eukaryotic) - they're fragments, not terms
-      // Truman: "if its not a verb, adverb, or something else then its a noun"
-      // Adjectives ending in -ic, -al, -ous are not standalone terms
-      if (!phrase.includes(" ") && /(ic|al|ous|ive|ary)$/i.test(phrase)) continue;
-      // Skip if it's a verb, adverb, or stopword (Truman's process of elimination)
-      if (!autodraftTermOk(phrase)) continue;
-      capFreq[phrase] = (capFreq[phrase] || 0) + 1;
-    }
-    // For phrases, find best definitional sentence (Truman: nouns are key, even if once)
-    for (const [phrase, freq] of Object.entries(capFreq)) {
-      // Single-occurrence terms allowed if they have a strong definitional sentence
-      if (freq < 1) continue;
-      if (nounSeen.has(phrase.toLowerCase())) continue;
-      // Find sentence containing the phrase
-      const sents = fullTextN.match(/[^.!?]+[.!?]+/g) || [];
-      let bestSent = null;
-      let bestScore = 0;
-      for (const s of sents) {
-        if (!s.toLowerCase().includes(phrase.toLowerCase())) continue;
-        if (s.length < 20 || s.length > 300) continue;
-        let score = 0;
-        // Phrase at start = likely the term being defined
-        if (s.trim().toLowerCase().startsWith(phrase.toLowerCase().substring(0, 10))) score += 3;
-        // Has a verb (any verb, not just our list)
-        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?)\b/i.test(s)) score += 2;
-        if (score > bestScore) {
-          bestScore = score;
-          bestSent = s.trim();
-        }
-      }
-      if (bestSent && bestScore >= 3) {
-        if (finalFiltered.length < AUTODRAFT_CAP) {
-          finalFiltered.push({ term: phrase, simple: bestSent, src: "Page 1", srcSentence: bestSent });
-          nounSeen.add(phrase.toLowerCase());
-        }
-      }
-      if (finalFiltered.length >= AUTODRAFT_CAP) break;
-    }
-  } catch (e) { /* noun-first pass failed */ }
+  // (NOUN-FIRST moved to Stage 1 at function start)
+
   // ADAPTABLE POST-PASS (2026-10-09, Truman: "malleable and adaptable to any upload"):
   // General sweep for missed definitional sentences. Not benchmark-specific.
   // Finds ANY "[Term] [verb] [definition]" pattern where the term wasn't captured.
