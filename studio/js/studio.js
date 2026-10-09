@@ -839,6 +839,8 @@ function extractDrafts(pages) {
     term = String(term || "").replace(/\s+(tend|tends|seem|seems|appear|appears|begin|begins|continue|continues|start|starts)\s+to$/i, "").trim();
     // Strip trailing modals: "Mirror neurons may" -> "Mirror neurons" (actionRe captures modal in term)
     term = term.replace(/\s+(may|can|will|must|should)$/i, "").trim();
+    // Strip trailing adverbs: "Sensory memory briefly" -> "Sensory memory"
+    term = term.replace(/\s+(briefly|quickly|slowly|carefully|easily|often|usually|typically|generally|specifically)$/i, "").trim();
     // Aggressive header-dedupe: if term contains a repeated word (case-insensitive),
     // keep only up to the first occurrence. "Memory Systems Memory" -> "Memory Systems".
     // "Operant Conditioning Operant" -> "Operant Conditioning".
@@ -1504,10 +1506,23 @@ function extractDrafts(pages) {
         if (anchor.length >= 20 && normText3.includes(anchor)) { goodSent = sent; break; }
       }
       if (!goodSent) continue;
-      finalTerms3.add(term.toLowerCase());
+      // Clean term: strip modals, adverbs, and dedupe repeated words (same as push())
+      let cleanTerm = term.replace(/\s+(may|can|will|must|should)$/i, "").trim();
+      cleanTerm = cleanTerm.replace(/\s+(briefly|quickly|slowly|carefully|easily|often|usually|typically|generally|specifically)$/i, "").trim();
+      const ctwords = cleanTerm.split(/\s+/);
+      const cseen = new Set();
+      let ccut = ctwords.length;
+      for (let cwi = 0; cwi < ctwords.length; cwi++) {
+        const clw = ctwords[cwi].toLowerCase().replace(/[^a-z]/g, "");
+        if (clw.length > 2 && cseen.has(clw)) { ccut = cwi; break; }
+        cseen.add(clw);
+      }
+      if (ccut < ctwords.length && ccut >= 1) cleanTerm = ctwords.slice(0, ccut).join(" ");
+      if (!autodraftTermOk(cleanTerm)) continue;
+      finalTerms3.add(cleanTerm.toLowerCase());
       let cleanDef = goodSent.trim().replace(/\s+/g, " ").replace(/^[0-9.\s]+/, "");
       verified.push({
-        term: term,
+        term: cleanTerm,
         simple: cleanDef,
         src: pages[0] ? (pages[0].src || ("Page " + pages[0].n)) : "",
         _verified: true,
