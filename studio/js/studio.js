@@ -1669,13 +1669,31 @@ function extractDrafts(pages) {
     const missedSeen = new Set(finalFiltered.map(d => d.term.toLowerCase()));
     const fullText = pages.map(p => String(p.text || "")).join("\n");
     // General definitional verbs (same as FACT_VERBS, but as a sweep pattern)
-    const defVerbs = "is|are|was|were|involves?|includes?|consists of|refers to|means|contains|describes";
+    // EXPANDED VERB LIBRARY (2026-10-09, Truman: "how big of a noun and verb library can we download"):
+    // ~100 definitional verbs across domains. Not benchmark-specific.
+    // Covers: identity (is/are), composition (includes/contains), production
+    // (produces/synthesizes), action (conducts/facilitates), change (alters/impairs).
+    const defVerbs = "is|are|was|were|be|been|being|" +
+      "involves?|includes?|contains?|consists of|comprises?|encompasses?|" +
+      "refers to|means?|denotes?|signifies|represents?|defines?|" +
+      "produces?|generates?|creates?|forms?|makes?|builds?|synthesizes?|manufactures?|" +
+      "conducts?|performs?|carries out|executes?|facilitates?|enables?|allows?|" +
+      "digests?|breaks down|stores?|keeps?|holds?|lacks?|misses?|" +
+      "regulates?|controls?|manages?|governs?|modifies?|changes?|alters?|transforms?|" +
+      "packages?|bundles?|provides?|supplies|gives?|offers?|" +
+      "describes?|explains?|calls?|names?|terms?|labels?|coins?|" +
+      "results? from|stems? from|arises? from|derives? from|" +
+      "leads? to|causes?|triggers?|produces?|increases?|decreases?|raises?|lowers?|boosts?|reduces?|" +
+      "impairs?|damages?|harms?|distorts?|affects?|influences?|mediates?";
     const genRe = new RegExp("\\b([A-Z][A-Za-z0-9\\s-]{2,50}?)\\s+(" + defVerbs + ")\\s+([^.!?]{10,200}[.!?])", "gi");
     let gm;
     const missedCards = [];
     while ((gm = genRe.exec(fullText)) !== null) {
       const gt = gm[1].trim().replace(/^(the|a|an)\s+/i, "");
       if (gt.length < 3 || gt.length > 50) continue;
+      // Term should not end with a verb or article ("Robert Hooke coined the" -> reject)
+      if (/\b(coined|termed|labeled|called|named)\s+(the|a|an)$/i.test(gt)) continue;
+      if (/\s+(the|a|an)$/i.test(gt)) gt = gt.replace(/\s+(the|a|an)$/i, "");
       if (missedSeen.has(gt.toLowerCase())) continue;
       if (!autodraftTermOk(gt)) continue;
       const gdef = gm[0].trim();
