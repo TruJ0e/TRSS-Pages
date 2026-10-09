@@ -963,6 +963,35 @@ function extractDrafts(pages) {
     }
     seen.add(key);
     drafts.push({ term: t, simple: simple, src: srcOf(p), srcSentence: String(def == null ? "" : def).replace(/\s+/g, " ").trim() });
+    // CO-TERM EXTRACTION (2026-10-08, Truman: "find a way" to close the 20% gap):
+    // Use compromise (if loaded) to find other noun phrases in the same definitional
+    // sentence. E.g., from "Stage N2 involves sleep spindles", also extract "sleep spindles".
+    // This is local NLP, zero API, and how we match GPT's semantic understanding.
+    try {
+      if (typeof window !== 'undefined' && window.nlp && def) {
+        const defStr = String(def).replace(/\s+/g, " ").trim();
+        if (defStr.length > 20 && defStr.length < 500) {
+          const coTerms = window.nlp(defStr).nouns().out('array')
+            .map(n => n.replace(/[.,;:!?]+$/, '').trim())
+            .filter(n => {
+              const nl = n.toLowerCase();
+              const wc = nl.split(/\s+/).length;
+              const ck = nl.replace(/[^a-z0-9]/g, "");
+              return wc >= 2 && wc <= 4 && nl.length >= 5 && nl.length <= 50 &&
+                     ck !== key && !seen.has(ck) &&
+                     !/\b(our|your|his|her|their|its|the|a|an|this|that)\b/i.test(nl);
+            });
+          for (const ct of coTerms.slice(0, 2)) {
+            if (drafts.length >= AUTODRAFT_CAP) break;
+            const ctKey = ct.toLowerCase().replace(/[^a-z0-9]/g, "");
+            if (!seen.has(ctKey) && autodraftTermOk(ct)) {
+              seen.add(ctKey);
+              drafts.push({ term: ct, simple: simple, src: srcOf(p), srcSentence: defStr, _coterm: true });
+            }
+          }
+        }
+      }
+    } catch (e) { /* compromise unavailable, skip co-terms */ }
     if (pl) personCards.set(pl, { key: key, idx: drafts.length - 1, term: t });
     return true;
   };
