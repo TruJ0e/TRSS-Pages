@@ -1206,14 +1206,22 @@ function extractDrafts(pages) {
               // Item term should be 1-4 words, no verbs
               if (/^[A-Za-z\s-]+$/.test(item) && item.split(/\s+/).length <= 4 && !/\b(is|are|was|were|has|have)\b/i.test(item)) {
                 if (autodraftTermOk(item)) {
-                  // Definition: item is a type of the parent category
-                  const def = item + " is a type of " + lm[1].trim().toLowerCase() + ". " + str.trim();
+                  // Definition: use the source sentence (verbatim, not authored)
+                  // "Sleep disorders include insomnia..." defines insomnia by context
+                  const def = str.trim();
                   if (push(item, def, p, null)) pushed++;
                   if (pushed >= 5) break; // limit per list
                 }
               }
             }
-            if (pushed > 0) done = true;
+            // Also create a card for the parent category itself
+            if (pushed > 0) {
+              const parentTerm = lm[1].trim();
+              if (autodraftTermOk(parentTerm)) {
+                push(parentTerm, str.trim(), p, null);
+              }
+              done = true;
+            }
           }
         }
       }
