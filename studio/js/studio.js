@@ -920,6 +920,21 @@ function extractDrafts(pages) {
     }
     if (!/[.!?]$/.test(simple)) simple += ".";
     if (!autodraftTermOk(t) || !autodraftDefOk(simple)) return false;
+    // ZERO-JUNK (Truman 2026-10-08): term must appear as a phrase in source text
+    // "Dreams Sleep" and "Meditation Hypnosis" are mashes that don't exist in source.
+    // Check each line separately to avoid false matches across newlines.
+    if (p && p.text) {
+      const termPhrase = t.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+      if (termPhrase.length > 5) {
+        const lines = p.text.toLowerCase().split(/\n/);
+        let found = false;
+        for (const line of lines) {
+          const lineNorm = line.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ");
+          if (lineNorm.includes(termPhrase)) { found = true; break; }
+        }
+        if (!found) return false;
+      }
+    }
     const key = t.toLowerCase();
     if (seen.has(key)) return false;
     // Single-word fragment of an already-claimed compound ("Gestalt" when
@@ -1563,7 +1578,23 @@ function extractDrafts(pages) {
     }
   }
 
-  return verified.slice(0, AUTODRAFT_CAP);
+  // ZERO-JUNK POST-FILTER (Truman 2026-10-08): remove any term that doesn't appear
+  // as a phrase in source. Catches junk from all extraction paths.
+  const finalFiltered = verified.filter(d => {
+    const t = (d.term || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    if (t.length <= 5) return true; // short terms ok
+    // Check each page separately to avoid cross-line false matches
+    for (const pg of (pages || [])) {
+      const txt = String((pg && pg.text) || "").toLowerCase();
+      const lines = txt.split(/\n/);
+      for (const line of lines) {
+        const ln = line.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ");
+        if (ln.includes(t)) return true;
+      }
+    }
+    return false;
+  });
+  return finalFiltered.slice(0, AUTODRAFT_CAP);
 }
 
 /* RANKING: Score drafts by importance for chapter-scale filtering */
