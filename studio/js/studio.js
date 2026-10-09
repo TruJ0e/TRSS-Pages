@@ -1661,6 +1661,60 @@ function extractDrafts(pages) {
     }
     return false;
   });
+  // NOUN-FIRST POST-PASS (2026-10-09, Truman: "noun identification is key...
+  // if its not a verb, adverb, or something else then its a noun"):
+  // Find ALL capitalized noun phrases, not just those matching verb patterns.
+  // This is domain-agnostic: nouns are nouns in any field.
+  try {
+    const nounSeen = new Set(finalFiltered.map(d => d.term.toLowerCase()));
+    const fullTextN = pages.map(p => String(p.text || "")).join("\n");
+    // Find capitalized 1-4 word phrases
+    const capRe = /\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,}){0,3})\b/g;
+    const capFreq = {};
+    let cm;
+    while ((cm = capRe.exec(fullTextN)) !== null) {
+      const phrase = cm[1].trim();
+      if (phrase.length < 4 || phrase.length > 50) continue;
+      if (nounSeen.has(phrase.toLowerCase())) continue;
+      // Skip single-word adjectives (Prokaryotic, Eukaryotic) - they're fragments, not terms
+      // Truman: "if its not a verb, adverb, or something else then its a noun"
+      // Adjectives ending in -ic, -al, -ous are not standalone terms
+      if (!phrase.includes(" ") && /(ic|al|ous|ive|ary)$/i.test(phrase)) continue;
+      // Skip if it's a verb, adverb, or stopword (Truman's process of elimination)
+      if (!autodraftTermOk(phrase)) continue;
+      capFreq[phrase] = (capFreq[phrase] || 0) + 1;
+    }
+    // For phrases, find best definitional sentence (Truman: nouns are key, even if once)
+    for (const [phrase, freq] of Object.entries(capFreq)) {
+      // Single-occurrence terms allowed if they have a strong definitional sentence
+      if (freq < 1) continue;
+      if (nounSeen.has(phrase.toLowerCase())) continue;
+      // Find sentence containing the phrase
+      const sents = fullTextN.match(/[^.!?]+[.!?]+/g) || [];
+      let bestSent = null;
+      let bestScore = 0;
+      for (const s of sents) {
+        if (!s.toLowerCase().includes(phrase.toLowerCase())) continue;
+        if (s.length < 20 || s.length > 300) continue;
+        let score = 0;
+        // Phrase at start = likely the term being defined
+        if (s.trim().toLowerCase().startsWith(phrase.toLowerCase().substring(0, 10))) score += 3;
+        // Has a verb (any verb, not just our list)
+        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?)\b/i.test(s)) score += 2;
+        if (score > bestScore) {
+          bestScore = score;
+          bestSent = s.trim();
+        }
+      }
+      if (bestSent && bestScore >= 3) {
+        if (finalFiltered.length < AUTODRAFT_CAP) {
+          finalFiltered.push({ term: phrase, simple: bestSent, src: "Page 1", srcSentence: bestSent });
+          nounSeen.add(phrase.toLowerCase());
+        }
+      }
+      if (finalFiltered.length >= AUTODRAFT_CAP) break;
+    }
+  } catch (e) { /* noun-first pass failed */ }
   // ADAPTABLE POST-PASS (2026-10-09, Truman: "malleable and adaptable to any upload"):
   // General sweep for missed definitional sentences. Not benchmark-specific.
   // Finds ANY "[Term] [verb] [definition]" pattern where the term wasn't captured.
