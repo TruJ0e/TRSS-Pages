@@ -518,7 +518,7 @@ function captureExplanationBlock(pageText, term, initialDef, pageTextLower) {
     const isBackref = backrefRe.test(clean) && !newRefRe.test(clean);
     // Comparative: "more X than [term]" / "better than the traditional X" = contrasting, not elaborating
     const isComparative = /\bthan\s+(is\s+)?(the\s+)?(traditional\s+)?/i.test(clean) && termWords.some(w => clean.toLowerCase().includes(w));
-    const isCont = /\b(is characterized by|includes|involves|consists of|typically|usually|often|for example|for instance)\b/i.test(clean);
+    const isCont = /\b(is characterized by|includes|involves?|consists of|typically|usually|often|for example|for instance)\b/i.test(clean);
     const mentions = fullPhrase || (isBackref && singleMention) || (isCont && singleMention);
     if (isComparative) continue; // contrasting, not elaborating
     if (!mentions && !isBackref && !isCont) {
@@ -643,7 +643,11 @@ function autodraftTermOk(term) {
   // Single-word terms allowed (Melatonin, Gestalt, etc.) - ranking will sort by quality
   if (/\u0099|\u2019What/i.test(term)) return false; // encoding artifact + "What"
   if (/\bvarious\b/i.test(term)) return false;                      // "Scientists from various fields"
-  if (/^[A-Z][a-z]+\s+and\s+[a-z]+$/.test(term)) return false;      // "Geology and psychology": two nouns, no head
+  if (/^[A-Z][a-z]+\s+and\s+[A-Za-z]+$/.test(term)) return false;      // "Geology and psychology" / "Sleep and Dreams": two nouns, no head
+  // Reject terms with repeated words: "Consciousness Consciousness", "Dreams Sleep" (mash)
+  const termWordsLower = term.toLowerCase().split(/\s+/).map(w => w.replace(/[^a-z]/g, ""));
+  const uniqueWords = new Set(termWordsLower.filter(w => w.length > 2));
+  if (uniqueWords.size < termWordsLower.filter(w => w.length > 2).length) return false;
   if (/^\d+$/.test(term.replace(/\s/g, ""))) return false; // bare number
   const toks = words.map((w) => w.toLowerCase().replace(/[^a-z]/g, ""));
   if (words.length === 1 && AUTODRAFT_VAGUE.has(toks[0])) return false; // "Efforts", "fact" …
@@ -900,7 +904,7 @@ function extractDrafts(pages) {
         const overlapRatio = nextWords.length > 0 ? overlap / nextWords.length : 0;
         const mentionsTerm = termWords.some(w => lower.includes(w)) || (overlap >= 2 && overlapRatio > 0.08);
         // GPT Signal C: definition continuation markers
-        const isContinuation = /\b(is characterized by|includes|involves|consists of|refers to|means|occurs when|happens when|is based on|is associated with|typically|usually|often|specifically|in other words)\b/i.test(clean);
+        const isContinuation = /\b(is characterized by|includes|involves?|consists of|refers to|means|occurs when|happens when|is based on|is associated with|typically|usually|often|specifically|in other words)\b/i.test(clean);
         // GPT Signal F: examples SHOULD be appended to definitions (were excluded before)
         const isExample = /\b(for example|for instance|such as|including|one example|an example)\b/i.test(clean);
         if (refersBack || mentionsTerm || isContinuation || isExample) {
@@ -948,7 +952,7 @@ function extractDrafts(pages) {
     return true;
   };
   // Factual linking verbs for the generic branch (multi-word verbs included).
-  const FACT_VERBS = "holds|contains|controls?|regulates?|lasts|involves|encodes|stores|transfers|replays|blocks|impairs|improves|" +
+  const FACT_VERBS = "holds|contains|controls?|regulates?|lasts|involves?|encodes|stores|transfers|replays|blocks|impairs|improves|" +
     "means|shows|demonstrates|describes|plays|survives|persists|remains|outperforms?|has|have|" +
     "depends\\s+on|relies\\s+on|results\\s+in|leads\\s+to|consists\\s+of|is\\s+caused\\s+by|results\\s+from";
   const STUDY_VERBS = "found|reported|showed|demonstrated|discovered|observed|concluded";
@@ -1088,7 +1092,7 @@ function extractDrafts(pages) {
     const areRe = /^(.{2,70}?)\s+(are|were)\s+(.{5,})$/i;
     const isTheRe = /^(.{2,70}?)\s+(is|was)\s+(the|a|an|our|their|his|her|its)\s+(.{5,})$/i;
     const isGenRe = /^(.{2,70}?)\s+(is|was)\s+(.{5,})$/i; // "X is Y" generic (no article required)
-    const actionRe = /^([A-Z][a-z-]+(?:\s+[a-z]+){0,2})\s+(?:may |can |will )?((adds|decreases|increases|involves|requires|produces|creates|triggers|activates|regulates|controls|mediates|facilitates|inhibits|enhances|reduces|eliminates|prevents|causes|leads to|results in|removes|plays?|allows?|enables?|rewards?|strengthens?|weakens?|holds?|contains?|lasts?|stores?|encodes?))\s+(.{10,})$/i; // "X verbs Y" definitional
+    const actionRe = /^([A-Z][a-z-]+(?:\s+[a-z]+){0,2})\s+(?:may |can |will )?((adds|decreases?|increases?|involves?|requires?|produces?|creates?|triggers?|activates?|regulates?|controls?|mediates?|facilitates?|inhibits?|enhances?|reduces?|eliminates?|prevents?|causes?|distorts?|leads to|results in|removes|plays?|allows?|enables?|rewards?|strengthens?|weakens?|holds?|contains?|lasts?|stores?|encodes?))\s+(.{10,})$/i; // "X verbs Y" definitional
     const knownAsRe = /^(.{2,60}?)\s+(is|was|are|were)\s+(known as|called)\s+(.{5,})$/i;
     const isOneRe = /^(.{2,70}?)\s+is\s+one\s+(that|who|which)\s+(.{5,})$/i;
     const knownForRe = /^(.{2,60}?)\s+(is|was|are|were)\s+((?:known|responsible)\s+for)\s+(.{5,})$/i;
@@ -1161,13 +1165,40 @@ function extractDrafts(pages) {
         }
       }
       // QUOTED TERM: '"Skinner box"' -> term "Skinner box"
+      // Require 2+ words to avoid single-word quotes like "stream"
       if (!done) {
         const quoteRe = /"([^"]{3,40})"/;
         const qm = quoteRe.exec(str);
         if (qm) {
           const qterm = qm[1].trim();
-          if (qterm.split(/\s+/).length <= 4 && autodraftTermOk(qterm)) {
+          const qw = qterm.split(/\s+/).length;
+          if (qw >= 2 && qw <= 4 && autodraftTermOk(qterm)) {
             done = push(qterm, str.trim(), p, nextSentences);
+          }
+        }
+      }
+      // LIST ITEMS: "Sleep disorders include insomnia, sleep apnea, and narcolepsy"
+      // Extract each item as a separate term (GPT does this, we should too)
+      if (!done) {
+        const listRe = /^(.{2,50}?)\s+(include|includes|are|were)\s+(.{10,200})$/i;
+        const lm = listRe.exec(str);
+        if (lm) {
+          const items = lm[3].split(/,\s*/).map(s => s.trim().replace(/^and\s+/i, "").replace(/\(.*\)/, "").replace(/[.]+$/, "").trim()).filter(s => s.length >= 3 && s.length <= 40);
+          // Only if we get 2+ clean items
+          if (items.length >= 2 && items.length <= 8) {
+            let pushed = 0;
+            for (const item of items) {
+              // Item term should be 1-4 words, no verbs
+              if (/^[A-Za-z\s-]+$/.test(item) && item.split(/\s+/).length <= 4 && !/\b(is|are|was|were|has|have)\b/i.test(item)) {
+                if (autodraftTermOk(item)) {
+                  // Definition: item is a type of the parent category
+                  const def = item + " is a type of " + lm[1].trim().toLowerCase() + ". " + str.trim();
+                  if (push(item, def, p, null)) pushed++;
+                  if (pushed >= 5) break; // limit per list
+                }
+              }
+            }
+            if (pushed > 0) done = true;
           }
         }
       }
@@ -1481,7 +1512,7 @@ function extractDrafts(pages) {
           const termPos = lower.indexOf(tLower);
           if (termPos >= 0 && termPos < 30) score += 3;
           // Has definition verbs
-          if (/\b(is|are|was|were|refers to|means|involves|includes|consists of)\b/i.test(clean)) score += 2;
+          if (/\b(is|are|was|were|refers to|means|involves?|includes|consists of)\b/i.test(clean)) score += 2;
           // Has explanatory content (longer, substantive)
           if (clean.length > 80) score += 1;
           // Penalty for heading-like
