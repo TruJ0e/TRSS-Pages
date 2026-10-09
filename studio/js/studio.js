@@ -1509,7 +1509,26 @@ function extractDrafts(pages) {
       const bolds = clean.match(/\*\*([^*]{2,40}?)\*\*/g) || [];
       // Capitalized 2-3 word phrases (concepts, theories, processes)
       const caps = clean.match(/\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,}){1,2})\b/g) || [];
-      const candidates = [...bolds.map(b => b.replace(/\*\*/g, "").trim()), ...caps.map(c => c.trim())];
+      // Lowercase noun phrases: "sleep spindles", "sleep cycle" (2 words, second is noun-like)
+      // Noun indicators: ends with noun suffix or is known noun
+      const lowers = [];
+      const words = clean.split(/\s+/);
+      for (let wi = 0; wi < words.length - 1; wi++) {
+        const w1 = words[wi].replace(/[^A-Za-z]/g, "").toLowerCase();
+        const w2 = words[wi+1].replace(/[^A-Za-z]/g, "").toLowerCase();
+        if (w1.length >= 3 && w2.length >= 3 && /^[a-z]+$/.test(w1) && /^[a-z]+$/.test(w2)) {
+          // Second word is noun-like: noun suffix or in noun list
+          const isNoun = /(tion|sion|ness|ity|ment|ence|ance|ing|ism|er|or|le|el)$/.test(w2) ||
+            ["sleep", "cycle", "model", "theory", "stage", "disorder", "drug", "meditation"].includes(w2);
+          if (isNoun) {
+            // First word not a verb/article/preposition
+            if (!/^(the|a|an|is|are|was|were|has|have|and|or|of|in|on|to|for)$/.test(w1)) {
+              lowers.push(w1 + " " + w2);
+            }
+          }
+        }
+      }
+      const candidates = [...bolds.map(b => b.replace(/\*\*/g, "").trim()), ...caps.map(c => c.trim()), ...lowers];
       for (const term of candidates) {
         const t = term.trim();
         if (t.length < 4 || t.length > 50) continue;
@@ -1523,9 +1542,11 @@ function extractDrafts(pages) {
           let score = 0;
           const lower = clean.toLowerCase();
           const tLower = t.toLowerCase();
-          // Sentence starts with or early-contains the term
+          // Sentence starts with or early-contains the term (subject position)
+          // If term appears after a verb, it's likely the object, not the term being defined
           const termPos = lower.indexOf(tLower);
-          if (termPos >= 0 && termPos < 30) score += 3;
+          if (termPos >= 0 && termPos < 20) score += 3;
+          else if (termPos >= 20) score -= 2; // penalty for object position
           // Has definition verbs
           if (/\b(is|are|was|were|refers to|means|involves?|includes|consists of)\b/i.test(clean)) score += 2;
           // Has explanatory content (longer, substantive)
@@ -1538,7 +1559,7 @@ function extractDrafts(pages) {
       }
     }
     const topTerms = Object.entries(termFreq)
-      .filter(([t, c]) => c >= 3 && !finalTerms3.has(t.toLowerCase()))
+      .filter(([t, c]) => c >= 2 && !finalTerms3.has(t.toLowerCase()))
       .sort((a, b) => b[1] - a[1])
       .slice(0, 30);
     for (const [term, freq] of topTerms) {
