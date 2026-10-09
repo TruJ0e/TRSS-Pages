@@ -538,7 +538,7 @@ function captureExplanationBlock(pageText, term, initialDef, pageTextLower) {
   return (initialDef.replace(/[.\s]+$/, "") + ". " + related.join(" ")).trim();
 }
 
-const AUTODRAFT_CAP = 500;
+const AUTODRAFT_CAP = 1500; // Truman 2026-10-08: goal is 1500 cards from multiple sources
 // Single vague nouns that are never flashcard terms on their own
 // ("Efforts are being made…" is throat-clearing, not a concept).
 const AUTODRAFT_VAGUE = new Set(
