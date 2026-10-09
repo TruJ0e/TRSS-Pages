@@ -1029,7 +1029,7 @@ function extractDrafts(pages) {
     if ((m = /^(.{2,60}?)\s+(occurs|takes place)\s+during\s+(.{15,})$/i.exec(r))) {
       return push(m[1], m[2].toLowerCase() + " during " + m[3], p, nextSentences);
     }
-    if ((m = new RegExp("^(.{2,60}?)\\s+(" + FACT_VERBS + ")\\s+(.{15,})$", "i").exec(r))) {
+    if ((m = new RegExp("^(.{2,60}?)\\s+(" + FACT_VERBS + ")\\s+(.{8,})$", "i").exec(r))) {
       const lead = L.text.length >= 8 ? L.text + ", " : "";
       return push(m[1], lead + m[2].toLowerCase().replace(/\s+/g, " ") + " " + m[3], p, nextSentences);
     }
