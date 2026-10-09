@@ -833,7 +833,9 @@ function extractDrafts(pages) {
       capFreq[phrase] = (capFreq[phrase] || 0) + 1;
     }
     // For phrases, find best definitional sentence (Truman: nouns are key, even if once)
-    for (const [phrase, freq] of Object.entries(capFreq)) {
+    // Sort longest-first so "Covalent bonds" claims before "Covalent" fragment
+    const sortedPhrases = Object.entries(capFreq).sort((a, b) => b[0].split(/\s+/).length - a[0].split(/\s+/).length || b[0].length - a[0].length);
+    for (const [phrase, freq] of sortedPhrases) {
       // Single-occurrence terms allowed if they have a strong definitional sentence
       if (freq < 1) continue;
       if (seen.has(phrase.toLowerCase())) continue;
@@ -858,6 +860,10 @@ function extractDrafts(pages) {
         if (drafts.length < AUTODRAFT_CAP) {
           drafts.push({ term: phrase, simple: bestSent, src: "Page 1", srcSentence: bestSent });
           seen.add(phrase.toLowerCase());
+          // Block single-word fragments: "Covalent bonds" blocks "Covalent"
+          for (const w of phrase.split(/\s+/)) {
+            if (w.length > 3) seen.add(w.toLowerCase());
+          }
         }
       }
       if (drafts.length >= AUTODRAFT_CAP) break;
@@ -1776,6 +1782,37 @@ function extractDrafts(pages) {
       if (finalFiltered.length < AUTODRAFT_CAP) finalFiltered.push(mc);
     }
   } catch (e) { /* post-pass failed */ }
+  // FRAGMENT DEDUP (2026-10-09): Drop single-word fragments when the full phrase exists.
+  // "Covalent" is dropped if "Covalent bonds" is present. "Avogadro" dropped if "Avogadro's number" present.
+  try {
+    const multiTerms = new Set();
+    for (const d of finalFiltered) {
+      if (d.term.split(/\s+/).length > 1) {
+        multiTerms.add(d.term.toLowerCase());
+      }
+    }
+    const deduped = [];
+    for (const d of finalFiltered) {
+      const t = d.term.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const words = d.term.split(/\s+/);
+      if (words.length === 1 && t.length > 3) {
+        // Single word: check if it's part of any multi-word term
+        let isFragment = false;
+        for (const mt of multiTerms) {
+          const mtNorm = mt.replace(/[^a-z0-9\s]/g, " ");
+          if (mtNorm.split(/\s+/).some(w => w.replace(/[^a-z0-9]/g, "") === t)) {
+            isFragment = true;
+            break;
+          }
+        }
+        if (isFragment) continue; // Skip fragment
+      }
+      deduped.push(d);
+    }
+    // Replace finalFiltered with deduped
+    finalFiltered.length = 0;
+    finalFiltered.push(...deduped);
+  } catch (e) { /* fragment dedup failed */ }
   return finalFiltered.slice(0, AUTODRAFT_CAP);
 }
 
