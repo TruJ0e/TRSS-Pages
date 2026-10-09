@@ -1030,8 +1030,8 @@ function extractDrafts(pages) {
       return push(m[1], m[2].toLowerCase() + " during " + m[3], p, nextSentences);
     }
     if ((m = new RegExp("^(.{2,60}?)\\s+(" + FACT_VERBS + ")\\s+(.{8,})$", "i").exec(r))) {
-      const lead = L.text.length >= 8 ? L.text + ", " : "";
-      return push(m[1], lead + m[2].toLowerCase().replace(/\s+/g, " ") + " " + m[3], p, nextSentences);
+      // Full sentence as definition (term appears in def for verification)
+      return push(m[1], r.trim(), p, nextSentences);
     }
     // INVERTED: "This phenomenon is called X" / "X, known as Y" (term comes after)
     if ((m = /^(.{10,80}?)\s+is\s+called\s+([A-Z][A-Za-z\s\-]{2,40}?)\s*[.,;]/.exec(r))) {
@@ -1219,6 +1219,15 @@ function extractDrafts(pages) {
           if (qw >= 2 && qw <= 4 && autodraftTermOk(qterm)) {
             done = push(qterm, str.trim(), p, nextSentences);
           }
+        }
+      }
+      // STAGE N PATTERN (2026-10-09): "Stage N2 involves sleep spindles" - explicit
+      // because the generic FACT_VERBS sometimes misses these in paragraph context
+      if (!done) {
+        const stageRe = /^(Stage\s+N\d+)\s+(is|involves|includes|consists of)\s+(.{8,200})$/i;
+        const sm = stageRe.exec(str);
+        if (sm && autodraftTermOk(sm[1])) {
+          if (push(sm[1], str.trim(), p, nextSentences)) done = true;
         }
       }
       // LIST ITEMS: "Sleep disorders include insomnia, sleep apnea, and narcolepsy"
@@ -1652,6 +1661,27 @@ function extractDrafts(pages) {
     }
     return false;
   });
+  // STAGE N POST-PASS (2026-10-09): Sweep for "Stage N2"/"Stage N3" missed in paragraph context
+  try {
+    const stageSeen = new Set(finalFiltered.map(d => d.term.toLowerCase()));
+    const fullText = pages.map(p => String(p.text || "")).join("\n");
+    const stageRe = /\b(Stage\s+N\d+)\s+(is|involves|includes|consists of)\s+([^.!?]{8,200}[.!?])/gi;
+    let sm;
+    const stageCards = [];
+    while ((sm = stageRe.exec(fullText)) !== null) {
+      const st = sm[1].trim();
+      if (stageSeen.has(st.toLowerCase())) continue;
+      if (!autodraftTermOk(st)) continue;
+      const sdef = sm[0].trim();
+      if (!autodraftDefOk(sdef)) continue;
+      stageCards.push({ term: st, simple: sdef, src: "Page 1", srcSentence: sdef });
+      stageSeen.add(st.toLowerCase());
+    }
+    // Add stage cards to the results
+    for (const sc of stageCards) {
+      if (finalFiltered.length < AUTODRAFT_CAP) finalFiltered.push(sc);
+    }
+  } catch (e) { /* post-pass failed */ }
   return finalFiltered.slice(0, AUTODRAFT_CAP);
 }
 
