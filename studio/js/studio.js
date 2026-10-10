@@ -828,7 +828,7 @@ function extractDrafts(pages) {
       phrase = phrase.replace(/^(the|a|an)\s+/i, "");
       // Trim trailing verbs: "Sodium chloride exemplifies" -> "Sodium chloride"
       // (verb is part of definition, not the term - Truman 2026-10-09)
-      phrase = phrase.replace(/\s+(exemplifies?|demonstrates?|measures?|occurs?|combines?|affects?|includes?|rearranges?|calculates?|relates?|equals?|expresses?|produces?|conducts?|synthesizes?|contains?|involves?|forms?|facilitates?)$/i, "");
+      phrase = phrase.replace(/\s+(exemplifies?|demonstrates?|measures?|occurs?|combines?|affects?|includes?|rearranges?|calculates?|relates?|equals?|expresses?|produces?|conducts?|synthesizes?|contains?|involves?|forms?|facilitates?|studies?)\b.*$/i, "");
       if (phrase.length < 4 || phrase.length > 50) continue;
       if (seen.has(phrase.toLowerCase())) continue;
       // Skip single-word adjectives (Prokaryotic, Eukaryotic) - they're fragments, not terms
@@ -864,9 +864,9 @@ function extractDrafts(pages) {
         if (s.length < 20 || s.length > 300) continue;
         let score = 0;
         // Phrase at start = likely the term being defined
-        if (s.trim().toLowerCase().startsWith(phrase.toLowerCase().substring(0, 10))) score += 3;
+        if (s.trim().toLowerCase().startsWith(phrase.toLowerCase().substring(0, 10))) score += 3; else if (s.trim().toLowerCase().indexOf(phrase.toLowerCase().substring(0, 10)) < 60 && s.trim().toLowerCase().indexOf(phrase.toLowerCase().substring(0, 10)) >= 0) score += 2;
         // Has a verb (any verb, not just our list)
-        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?)\b/i.test(s)) score += 2;
+        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?|studies?|measures?|represents?|establishes?)\b/i.test(s)) score += 2;
         if (score > bestScore) {
           bestScore = score;
           bestSent = s.trim();
