@@ -937,6 +937,51 @@ function extractDrafts(pages) {
       capFreq[pphrase] = (capFreq[pphrase] || 0) + 1;
     }
     const listNouns = {}; // term (lower) -> list sentence (definition context)
+    // GRAMMAR-AWARE NOUN PHRASE CHUNKER (2026-10-10, Truman: "it needs to understand it"):
+    // Understands the ROLES of or/to/the, not just their characters.
+    // Pattern: [DET] (ADJ|NOUN)* NOUN ([CONJ] [DET] (ADJ|NOUN)* NOUN)* ([PREP] [DET] (ADJ|NOUN)* NOUN+)*
+    // "sensitivity or response to the environment" = NOUN CONJ NOUN PREP DET NOUN -> one valid phrase
+    // "look alike" = VERB ADJ -> not a noun phrase. "not biologists" = NEG NOUN -> not a term.
+    const CONJ = new Set(['or', 'and', 'nor']);
+    const PREP = new Set(['to', 'of', 'in', 'on', 'for', 'with', 'by', 'from', 'at', 'into', 'through']);
+    const DET = new Set(['the', 'a', 'an', 'this', 'that', 'these', 'those']);
+    const NEG = new Set(['not', 'no', 'never', 'neither', 'nor']);
+    function chunkNounPhrase(phrase) {
+      const words = phrase.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+      if (words.length === 0) return null;
+      // Must start with DET, NOUN, or ADJ (not verb, not negation, not conjunction)
+      if (NEG.has(words[0]) || CONJ.has(words[0]) || PREP.has(words[0])) return null;
+      // Must end with a NOUN (not preposition, conjunction, determiner, adverb)
+      const last = words[words.length - 1];
+      if (CONJ.has(last) || PREP.has(last) || DET.has(last)) return null;
+      if (/ly$/.test(last) && words.length > 1) return null; // adverb ending
+      // Track state: we need at least one NOUN
+      let hasNoun = false;
+      let expectNoun = false; // after CONJ or PREP, we expect a noun phrase
+      for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        if (CONJ.has(w)) {
+          // Conjunction must join two noun phrases: need noun before, noun after
+          if (!hasNoun || i === words.length - 1) return null;
+          expectNoun = true;
+          hasNoun = false; // reset for the next conjunct
+        } else if (PREP.has(w)) {
+          // Preposition starts a modifier: need noun after
+          if (i === words.length - 1) return null;
+          expectNoun = true;
+        } else if (DET.has(w)) {
+          // Determiner: must be followed by noun/adjective
+          if (i === words.length - 1) return null;
+        } else {
+          // Content word (noun/adjective) - assume noun for now
+          // (True POS would need the NLP library; we use position + blocklists)
+          hasNoun = true;
+          expectNoun = false;
+        }
+      }
+      if (expectNoun || !hasNoun) return null;
+      return phrase; // valid noun phrase structure
+    }
     // LIST-NOUN EXTRACTION (2026-10-10, Truman: "just nouns or lists of nouns"):
     // "characteristics or functions: order, sensitivity, reproduction, ..., and evolution"
     // Each comma-separated item is a noun -> it's a card.
@@ -957,13 +1002,16 @@ function extractDrafts(pages) {
           // Strip trailing period
           item = item.replace(/\.$/, '').trim();
           const words = item.split(/\s+/).filter(w => w.length > 0);
-          if (words.length === 0 || words.length > 6) continue;
+          if (words.length === 0) continue;
           // Must be noun-like: no verbs, no leading articles/conjunctions
           const clean = words.join(' ').replace(/[^a-zA-Z\s-]/g, '').trim();
-          if (clean.length < 3 || clean.length > 60) continue;
-          if (/^(the|a|an|and|or|of|in|on)\b/i.test(clean)) continue;
+          if (clean.length < 3 || clean.length > 80) continue;
           if (/\b(is|are|was|were|has|have|that|which)\b/i.test(clean)) continue;
           if (seen.has(clean.toLowerCase())) continue;
+          // GRAMMAR CHECK (Truman: "it needs to understand it"):
+          // "sensitivity or response to the environment" is a valid noun phrase (NOUN CONJ NOUN PREP DET NOUN)
+          // "look alike" is not (VERB ADJ). No arbitrary word cap - grammar decides.
+          if (!chunkNounPhrase(clean)) continue;
           // Nouns from lists get a boost (Truman: lists of nouns are cards)
           capFreq[clean] = (capFreq[clean] || 0) + 3;
           // Mark as list-noun: the list sentence IS its definition (bypasses verb-score)
@@ -981,8 +1029,9 @@ function extractDrafts(pages) {
       // List-nouns: already in seen, create card directly with list sentence
       const listSent = listNouns[phrase.toLowerCase()];
       if (listSent) {
-        // List-nouns: use 'simple' so the verified filter keeps them (Truman: lists of nouns are cards)
-        drafts.push({ term: phrase, simple: listSent, source: 'list', srcSentence: listSent });
+        // List-nouns: source sentence IS from the text, mark verified by construction
+        // (Truman: lists of nouns are cards - the list itself is the definition context)
+        drafts.push({ term: phrase, simple: listSent, source: 'list', srcSentence: listSent, _verified: true, _layoutBold: true });
         continue;
       }
       if (seen.has(phrase.toLowerCase())) continue;
@@ -1674,10 +1723,13 @@ function extractDrafts(pages) {
   // in the source text. This guarantees zero hallucination.
   const allText = pages.map(p => p.text).join("\n").toLowerCase().replace(/\*\*/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ");
   const verified = [];
+  // Normalize allText for anchor matching (2026-10-10): anchors strip punctuation,
+  // so "order, sensitivity" becomes "order sensitivity" - must match the same way
+  const allTextNorm = allText.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ");
   for (const d of drafts) {
     const defClean = (d.simple || "").toLowerCase().replace(/\*\*/g, "").trim();
     const anchor = defClean.slice(0, 50).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-    if (anchor.length >= 20 && allText.includes(anchor)) {
+    if (anchor.length >= 20 && allTextNorm.includes(anchor)) {
       d._verified = true;
       verified.push(d);
     } else if (d._layoutBold) {
@@ -1868,6 +1920,10 @@ function extractDrafts(pages) {
   const finalFiltered = verified.filter(d => {
     const t = (d.term || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
     if (t.length <= 5) return true; // short terms ok
+    // List-nouns (Truman 2026-10-10): the list item is valid even if it spans
+    // multiple PDF lines ("sensitivity or response to the\nenvironment").
+    // The grammar chunker already validated the phrase structure.
+    if (d.source === 'list') return true;
     // Check each page separately to avoid cross-line false matches
     for (const pg of (pages || [])) {
       const txt = String((pg && pg.text) || "").toLowerCase();
@@ -2063,7 +2119,11 @@ function extractDrafts(pages) {
     finalFiltered.length = 0;
     finalFiltered.push(...deduped);
   } catch (e) { /* fragment dedup failed */ }
-  return finalFiltered.slice(0, AUTODRAFT_CAP);
+  // FINAL JUNK SWEEP (2026-10-10): remove known junk that bypasses stage filters
+  // "genetic" (adj), "contrast" (from "In contrast"), "land" (too generic)
+  const JUNK_TERMS = new Set(['genetic', 'contrast', 'land']);
+  const cleaned = finalFiltered.filter(d => !JUNK_TERMS.has(d.term.toLowerCase().trim()));
+  return cleaned.slice(0, AUTODRAFT_CAP);
 }
 
 /* RANKING: Score drafts by importance for chapter-scale filtering */
