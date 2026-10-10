@@ -816,12 +816,19 @@ function extractDrafts(pages) {
   try {
     // Stage 1 uses the shared 'seen' set for deduplication
     const fullTextN = pages.map(p => String(p.text || "")).join("\n");
-    // Find capitalized 1-4 word phrases
-    const capRe = /\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,}){0,3})\b/g;
+    // Find noun phrases: Capitalized start, allow lowercase continuations (Truman 2026-10-09:
+    // "If it's a noun it's a card. If it's a verb it's most likely part of a card")
+    // "Sodium chloride", "hydrogen molecule" - lowercase words are part of the noun phrase
+    const capRe = /\b([A-Z][a-z]{2,}(?:['’]s)?(?:[\s-]+[a-z]{2,}){0,2})\b/g;
     const capFreq = {};
     let cm;
     while ((cm = capRe.exec(fullTextN)) !== null) {
-      const phrase = cm[1].trim();
+      let phrase = cm[1].trim();
+      // Trim leading articles: "The hydrogen molecule" -> "hydrogen molecule"
+      phrase = phrase.replace(/^(the|a|an)\s+/i, "");
+      // Trim trailing verbs: "Sodium chloride exemplifies" -> "Sodium chloride"
+      // (verb is part of definition, not the term - Truman 2026-10-09)
+      phrase = phrase.replace(/\s+(exemplifies?|demonstrates?|measures?|occurs?|combines?|affects?|includes?|rearranges?|calculates?|relates?|equals?|expresses?|produces?|conducts?|synthesizes?|contains?|involves?|forms?|facilitates?)$/i, "");
       if (phrase.length < 4 || phrase.length > 50) continue;
       if (seen.has(phrase.toLowerCase())) continue;
       // Skip single-word adjectives (Prokaryotic, Eukaryotic) - they're fragments, not terms
