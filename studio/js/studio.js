@@ -835,6 +835,15 @@ function extractDrafts(pages) {
       // Truman: "if its not a verb, adverb, or something else then its a noun"
       // Adjectives ending in -ic, -al, -ous are not standalone terms
       if (!phrase.includes(" ") && /(ic|al|ous|ive|ary)$/i.test(phrase)) continue;
+      // JUNK FILTER 1: Prepositional phrases - "between polar molecules" is not a term
+      if (/^(between|through|via|by|in|on|at|from|with|without|against|among)$/i.test(phrase)) continue;
+      // JUNK FILTER 2: Clauses - "that atoms tend", "neither created nor" are not noun phrases
+      if (/\b(that|which|who|whom|neither|either|whether)\b/i.test(phrase)) continue;
+      // JUNK FILTER 3: Verb phrases - "achieve stability", "form bonds" start with verbs
+      // Truman: "If it's a verb it's most likely part of a card" (not the card itself)
+      const firstWord = phrase.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "");
+      const verbStarts = ["achieve","form","make","take","give","get","go","come","become","seem","appear"];
+      if (verbStarts.includes(firstWord)) continue;
       // Skip if it's a verb, adverb, or stopword (Truman's process of elimination)
       if (!autodraftTermOk(phrase)) continue;
       capFreq[phrase] = (capFreq[phrase] || 0) + 1;
@@ -1789,6 +1798,18 @@ function extractDrafts(pages) {
       if (finalFiltered.length < AUTODRAFT_CAP) finalFiltered.push(mc);
     }
   } catch (e) { /* post-pass failed */ }
+  // VERB TRIM (2026-10-09, Truman: "If it's a verb it's most likely part of a card"):
+  // "Electronegativity measures attraction" -> "Electronegativity"
+  // Verbs belong in definitions, not terms.
+  try {
+    const verbPattern = /\s+(measures?|calculates?|occurs?|involves?|includes?|contains?|produces?|conducts?|demonstrates?|exemplifies?|affects?|combines?|rearranges?|relates?|equals?|expresses?|forms?|states?|carries?).*$/i;
+    for (const d of finalFiltered) {
+      const trimmed = d.term.replace(verbPattern, "").trim();
+      if (trimmed.length >= 3 && trimmed !== d.term) {
+        d.term = trimmed;
+      }
+    }
+  } catch (e) { /* verb trim failed */ }
   // FRAGMENT DEDUP (2026-10-09): Drop single-word fragments when the full phrase exists.
   // "Covalent" is dropped if "Covalent bonds" is present. "Avogadro" dropped if "Avogadro's number" present.
   try {
