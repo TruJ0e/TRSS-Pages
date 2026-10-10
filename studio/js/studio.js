@@ -974,13 +974,26 @@ function extractDrafts(pages) {
       // Heuristic fallback: classify by word lists + morphology
       if (!tags) {
         const CONJ = new Set(['or', 'and', 'nor', 'but', 'yet', 'so']);
-        const PREP = new Set(['to', 'of', 'in', 'on', 'for', 'with', 'by', 'from', 'at', 'into', 'through', 'toward', 'towards', 'against', 'among', 'between']);
+        const PREP = new Set(['to', 'of', 'in', 'on', 'for', 'with', 'by', 'from', 'at', 'into', 'through', 'toward', 'towards', 'against', 'among', 'between', 'like', 'unlike']);
         const DET = new Set(['the', 'a', 'an', 'this', 'that', 'these', 'those']);
         const PRON = new Set(['it', 'its', 'itself', 'they', 'them', 'themselves', 'he', 'she', 'him', 'her', 'himself', 'herself', 'we', 'us', 'ourselves', 'you', 'yourself']);
         const NEG = new Set(['not', 'no', 'never', 'neither', 'none']);
-        const VERBS = new Set(['is', 'are', 'was', 'were', 'be', 'been', 'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 'can', 'could', 'shall', 'should', 'may', 'might', 'must', 'look', 'looks', 'respond', 'responds', 'cope', 'copes', 'react', 'reacts', 'achieve', 'form', 'make', 'take', 'give', 'get', 'go', 'come', 'become', 'seem', 'appear']);
+        const VERBS = new Set(['is', 'are', 'was', 'were', 'be', 'been', 'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 'can', 'could', 'shall', 'should', 'may', 'might', 'must', 'look', 'looks', 'respond', 'responds', 'cope', 'copes', 'react', 'reacts', 'achieve', 'form', 'make', 'take', 'give', 'get', 'go', 'come', 'become', 'seem', 'appear',
+          // Instructional imperatives (closed class in textbooks)
+          'suppose', 'consider', 'assume', 'calculate', 'determine', 'classify', 'describe', 'explain', 'define', 'list', 'name', 'identify', 'predict', 'estimate']);
         // Common adverbs that don't end in -ly (2026-10-10)
-        const ADV = new Set(['often', 'usually', 'generally', 'typically', 'commonly', 'collectively', 'rarely', 'seldom', 'never', 'always', 'sometimes', 'frequently']);
+        const ADV = new Set(['often', 'usually', 'generally', 'typically', 'commonly', 'collectively', 'rarely', 'seldom', 'never', 'always', 'sometimes', 'frequently', 'therefore', 'thus', 'hence', 'however']);
+        // 3rd-person singular verbs: "floats", "sinks", "displaces", "travels"
+        // General rule (morphology, not word list): NOUN/ADJ + word ending in 's' = VERB,
+        // unless it's a clear plural noun pattern.
+        function isThirdPersonVerb(word, prevTag) {
+          if (!['NOUN', 'ADJ'].includes(prevTag)) return false;
+          const cw = word.replace(/[^a-z]/g, '');
+          if (!/s$/.test(cw) || cw.length < 4) return false;
+          if (/ss$/.test(cw)) return false;
+          if (/(ions|ations|ers|ors|ists|ies|ves|oes|xes|ches|shes|sses)$/.test(cw)) return false;
+          return true;
+        }
         const rawTags = words.map(w => {
           const cw = w.replace(/[^a-z]/g, '');
           if (CONJ.has(cw)) return 'CONJ';
@@ -1007,6 +1020,12 @@ function extractDrafts(pages) {
             const w = words[i].replace(/[^a-z]/g, '');
             if (GERUND_NOUNS.has(w)) return 'NOUN';
             return 'VERB';
+          }
+          if (t === 'NOUN' && i > 0) {
+            // Look back past ADV/CONJ to find the subject noun
+            let prevIdx = i - 1;
+            while (prevIdx >= 0 && ['ADV', 'CONJ'].includes(rawTags[prevIdx])) prevIdx--;
+            if (prevIdx >= 0 && isThirdPersonVerb(words[i], rawTags[prevIdx])) return 'VERB';
           }
           return t;
         });
@@ -1061,6 +1080,8 @@ function extractDrafts(pages) {
         // Must look like a list: at least 2 commas or comma+and
         const commas = (listText.match(/,/g) || []).length;
         if (commas < 2) continue;
+        // Reject instruction lists: "To learn...", "Use this...", "See Figure..."
+        if (/^\s*(to|use|see|refer|click)\b/i.test(listText)) continue;
         // Skip if it looks like a sentence (has verbs)
         if (/\b(is|are|was|were|has|have|will|would|can|could)\b/i.test(listText.slice(0, 80))) continue;
         const items = listText.split(/,\s*/);
@@ -2200,7 +2221,25 @@ function extractDrafts(pages) {
     const transPat = new RegExp('\\b(?:in|by|on)\\s+' + t.replace(/[^a-z0-9]/g, '') + '\\s*,', 'i');
     return transPat.test(fullTextForTrans);
   }
+  // Structural junk patterns (general, not word lists):
+  // - Section labels: "Solution:", "Exercise:" - structural, not terms
+  // - Bracket artifacts: "link]" from "[link]" placeholders
+  // - Number mash: "00-kg", "25pound" - measurements, not terms
   const cleaned = finalFiltered.filter(d => {
+    const termRaw = (d.term || '').trim();
+    // Section labels: "Solution:", "Exercise:" - appear as labels followed by colon
+    // General pattern: single capitalized word + colon at line start or after newline
+    const tlow = termRaw.toLowerCase();
+    if (/^[A-Z][a-z]+$/.test(termRaw)) {
+      const labelPat = new RegExp('(^|\\n)\\s*' + tlow + '\\s*:', 'i');
+      const fullTxt = pages.map(p => String(p.text || "")).join("\n");
+      if (labelPat.test(fullTxt)) return false;
+    }
+    // Bracket artifacts
+    if (/[\[\]]/.test(termRaw)) return false;
+    // Number-word mash: "25pound", "00-kg", "5.00-kg" are measurements, not terms.
+    // General: if term contains BOTH digits and letters mixed, it's a mash.
+    if (/\d/.test(termRaw) && /[a-z]/i.test(termRaw)) return false;
     const term = (d.term || '').trim();
     if (!term) return false;
     const tlower = term.toLowerCase();
