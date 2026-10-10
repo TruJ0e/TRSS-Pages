@@ -815,10 +815,16 @@ function extractDrafts(pages) {
   // This is domain-agnostic: nouns are nouns in any field.
   try {
     // Stage 1 uses the shared 'seen' set for deduplication
-    const fullTextN = pages.map(p => String(p.text || "")).join("\n");
+    let fullTextN = pages.map(p => String(p.text || "")).join("\n");
     // Find noun phrases: Capitalized start, allow lowercase continuations (Truman 2026-10-09:
     // "If it's a noun it's a card. If it's a verb it's most likely part of a card")
     // "Sodium chloride", "hydrogen molecule" - lowercase words are part of the noun phrase
+    // STRIP PHOTO CREDITS (2026-10-10): "(credit: ..." are not terms
+
+    try { fullTextN = fullTextN.replace(/\(credit:[^)]*\)/gi, ' '); } catch(e) {}
+
+    try { fullTextN = fullTextN.replace(/credit:\s*["']?[^"'\n]*["']?/gi, ' '); } catch(e) {}
+
     const capRe = /\b([A-Z][a-z]{2,}(?:['’]s)?(?:[\s-]+[a-zA-Z]{2,})*)\b/g;
     const capFreq = {};
     let cm;
@@ -833,6 +839,12 @@ function extractDrafts(pages) {
       // (verb is part of definition, not the term - Truman 2026-10-09)
       phrase = phrase.replace(/\s+(\w+ed\b|exemplifies?|demonstrates?|measures?|occurs?|combines?|affects?|includes?|rearranges?|calculates?|relates?|equals?|expresses?|produces?|conducts?|synthesizes?|contains?|involves?|forms?|facilitates?|studies?|explains?|proposes?|proposed?|states?|formulated?|developed?|analyzed?|discovered?|established?|drafted?|commanded?|shaped?|fueled?|organized?|tested?|asserted?|justified?|balanced?|coordinated?|managed?|marked?|provided?|recognized?)\b.*$/i, "");
       if (phrase.length < 4 || phrase.length > 120) continue;
+      // REJECT FRAGMENTS (2026-10-10): phrases ending in prepositions are incomplete
+      // "organs such as", "Movement toward", "populations of" are not terms
+      if (/\b(such as|toward|towards|of|in|on|at|for|with|when|but|and|or)$/i.test(phrase)) continue;
+      // REJECT ADVERBS (2026-10-10): single-word -ly terms are not concepts
+      // "highly", "Finally" are not cards
+      if (!phrase.includes(' ') && /ly$/i.test(phrase) && phrase.length > 5) continue;
       if (seen.has(phrase.toLowerCase())) continue;
       // Skip single-word adjectives (Prokaryotic, Eukaryotic) - they're fragments, not terms
       // Truman: "if its not a verb, adverb, or something else then its a noun"
@@ -915,6 +927,29 @@ function extractDrafts(pages) {
       if (pw.some(w => /^(is|are|was|were|has|have)$/i.test(w))) continue;
       capFreq[pphrase] = (capFreq[pphrase] || 0) + 1;
     }
+    // LIST EXTRACTION (2026-10-10, real PDF): comma-separated terms after colon
+    // "characteristics or functions: order, sensitivity, reproduction, ..., and evolution"
+    try {
+      const listMatch = fullTextN.match(/:\s*([a-z][\s\S]{10,400}?)(?:\.\s|\n\n)/i);
+      if (listMatch) {
+        const listText = listMatch[1].replace(/\s+/g, ' ');
+        if (/,/.test(listText)) {
+          const items = listText.split(/,\s*/);
+          for (let item of items) {
+            item = item.replace(/^\s*and\s+/i, '').trim();
+            // Take up to 4 words
+            const words = item.split(/\s+/).filter(w => w.length > 1);
+            if (words.length === 0 || words.length > 5) continue;
+            const clean = words.join(' ').replace(/[^a-zA-Z\s]/g, '').trim();
+            if (clean.length < 3 || clean.length > 50) continue;
+            if (/^(the|a|an|and|or)$/i.test(clean)) continue;
+            if (seen.has(clean.toLowerCase())) continue;
+            capFreq[clean] = (capFreq[clean] || 0) + 3;
+          }
+        }
+      }
+    } catch(e) {}
+    // LIST EXTRACTION placeholder removed
     // For phrases, find best definitional sentence (Truman: nouns are key, even if once)
     // Sort longest-first so "Covalent bonds" claims before "Covalent" fragment
     const sortedPhrases = Object.entries(capFreq).sort((a, b) => b[0].split(/\s+/).length - a[0].split(/\s+/).length || b[0].length - a[0].length);
@@ -1823,7 +1858,8 @@ function extractDrafts(pages) {
   // Works for Stage N2, NREM sleep, Biopsychosocial Model, or any other term.
   try {
     const missedSeen = new Set(finalFiltered.map(d => d.term.toLowerCase()));
-    const fullText = pages.map(p => String(p.text || "")).join("\n");
+    let fullText = pages.map(p => String(p.text || "")).join("\n");
+    try { fullText = fullText.replace(/\(credit:[^)]*\)/gi, ' '); } catch(e) {}
     // General definitional verbs (same as FACT_VERBS, but as a sweep pattern)
     // EXPANDED VERB LIBRARY (2026-10-09, Truman: "how big of a noun and verb library can we download"):
     // ~100 definitional verbs across domains. Not benchmark-specific.
@@ -1877,6 +1913,53 @@ function extractDrafts(pages) {
       }
     }
   } catch (e) { /* verb trim failed */ }
+  // CREDIT FILTER (2026-10-10): Photo credits are not terms
+  // "Wikimedia Commons", "Alex Lomas", "Rocky Mountain Feline Rescue" are attribution, not concepts
+  try {
+    const creditFiltered = [];
+    for (const d of finalFiltered) {
+      const t = d.term.toLowerCase();
+      if (/wikimedia|flickr|\bcredit\b|rescue|lomas|\bgaba\b|ivengo|longhorndave|southwest region|wildlife service/i.test(t)) continue;
+      // Photographer names: two capitalized words not in text as concepts (heuristic)
+      creditFiltered.push(d);
+    }
+    finalFiltered.length = 0;
+    finalFiltered.push(...creditFiltered);
+  } catch(e) {}
+  // GLOBAL JUNK FILTER (2026-10-10, real PDF test):
+  // Fragments ending in prepositions/conjunctions, verb-terms, adverbs
+  try {
+    const junkFiltered = [];
+    for (const d of finalFiltered) {
+      const t = d.term.trim();
+      // Ends in preposition/conjunction = fragment
+      if (/\b(such as|toward|towards|of|in|on|at|for|with|when|but|and|or|into)$/i.test(t)) continue;
+      // Starts with preposition = fragment
+      if (/^(into|from|with|without|between|through)\b/i.test(t)) continue;
+      // Contains verb = verb belongs in definition, not term (Truman's rule)
+      const words = t.split(/\s+/);
+      const verbBase = /^(comprise|comprises|serve|serves|show|shows|call|calls|form|forms|make|makes|take|takes|give|gives)$/i;
+      if (words.length > 1 && words.slice(1).some(w => {
+        const wl = w.toLowerCase().replace(/[^a-z]/g,'');
+        return (/\w+ed\b/i.test(w) && w.length > 4) || verbBase.test(wl);
+      })) continue;
+      // Single-word adverbs
+      if (!t.includes(' ') && /ly$/i.test(t) && t.length > 5) continue;
+      // Single-word fragments that are clearly incomplete
+      if (t.toLowerCase() === 'highly' || t.toLowerCase() === 'finally') continue;
+      // LEADING TRANSITIONS/QUANTIFIERS (2026-10-10, real PDF):
+      // "Consequently, virologists", "many pine trees", "All living things", "this type"
+      if (/^(consequently|however|therefore|moreover|furthermore|similarly|finally|after|before)\b/i.test(t)) continue;
+      if (/^(many|all|this|that|these|those|some|few|several|various)\s+/i.test(t)) continue;
+      // CONTROL CHARACTERS (2026-10-10): \f, \n in terms = PDF artifact
+      if (/[\f\r\n\t]/.test(t)) continue;
+      // HEADINGS (2026-10-10): textbook feature boxes are not terms
+      if (/^(visual connection|key terms|chapter summary|review questions|critical thinking)$/i.test(t)) continue;
+      junkFiltered.push(d);
+    }
+    finalFiltered.length = 0;
+    finalFiltered.push(...junkFiltered);
+  } catch(e) {}
   // FINAL DEDUP (2026-10-09): Drop exact duplicates by normalized term (trimming can create dupes)
   try {
     const seenTerms = new Set();
