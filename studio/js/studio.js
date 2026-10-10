@@ -1802,7 +1802,7 @@ function extractDrafts(pages) {
   // "Electronegativity measures attraction" -> "Electronegativity"
   // Verbs belong in definitions, not terms.
   try {
-    const verbPattern = /\s+(measures?|calculates?|occurs?|involves?|includes?|contains?|produces?|conducts?|demonstrates?|exemplifies?|affects?|combines?|rearranges?|relates?|equals?|expresses?|forms?|states?|carries?).*$/i;
+    const verbPattern = /\s+(measures?|calculates?|occurs?|involves?|includes?|contains?|produces?|conducts?|demonstrates?|exemplifies?|affects?|combines?|rearranges?|relates?|equals?|expresses?|forms?|states?|carries?|represents?|converts?|flows?|predicts?|establishes?).*$/i;
     for (const d of finalFiltered) {
       const trimmed = d.term.replace(verbPattern, "").trim();
       if (trimmed.length >= 3 && trimmed !== d.term) {
@@ -1810,6 +1810,19 @@ function extractDrafts(pages) {
       }
     }
   } catch (e) { /* verb trim failed */ }
+  // FINAL DEDUP (2026-10-09): Drop exact duplicates by normalized term (trimming can create dupes)
+  try {
+    const seenTerms = new Set();
+    const uniqueFiltered = [];
+    for (const d of finalFiltered) {
+      const nk = d.term.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (seenTerms.has(nk)) continue;
+      seenTerms.add(nk);
+      uniqueFiltered.push(d);
+    }
+    finalFiltered.length = 0;
+    finalFiltered.push(...uniqueFiltered);
+  } catch (e) { /* dedup failed */ }
   // FRAGMENT DEDUP (2026-10-09): Drop single-word fragments when the full phrase exists.
   // "Covalent" is dropped if "Covalent bonds" is present. "Avogadro" dropped if "Avogadro's number" present.
   try {
