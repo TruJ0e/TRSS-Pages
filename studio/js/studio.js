@@ -851,7 +851,7 @@ function extractDrafts(pages) {
     // OBJECT EXTRACTION (Truman 2026-10-09: "Those are all nouns"):
     // "establishes thermal equilibrium" -> "thermal equilibrium" is a noun, it's a card
     // "formulated the heat theorem" -> "heat theorem" is a noun, it's a card
-    const objRe = /\b(establishes?|states?|formulated?|predicts?|measures?|represents?|includes?|contains?|involves?|converts?)\s+(?:the\s+|a\s+|an\s+)?([a-z]{3,}(?:\s+[a-z]{3,}){0,1})\b/gi;
+    const objRe = /\b(establishes?|states?|formulated?|predicts?|measures?|represents?|includes?|contains?|involves?|converts?|proposed?|explains?|discovered?|calculates?)\s+(?:the\s+|a\s+|an\s+)?([a-zA-Z]{3,}(?:\s+[a-zA-Z]{3,}){0,2})\b/gi;
     let om;
     while ((om = objRe.exec(fullTextN)) !== null) {
       let ophrase = om[2].trim();
@@ -866,6 +866,20 @@ function extractDrafts(pages) {
       // Skip descriptive phrases (not technical terms): "organized energy", "average kinetic", "total heat", "maximum efficiency"
       if (/^(organized|average|total|maximum|minimum)\b/i.test(ophrase)) continue;
       capFreq[ophrase] = (capFreq[ophrase] || 0) + 1;
+    }
+    // PREPOSITIONAL OBJECTS (Truman 2026-10-09: nouns are cards):
+    // "through electron transfer" -> "electron transfer"
+    // "in metal lattices" -> "metal lattices"
+    const prepRe = /\b(?:through|via|in|by)\s+(?:the\s+|a\s+|an\s+)?([a-z]{3,}(?:\s+[a-z]{3,}){0,1})\b/gi;
+    let pm;
+    while ((pm = prepRe.exec(fullTextN)) !== null) {
+      let pphrase = pm[1].trim();
+      if (pphrase.length < 4 || pphrase.length > 30) continue;
+      if (/\b(the|a|an|of|and|or|is|are)\b/i.test(pphrase)) continue;
+      if (seen.has(pphrase.toLowerCase())) continue;
+      const pw = pphrase.split(/\s+/);
+      if (pw.some(w => /^(is|are|was|were|has|have)$/i.test(w))) continue;
+      capFreq[pphrase] = (capFreq[pphrase] || 0) + 1;
     }
     // For phrases, find best definitional sentence (Truman: nouns are key, even if once)
     // Sort longest-first so "Covalent bonds" claims before "Covalent" fragment
@@ -885,7 +899,7 @@ function extractDrafts(pages) {
         // Phrase at start = likely the term being defined
         if (s.trim().toLowerCase().startsWith(phrase.toLowerCase().substring(0, 10))) score += 3; else if (s.trim().toLowerCase().indexOf(phrase.toLowerCase().substring(0, 10)) < 60 && s.trim().toLowerCase().indexOf(phrase.toLowerCase().substring(0, 10)) >= 0) score += 2;
         // Has a verb (any verb, not just our list)
-        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?|studies?|measures?|represents?|establishes?|states?|formulated?|predicted?)\b/i.test(s)) score += 2;
+        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?|studies?|measures?|represents?|establishes?|states?|formulated?|predicted?|forms?|occurs?|proposes?|proposed?|explains?|includes?|calculates?|relates?)\b/i.test(s)) score += 2;
         if (score > bestScore) {
           bestScore = score;
           bestSent = s.trim();
