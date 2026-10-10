@@ -848,6 +848,25 @@ function extractDrafts(pages) {
       if (!autodraftTermOk(phrase)) continue;
       capFreq[phrase] = (capFreq[phrase] || 0) + 1;
     }
+    // OBJECT EXTRACTION (Truman 2026-10-09: "Those are all nouns"):
+    // "establishes thermal equilibrium" -> "thermal equilibrium" is a noun, it's a card
+    // "formulated the heat theorem" -> "heat theorem" is a noun, it's a card
+    const objRe = /\b(establishes?|states?|formulated?|predicts?|measures?|represents?|includes?|contains?|involves?|converts?)\s+(?:the\s+|a\s+|an\s+)?([a-z]{3,}(?:\s+[a-z]{3,}){0,1})\b/gi;
+    let om;
+    while ((om = objRe.exec(fullTextN)) !== null) {
+      let ophrase = om[2].trim();
+      if (ophrase.length < 4 || ophrase.length > 40) continue;
+      // Skip if contains verbs or stopwords
+      if (/\b(is|are|was|were|has|have|that|which|and|or)\b/i.test(ophrase)) continue;
+      if (seen.has(ophrase.toLowerCase())) continue;
+      // Must not be a verb phrase itself (Truman: verb is part of card, not the card)
+      const ow = ophrase.split(/\s+/);
+      const verbWords = /^(achieve|form|make|take|increases?|decreases?|states?|is|are|was|were)$/i;
+      if (ow.some(w => verbWords.test(w.toLowerCase().replace(/[^a-z]/g,'')))) continue;
+      // Skip descriptive phrases (not technical terms): "organized energy", "average kinetic", "total heat", "maximum efficiency"
+      if (/^(organized|average|total|maximum|minimum)\b/i.test(ophrase)) continue;
+      capFreq[ophrase] = (capFreq[ophrase] || 0) + 1;
+    }
     // For phrases, find best definitional sentence (Truman: nouns are key, even if once)
     // Sort longest-first so "Covalent bonds" claims before "Covalent" fragment
     const sortedPhrases = Object.entries(capFreq).sort((a, b) => b[0].split(/\s+/).length - a[0].split(/\s+/).length || b[0].length - a[0].length);
@@ -866,7 +885,7 @@ function extractDrafts(pages) {
         // Phrase at start = likely the term being defined
         if (s.trim().toLowerCase().startsWith(phrase.toLowerCase().substring(0, 10))) score += 3; else if (s.trim().toLowerCase().indexOf(phrase.toLowerCase().substring(0, 10)) < 60 && s.trim().toLowerCase().indexOf(phrase.toLowerCase().substring(0, 10)) >= 0) score += 2;
         // Has a verb (any verb, not just our list)
-        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?|studies?|measures?|represents?|establishes?)\b/i.test(s)) score += 2;
+        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?|studies?|measures?|represents?|establishes?|states?|formulated?|predicted?)\b/i.test(s)) score += 2;
         if (score > bestScore) {
           bestScore = score;
           bestSent = s.trim();
@@ -1844,6 +1863,36 @@ function extractDrafts(pages) {
           if (mtNorm.split(/\s+/).some(w => w.replace(/[^a-z0-9]/g, "") === t)) {
             isFragment = true;
             break;
+          }
+        }
+        // Truman 2026-10-09: "Those are all nouns" - keep standalone concepts
+        // "Heat" is a card even if "Heat engines" exists, because "Heat flows..." stands alone
+        // Only drop if it's clearly a modifier (adjective) or never stands alone
+        if (isFragment) {
+          // Keep ONLY if the term stands alone as a subject elsewhere
+          // "Heat" kept because "Heat flows..." starts with it
+          // "Clausius" dropped because it never starts a sentence alone
+          // Standalone = term starts the sentence AND is followed by verb/punctuation (not another name word)
+          // "Heat flows..." -> "Heat" + " flows" (verb) = standalone ✓
+          // "Walther Nernst formulated..." -> "Walther" + " Nernst" (capitalized) = fragment ✗
+          let isStandalone = false;
+          if (d.srcSentence) {
+            const s = d.srcSentence.trim();
+            const t = d.term.trim();
+            if (s.toLowerCase().startsWith(t.toLowerCase())) {
+              const after = s.substring(t.length).trim();
+              const firstAfter = after.split(/\s+/)[0] || "";
+              // If next word is capitalized, this term is part of a longer name -> NOT standalone
+              // "Walther" + "Nernst" -> fragment. "Heat" + "flows" -> standalone.
+              if (/^[A-Z]/.test(firstAfter)) {
+                isStandalone = false;
+              } else {
+                isStandalone = true;
+              }
+            }
+          }
+          if (isStandalone) {
+            isFragment = false;
           }
         }
         if (isFragment) continue; // Skip fragment
