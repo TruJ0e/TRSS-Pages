@@ -637,16 +637,16 @@ function autodraftTermOk(term) {
   if (/^(in|on|at|what|when|where|how|why)\b/i.test(term)) return false; // question fragment
   if (/\bmany\b/i.test(term) && /\bpsychologists/i.test(term)) return false; // "many psychologists"
   if (/^(among|according|notable|and|or|but)\b/i.test(term)) return false; // fragment starter
-  if (/^not\b/i.test(term)) return false; // "not biologists" - negation fragment, not a term (2026-10-10)
-  if (/\b(often|usually|generally|typically|commonly)\s*$/i.test(term)) return false; // ends with adverb: "organisms often" (2026-10-10)
-  if (/\blook\s+alike/i.test(term)) return false; // "look alike" - verb phrase, not a term (2026-10-10)
-  if (/^(respond|cope|react|adapt|grow|move|change)\b/i.test(term)) return false; // verb-led phrase: "respond to stimuli" (2026-10-10)
-  if (/\b(itself|themselves|himself|herself)\s*$/i.test(term)) return false; // "cell itself" - pronoun, not a term (2026-10-10)
-  if (/\w+ly\s*$/i.test(term) && term.split(/\s+/).length > 1) return false; // ends with adverb: "Biologists collectively" (2026-10-10)
-  if (/\b(living|dying|growing)\s*$/i.test(term)) return false; // ends with participle: "viruses living" (2026-10-10)
+  // NEG handled by POS classifier
+  // ADV ending handled by POS classifier
+  // VERB-led handled by POS classifier
+  // VERB-led handled by POS classifier
+  // PRON handled by POS classifier
+  // ADV ending handled by POS classifier
+  // VERB participle handled by POS classifier
   if (/^(from|by|with|for)\s+/i.test(term)) return false;
-  if (/^(contrast|genetic|land)$/i.test(term)) return false; // vague single words: "In contrast", "genetic" (adj), "land" (2026-10-10)
-  if (/\btoward\b/i.test(term)) return false; // "Movement toward a stimulus" - prepositional fragment (2026-10-10)
+  // Single-word POS check in final sweep
+  // PREP without noun handled by POS classifier
   if (/^\d+\s+/i.test(term)) return false; // "6 main characteristics" list header
   if (/^all\s+\w+$/i.test(term)) return false;
   // Single-word terms allowed (Melatonin, Gestalt, etc.) - ranking will sort by quality
@@ -937,50 +937,117 @@ function extractDrafts(pages) {
       capFreq[pphrase] = (capFreq[pphrase] || 0) + 1;
     }
     const listNouns = {}; // term (lower) -> list sentence (definition context)
-    // GRAMMAR-AWARE NOUN PHRASE CHUNKER (2026-10-10, Truman: "it needs to understand it"):
-    // Understands the ROLES of or/to/the, not just their characters.
-    // Pattern: [DET] (ADJ|NOUN)* NOUN ([CONJ] [DET] (ADJ|NOUN)* NOUN)* ([PREP] [DET] (ADJ|NOUN)* NOUN+)*
-    // "sensitivity or response to the environment" = NOUN CONJ NOUN PREP DET NOUN -> one valid phrase
-    // "look alike" = VERB ADJ -> not a noun phrase. "not biologists" = NEG NOUN -> not a term.
-    const CONJ = new Set(['or', 'and', 'nor']);
-    const PREP = new Set(['to', 'of', 'in', 'on', 'for', 'with', 'by', 'from', 'at', 'into', 'through']);
-    const DET = new Set(['the', 'a', 'an', 'this', 'that', 'these', 'those']);
-    const NEG = new Set(['not', 'no', 'never', 'neither', 'nor']);
-    function chunkNounPhrase(phrase) {
-      const words = phrase.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-      if (words.length === 0) return null;
-      // Must start with DET, NOUN, or ADJ (not verb, not negation, not conjunction)
-      if (NEG.has(words[0]) || CONJ.has(words[0]) || PREP.has(words[0])) return null;
-      // Must end with a NOUN (not preposition, conjunction, determiner, adverb)
-      const last = words[words.length - 1];
-      if (CONJ.has(last) || PREP.has(last) || DET.has(last)) return null;
-      if (/ly$/.test(last) && words.length > 1) return null; // adverb ending
-      // Track state: we need at least one NOUN
-      let hasNoun = false;
-      let expectNoun = false; // after CONJ or PREP, we expect a noun phrase
-      for (let i = 0; i < words.length; i++) {
-        const w = words[i];
-        if (CONJ.has(w)) {
-          // Conjunction must join two noun phrases: need noun before, noun after
-          if (!hasNoun || i === words.length - 1) return null;
-          expectNoun = true;
-          hasNoun = false; // reset for the next conjunct
-        } else if (PREP.has(w)) {
-          // Preposition starts a modifier: need noun after
-          if (i === words.length - 1) return null;
-          expectNoun = true;
-        } else if (DET.has(w)) {
-          // Determiner: must be followed by noun/adjective
-          if (i === words.length - 1) return null;
-        } else {
-          // Content word (noun/adjective) - assume noun for now
-          // (True POS would need the NLP library; we use position + blocklists)
-          hasNoun = true;
-          expectNoun = false;
+    // GENERAL POS CLASSIFIER (2026-10-10, Truman: "classify words on noun, verb, adverb, conjunction..."):
+    // Not specific word lists - general part-of-speech tagging. Uses compromise.js (window.nlp)
+    // when available in the browser, falls back to heuristic rules in Node/test.
+    // Every word gets a tag: NOUN, VERB, ADJ, ADV, CONJ, PREP, DET, PRON, NEG, NUM, UNK
+    const _posCache = {};
+    function classifyWords(phrase) {
+      const key = phrase.toLowerCase();
+      if (_posCache[key]) return _posCache[key];
+      const words = key.split(/\s+/).filter(w => w.length > 0);
+      let tags;
+      // Try compromise.js for real POS tagging
+      try {
+        if (typeof window !== 'undefined' && window.nlp) {
+          const doc = window.nlp(phrase);
+          const json = doc.json()[0];
+          if (json && json.terms) {
+            tags = json.terms.map(t => {
+              const ts = t.tags || [];
+              if (ts.includes('Noun')) return 'NOUN';
+              if (ts.includes('Verb')) return 'VERB';
+              if (ts.includes('Adjective')) return 'ADJ';
+              if (ts.includes('Adverb')) return 'ADV';
+              if (ts.includes('Conjunction')) return 'CONJ';
+              if (ts.includes('Preposition')) return 'PREP';
+              if (ts.includes('Determiner')) return 'DET';
+              if (ts.includes('Pronoun')) return 'PRON';
+              if (ts.includes('Negative')) return 'NEG';
+              return 'UNK';
+            });
+            // Align tags with words (compromise may split differently)
+            if (tags.length !== words.length) tags = null;
+          }
+        }
+      } catch (e) { tags = null; }
+      // Heuristic fallback: classify by word lists + morphology
+      if (!tags) {
+        const CONJ = new Set(['or', 'and', 'nor', 'but', 'yet', 'so']);
+        const PREP = new Set(['to', 'of', 'in', 'on', 'for', 'with', 'by', 'from', 'at', 'into', 'through', 'toward', 'towards', 'against', 'among', 'between']);
+        const DET = new Set(['the', 'a', 'an', 'this', 'that', 'these', 'those']);
+        const PRON = new Set(['it', 'its', 'itself', 'they', 'them', 'themselves', 'he', 'she', 'him', 'her', 'himself', 'herself', 'we', 'us', 'ourselves', 'you', 'yourself']);
+        const NEG = new Set(['not', 'no', 'never', 'neither', 'none']);
+        const VERBS = new Set(['is', 'are', 'was', 'were', 'be', 'been', 'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 'can', 'could', 'shall', 'should', 'may', 'might', 'must', 'look', 'looks', 'respond', 'responds', 'cope', 'copes', 'react', 'reacts', 'achieve', 'form', 'make', 'take', 'give', 'get', 'go', 'come', 'become', 'seem', 'appear']);
+        // Common adverbs that don't end in -ly (2026-10-10)
+        const ADV = new Set(['often', 'usually', 'generally', 'typically', 'commonly', 'collectively', 'rarely', 'seldom', 'never', 'always', 'sometimes', 'frequently']);
+        const rawTags = words.map(w => {
+          const cw = w.replace(/[^a-z]/g, '');
+          if (CONJ.has(cw)) return 'CONJ';
+          if (PREP.has(cw)) return 'PREP';
+          if (DET.has(cw)) return 'DET';
+          if (PRON.has(cw)) return 'PRON';
+          if (NEG.has(cw)) return 'NEG';
+          if (VERBS.has(cw)) return 'VERB';
+          if (ADV.has(cw)) return 'ADV';
+          if (/ly$/.test(cw) && cw.length > 5) return 'ADV';
+          if (/^(un|in|im|dis|non)/.test(cw) && /(able|ible|ive|ous|al|ic)$/.test(cw)) return 'ADJ';
+          if (/(ic|al|ous|ive|ary|ful|less)$/.test(cw) && cw.length > 4) return 'ADJ';
+          if (/ed$/.test(cw) && cw.length > 4) return 'VERB'; // past tense
+          if (/ing$/.test(cw) && cw.length > 5) return 'VERB_ING'; // may be gerund-noun
+          return 'NOUN';
+        });
+        // Context fix: -ing as gerund-noun only in true compounds.
+        // "energy processing", "data processing" -> NOUN (the process).
+        // "viruses living", "cells dividing" -> VERB (participle: viruses that live).
+        // Distinguish: gerunds are abstract process nouns; participles describe the noun.
+        const GERUND_NOUNS = new Set(['processing', 'building', 'learning', 'training', 'binding', 'coding', 'signaling']);
+        tags = rawTags.map((t, i) => {
+          if (t === 'VERB_ING') {
+            const w = words[i].replace(/[^a-z]/g, '');
+            if (GERUND_NOUNS.has(w)) return 'NOUN';
+            return 'VERB';
+          }
+          return t;
+        });
+      }
+      const result = words.map((w, i) => ({ word: w, tag: tags[i] || 'UNK' }));
+      _posCache[key] = result;
+      return result;
+    }
+    // NOUN PHRASE VALIDATOR (2026-10-10): uses POS tags, not word lists.
+    // Valid: [DET] (ADJ|NOUN)* NOUN ([CONJ] [DET] (ADJ|NOUN)* NOUN)* ([PREP] [DET] (ADJ|NOUN)* NOUN+)*
+    // Invalid: starts with VERB/ADV/NEG/CONJ/PREP, ends with non-NOUN, contains main VERB
+    function isNounPhrase(phrase) {
+      const tagged = classifyWords(phrase);
+      if (tagged.length === 0) return false;
+      const tags = tagged.map(t => t.tag);
+      // Must start with DET, ADJ, or NOUN
+      if (!['DET', 'ADJ', 'NOUN'].includes(tags[0])) return false;
+      // Must end with NOUN (the head word)
+      if (tags[tags.length - 1] !== 'NOUN') return false;
+      // Must contain at least one NOUN
+      if (!tags.includes('NOUN')) return false;
+      // No VERB in main position (verbs only allowed? No - verbs disqualify)
+      // But allow VERB-looking words that are actually nouns? No, trust the tagger.
+      if (tags.includes('VERB')) return false;
+      // No NEG, PRON as head
+      if (tags.includes('NEG')) return false;
+      // CONJ must be between nouns: check pattern
+      for (let i = 0; i < tags.length; i++) {
+        if (tags[i] === 'CONJ') {
+          // Need NOUN before (or ADJ+NOUN) and NOUN after
+          const before = tags.slice(0, i);
+          const after = tags.slice(i + 1);
+          if (!before.includes('NOUN') || !after.includes('NOUN')) return false;
+        }
+        if (tags[i] === 'PREP') {
+          // Need NOUN after the preposition
+          const after = tags.slice(i + 1);
+          if (!after.includes('NOUN')) return false;
         }
       }
-      if (expectNoun || !hasNoun) return null;
-      return phrase; // valid noun phrase structure
+      return true;
     }
     // LIST-NOUN EXTRACTION (2026-10-10, Truman: "just nouns or lists of nouns"):
     // "characteristics or functions: order, sensitivity, reproduction, ..., and evolution"
@@ -1011,7 +1078,7 @@ function extractDrafts(pages) {
           // GRAMMAR CHECK (Truman: "it needs to understand it"):
           // "sensitivity or response to the environment" is a valid noun phrase (NOUN CONJ NOUN PREP DET NOUN)
           // "look alike" is not (VERB ADJ). No arbitrary word cap - grammar decides.
-          if (!chunkNounPhrase(clean)) continue;
+          if (!isNounPhrase(clean)) continue;
           // Nouns from lists get a boost (Truman: lists of nouns are cards)
           capFreq[clean] = (capFreq[clean] || 0) + 3;
           // Mark as list-noun: the list sentence IS its definition (bypasses verb-score)
@@ -2119,10 +2186,48 @@ function extractDrafts(pages) {
     finalFiltered.length = 0;
     finalFiltered.push(...deduped);
   } catch (e) { /* fragment dedup failed */ }
-  // FINAL JUNK SWEEP (2026-10-10): remove known junk that bypasses stage filters
-  // "genetic" (adj), "contrast" (from "In contrast"), "land" (too generic)
-  const JUNK_TERMS = new Set(['genetic', 'contrast', 'land']);
-  const cleaned = finalFiltered.filter(d => !JUNK_TERMS.has(d.term.toLowerCase().trim()));
+  // FINAL POS SWEEP (2026-10-10, Truman: classify, don't list examples):
+  // Every term must be a valid noun phrase by POS tags. "genetic" (ADJ),
+  // "contrast" (from "In contrast" - no noun head), "land" (too generic, no context)
+  // are rejected by the classifier, not a blocklist.
+  // GENERAL TRANSITION DETECTION (2026-10-10): transitions follow patterns, not word lists.
+  // "In contrast," "In addition," "By comparison," - PREP + NOUN + comma at clause start.
+  // These are discourse markers, not defined concepts. Detect by PATTERN.
+  const fullTextForTrans = pages.map(p => String(p.text || "")).join("\n");
+  function isTransition(term) {
+    const t = term.toLowerCase().trim();
+    // Pattern: "In <term>," or "By <term>," - prepositional transition phrase
+    const transPat = new RegExp('\\b(?:in|by|on)\\s+' + t.replace(/[^a-z0-9]/g, '') + '\\s*,', 'i');
+    return transPat.test(fullTextForTrans);
+  }
+  const cleaned = finalFiltered.filter(d => {
+    const term = (d.term || '').trim();
+    if (!term) return false;
+    const tlower = term.toLowerCase();
+    // Transition pattern: "In contrast," -> not a term (general pattern, not word list)
+    if (isTransition(term)) return false;
+    const words = term.split(/\s+/);
+    if (words.length === 1) {
+      const tagged = classifyWords(term);
+      if (tagged.length === 0 || tagged[0].tag !== 'NOUN') return false;
+      // Single common nouns need definitional context to be terms.
+      // "land" is a noun, but if it's never defined ("Land is..."), it's not a term.
+      // Check: does the text define it? (Term appears as subject of definitional verb)
+      if (d.source !== 'list') {
+        const defPat = new RegExp('\\b' + tlower.replace(/[^a-z0-9]/g, '') + '\\s+(?:is|are|was|were|refers? to|means?)\\b', 'i');
+        if (!defPat.test(fullTextForTrans)) {
+          // No definition found - is it a technical term or common word?
+          // Technical terms are usually multi-word or capitalized. Single common
+          // nouns without definitions are not terms.
+          if (/^[a-z]+$/.test(tlower) && tlower.length <= 6) return false;
+        }
+      }
+    } else {
+      // Multi-word: must be a valid noun phrase
+      if (!isNounPhrase(term)) return false;
+    }
+    return true;
+  });
   return cleaned.slice(0, AUTODRAFT_CAP);
 }
 
