@@ -885,7 +885,7 @@ function extractDrafts(pages) {
     // OBJECT EXTRACTION (Truman 2026-10-09: "Those are all nouns"):
     // "establishes thermal equilibrium" -> "thermal equilibrium" is a noun, it's a card
     // "formulated the heat theorem" -> "heat theorem" is a noun, it's a card
-    const objRe = /\b(establishes?|states?|formulated?|predicts?|measures?|represents?|includes?|contains?|involves?|converts?|proposed?|explains?|discovered?|calculates?)\s+(?:the\s+|a\s+|an\s+)?([a-zA-Z]{3,}(?:\s+[a-zA-Z]{3,}){0,2})\b/gi;
+    const objRe = /\b(establishes?|states?|formulated?|predicts?|measures?|represents?|includes?|contains?|involves?|converts?|proposed?|explains?|discovered?|calculates?|drafted?)\s+(?:the\s+|a\s+|an\s+)?([a-zA-Z]{3,}(?:\s+[a-zA-Z]{2,}){0,2})\b/gi;
     let om;
     while ((om = objRe.exec(fullTextN)) !== null) {
       let ophrase = om[2].trim();
