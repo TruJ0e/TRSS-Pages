@@ -819,7 +819,7 @@ function extractDrafts(pages) {
     // Find noun phrases: Capitalized start, allow lowercase continuations (Truman 2026-10-09:
     // "If it's a noun it's a card. If it's a verb it's most likely part of a card")
     // "Sodium chloride", "hydrogen molecule" - lowercase words are part of the noun phrase
-    const capRe = /\b([A-Z][a-z]{2,}(?:['’]s)?(?:[\s-]+[a-z]{2,}){0,2})\b/g;
+    const capRe = /\b([A-Z][a-z]{2,}(?:['’]s)?(?:[\s-]+[a-zA-Z]{2,})*)\b/g;
     const capFreq = {};
     let cm;
     while ((cm = capRe.exec(fullTextN)) !== null) {
@@ -828,8 +828,8 @@ function extractDrafts(pages) {
       phrase = phrase.replace(/^(the|a|an)\s+/i, "");
       // Trim trailing verbs: "Sodium chloride exemplifies" -> "Sodium chloride"
       // (verb is part of definition, not the term - Truman 2026-10-09)
-      phrase = phrase.replace(/\s+(exemplifies?|demonstrates?|measures?|occurs?|combines?|affects?|includes?|rearranges?|calculates?|relates?|equals?|expresses?|produces?|conducts?|synthesizes?|contains?|involves?|forms?|facilitates?|studies?)\b.*$/i, "");
-      if (phrase.length < 4 || phrase.length > 50) continue;
+      phrase = phrase.replace(/\s+(exemplifies?|demonstrates?|measures?|occurs?|combines?|affects?|includes?|rearranges?|calculates?|relates?|equals?|expresses?|produces?|conducts?|synthesizes?|contains?|involves?|forms?|facilitates?|studies?|explains?|proposes?|proposed?|states?|formulated?|developed?|analyzed?|discovered?|established?)\b.*$/i, "");
+      if (phrase.length < 4 || phrase.length > 120) continue;
       if (seen.has(phrase.toLowerCase())) continue;
       // Skip single-word adjectives (Prokaryotic, Eukaryotic) - they're fragments, not terms
       // Truman: "if its not a verb, adverb, or something else then its a noun"
