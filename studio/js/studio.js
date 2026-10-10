@@ -637,7 +637,16 @@ function autodraftTermOk(term) {
   if (/^(in|on|at|what|when|where|how|why)\b/i.test(term)) return false; // question fragment
   if (/\bmany\b/i.test(term) && /\bpsychologists/i.test(term)) return false; // "many psychologists"
   if (/^(among|according|notable|and|or|but)\b/i.test(term)) return false; // fragment starter
+  if (/^not\b/i.test(term)) return false; // "not biologists" - negation fragment, not a term (2026-10-10)
+  if (/\b(often|usually|generally|typically|commonly)\s*$/i.test(term)) return false; // ends with adverb: "organisms often" (2026-10-10)
+  if (/\blook\s+alike/i.test(term)) return false; // "look alike" - verb phrase, not a term (2026-10-10)
+  if (/^(respond|cope|react|adapt|grow|move|change)\b/i.test(term)) return false; // verb-led phrase: "respond to stimuli" (2026-10-10)
+  if (/\b(itself|themselves|himself|herself)\s*$/i.test(term)) return false; // "cell itself" - pronoun, not a term (2026-10-10)
+  if (/\w+ly\s*$/i.test(term) && term.split(/\s+/).length > 1) return false; // ends with adverb: "Biologists collectively" (2026-10-10)
+  if (/\b(living|dying|growing)\s*$/i.test(term)) return false; // ends with participle: "viruses living" (2026-10-10)
   if (/^(from|by|with|for)\s+/i.test(term)) return false;
+  if (/^(contrast|genetic|land)$/i.test(term)) return false; // vague single words: "In contrast", "genetic" (adj), "land" (2026-10-10)
+  if (/\btoward\b/i.test(term)) return false; // "Movement toward a stimulus" - prepositional fragment (2026-10-10)
   if (/^\d+\s+/i.test(term)) return false; // "6 main characteristics" list header
   if (/^all\s+\w+$/i.test(term)) return false;
   // Single-word terms allowed (Melatonin, Gestalt, etc.) - ranking will sort by quality
@@ -927,35 +936,55 @@ function extractDrafts(pages) {
       if (pw.some(w => /^(is|are|was|were|has|have)$/i.test(w))) continue;
       capFreq[pphrase] = (capFreq[pphrase] || 0) + 1;
     }
-    // LIST EXTRACTION (2026-10-10, real PDF): comma-separated terms after colon
+    const listNouns = {}; // term (lower) -> list sentence (definition context)
+    // LIST-NOUN EXTRACTION (2026-10-10, Truman: "just nouns or lists of nouns"):
     // "characteristics or functions: order, sensitivity, reproduction, ..., and evolution"
+    // Each comma-separated item is a noun -> it's a card.
     try {
-      const listMatch = fullTextN.match(/:\s*([a-z][\s\S]{10,400}?)(?:\.\s|\n\n)/i);
-      if (listMatch) {
-        const listText = listMatch[1].replace(/\s+/g, ' ');
-        if (/,/.test(listText)) {
-          const items = listText.split(/,\s*/);
-          for (let item of items) {
-            item = item.replace(/^\s*and\s+/i, '').trim();
-            // Take up to 4 words
-            const words = item.split(/\s+/).filter(w => w.length > 1);
-            if (words.length === 0 || words.length > 5) continue;
-            const clean = words.join(' ').replace(/[^a-zA-Z\s]/g, '').trim();
-            if (clean.length < 3 || clean.length > 50) continue;
-            if (/^(the|a|an|and|or)$/i.test(clean)) continue;
-            if (seen.has(clean.toLowerCase())) continue;
-            capFreq[clean] = (capFreq[clean] || 0) + 3;
-          }
+      // Find all colon-introduced lists
+      const colonRe = /:\s*([\s\S]{10,500}?)(?:\.\s|\n\n|\.(?:\n|$))/gi;
+      let cm2;
+      while ((cm2 = colonRe.exec(fullTextN)) !== null) {
+        let listText = cm2[1].replace(/\s+/g, ' ').trim();
+        // Must look like a list: at least 2 commas or comma+and
+        const commas = (listText.match(/,/g) || []).length;
+        if (commas < 2) continue;
+        // Skip if it looks like a sentence (has verbs)
+        if (/\b(is|are|was|were|has|have|will|would|can|could)\b/i.test(listText.slice(0, 80))) continue;
+        const items = listText.split(/,\s*/);
+        for (let item of items) {
+          item = item.replace(/^\s*and\s+/i, '').trim();
+          // Strip trailing period
+          item = item.replace(/\.$/, '').trim();
+          const words = item.split(/\s+/).filter(w => w.length > 0);
+          if (words.length === 0 || words.length > 6) continue;
+          // Must be noun-like: no verbs, no leading articles/conjunctions
+          const clean = words.join(' ').replace(/[^a-zA-Z\s-]/g, '').trim();
+          if (clean.length < 3 || clean.length > 60) continue;
+          if (/^(the|a|an|and|or|of|in|on)\b/i.test(clean)) continue;
+          if (/\b(is|are|was|were|has|have|that|which)\b/i.test(clean)) continue;
+          if (seen.has(clean.toLowerCase())) continue;
+          // Nouns from lists get a boost (Truman: lists of nouns are cards)
+          capFreq[clean] = (capFreq[clean] || 0) + 3;
+          // Mark as list-noun: the list sentence IS its definition (bypasses verb-score)
+          listNouns[clean.toLowerCase()] = cm2[0].replace(/\s+/g, ' ').trim().slice(0, 300);
+          seen.add(clean.toLowerCase());
         }
       }
     } catch(e) {}
-    // LIST EXTRACTION placeholder removed
     // For phrases, find best definitional sentence (Truman: nouns are key, even if once)
     // Sort longest-first so "Covalent bonds" claims before "Covalent" fragment
     const sortedPhrases = Object.entries(capFreq).sort((a, b) => b[0].split(/\s+/).length - a[0].split(/\s+/).length || b[0].length - a[0].length);
     for (const [phrase, freq] of sortedPhrases) {
       // Single-occurrence terms allowed if they have a strong definitional sentence
       if (freq < 1) continue;
+      // List-nouns: already in seen, create card directly with list sentence
+      const listSent = listNouns[phrase.toLowerCase()];
+      if (listSent) {
+        // List-nouns: use 'simple' so the verified filter keeps them (Truman: lists of nouns are cards)
+        drafts.push({ term: phrase, simple: listSent, source: 'list', srcSentence: listSent });
+        continue;
+      }
       if (seen.has(phrase.toLowerCase())) continue;
       // Find sentence containing the phrase
       const sents = fullTextN.match(/[^.!?]+[.!?]+/g) || [];
