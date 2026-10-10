@@ -826,6 +826,9 @@ function extractDrafts(pages) {
       let phrase = cm[1].trim();
       // Trim leading articles: "The hydrogen molecule" -> "hydrogen molecule"
       phrase = phrase.replace(/^(the|a|an)\s+/i, "");
+      // Trim leading numerals/ordinals: "Eight valence electrons" -> "valence electrons"
+      // (2026-10-10, Truman's noun-first rule: the numeral is a modifier, not the term)
+      phrase = phrase.replace(/^(?:\d+(?:st|nd|rd|th)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)\s+/i, "");
       // Trim trailing verbs: "Sodium chloride exemplifies" -> "Sodium chloride"
       // (verb is part of definition, not the term - Truman 2026-10-09)
       phrase = phrase.replace(/\s+(exemplifies?|demonstrates?|measures?|occurs?|combines?|affects?|includes?|rearranges?|calculates?|relates?|equals?|expresses?|produces?|conducts?|synthesizes?|contains?|involves?|forms?|facilitates?|studies?|explains?|proposes?|proposed?|states?|formulated?|developed?|analyzed?|discovered?|established?)\b.*$/i, "");
@@ -847,6 +850,37 @@ function extractDrafts(pages) {
       // Skip if it's a verb, adverb, or stopword (Truman's process of elimination)
       if (!autodraftTermOk(phrase)) continue;
       capFreq[phrase] = (capFreq[phrase] || 0) + 1;
+    }
+    // NUMERAL-PREFIXED NOUNS (2026-10-10, Truman's noun-first rule):
+    // "eight valence electrons" -> "valence electrons". Lowercase numeral-led phrases
+    // never match the capitalized pass and have no verb hook, so the noun was missed.
+    // The numeral/quantifier is a modifier, not the term — strip it and run the noun
+    // through the same junk filters + definitional-sentence gate as every other pass.
+    const numRe = /\b(?:\d+(?:st|nd|rd|th)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|several|many|few)\s+([a-zA-Z]{3,}(?:\s+[a-zA-Z]{3,}){0,3})\b/gi;
+    // First-word blocklist: vague nouns, time units, sample/count words, people —
+    // "two things happen" / "six days later" / "three students found" are not terms.
+    const numBlock = new Set(("effort efforts fact facts thing things way ways part parts approach approaches kind kinds study studies result results " +
+      "day days week weeks month months year years hour hours minute minutes second seconds time times moment moments " +
+      "sample samples trial trials test tests page pages chapter chapters section sections figure figures table tables group groups step steps item items point points example examples " +
+      "student students person people participant participants researcher researchers scientist scientists").split(" "));
+    const numVerbStarts = ["achieve","form","make","take","give","get","go","come","become","seem","appear"];
+    // Head-word check: a noun phrase's last word must be a noun —
+    // "objects reach the same" (head "same") is a clause fragment, not a term.
+    const numHeadBlock = new Set(("same other another such many few several all both each every more most less least own very too so as than that this these those " +
+      "reach reaches go goes come comes run runs move moves change changes form forms make makes take takes give gives get gets seem seems appear appears become becomes remain remains stay stays keep keeps turn turns grow grows fall falls rise rises lead leads happen happens occur occurs").split(" "));
+    let nm;
+    while ((nm = numRe.exec(fullTextN)) !== null) {
+      let nphrase = nm[1].trim();
+      if (nphrase.length < 4 || nphrase.length > 70) continue;
+      if (seen.has(nphrase.toLowerCase())) continue;
+      const nwords = nphrase.split(/\s+/);
+      const nfirst = nwords[0].toLowerCase().replace(/[^a-z]/g, "");
+      if (numBlock.has(nfirst)) continue;
+      if (numVerbStarts.includes(nfirst)) continue;
+      const nhead = nwords[nwords.length - 1].toLowerCase().replace(/[^a-z]/g, "");
+      if (numHeadBlock.has(nhead)) continue;
+      if (!autodraftTermOk(nphrase)) continue;
+      capFreq[nphrase] = (capFreq[nphrase] || 0) + 1;
     }
     // OBJECT EXTRACTION (Truman 2026-10-09: "Those are all nouns"):
     // "establishes thermal equilibrium" -> "thermal equilibrium" is a noun, it's a card
