@@ -831,7 +831,7 @@ function extractDrafts(pages) {
       phrase = phrase.replace(/^(?:\d+(?:st|nd|rd|th)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)\s+/i, "");
       // Trim trailing verbs: "Sodium chloride exemplifies" -> "Sodium chloride"
       // (verb is part of definition, not the term - Truman 2026-10-09)
-      phrase = phrase.replace(/\s+(exemplifies?|demonstrates?|measures?|occurs?|combines?|affects?|includes?|rearranges?|calculates?|relates?|equals?|expresses?|produces?|conducts?|synthesizes?|contains?|involves?|forms?|facilitates?|studies?|explains?|proposes?|proposed?|states?|formulated?|developed?|analyzed?|discovered?|established?)\b.*$/i, "");
+      phrase = phrase.replace(/\s+(\w+ed\b|exemplifies?|demonstrates?|measures?|occurs?|combines?|affects?|includes?|rearranges?|calculates?|relates?|equals?|expresses?|produces?|conducts?|synthesizes?|contains?|involves?|forms?|facilitates?|studies?|explains?|proposes?|proposed?|states?|formulated?|developed?|analyzed?|discovered?|established?|drafted?|commanded?|shaped?|fueled?|organized?|tested?|asserted?|justified?|balanced?|coordinated?|managed?|marked?|provided?|recognized?)\b.*$/i, "");
       if (phrase.length < 4 || phrase.length > 120) continue;
       if (seen.has(phrase.toLowerCase())) continue;
       // Skip single-word adjectives (Prokaryotic, Eukaryotic) - they're fragments, not terms
@@ -933,7 +933,7 @@ function extractDrafts(pages) {
         // Phrase at start = likely the term being defined
         if (s.trim().toLowerCase().startsWith(phrase.toLowerCase().substring(0, 10))) score += 3; else if (s.trim().toLowerCase().indexOf(phrase.toLowerCase().substring(0, 10)) < 60 && s.trim().toLowerCase().indexOf(phrase.toLowerCase().substring(0, 10)) >= 0) score += 2;
         // Has a verb (any verb, not just our list)
-        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?|studies?|measures?|represents?|establishes?|states?|formulated?|predicted?|forms?|occurs?|proposes?|proposed?|explains?|includes?|calculates?|relates?)\b/i.test(s)) score += 2;
+        if (/\b(is|are|was|were|has|have|produces?|conducts?|synthesizes?|contains?|involves?|studies?|measures?|represents?|establishes?|states?|formulated?|predicted?|forms?|occurs?|proposes?|proposed?|explains?|includes?|calculates?|relates?)\b/i.test(s)) score += 2; else if (/\b\w+ed\b/.test(s)) score += 2; // generic past-tense verb
         if (score > bestScore) {
           bestScore = score;
           bestSent = s.trim();
@@ -1869,7 +1869,7 @@ function extractDrafts(pages) {
   // "Electronegativity measures attraction" -> "Electronegativity"
   // Verbs belong in definitions, not terms.
   try {
-    const verbPattern = /\s+(measures?|calculates?|occurs?|involves?|includes?|contains?|produces?|conducts?|demonstrates?|exemplifies?|affects?|combines?|rearranges?|relates?|equals?|expresses?|forms?|states?|carries?|represents?|converts?|flows?|predicts?|establishes?).*$/i;
+    const verbPattern = /\s+(\w+ed\b|measures?|calculates?|occurs?|involves?|includes?|contains?|produces?|conducts?|demonstrates?|exemplifies?|affects?|combines?|rearranges?|relates?|equals?|expresses?|forms?|states?|carries?|represents?|converts?|flows?|predicts?|establishes?).*$/i;
     for (const d of finalFiltered) {
       const trimmed = d.term.replace(verbPattern, "").trim();
       if (trimmed.length >= 3 && trimmed !== d.term) {
