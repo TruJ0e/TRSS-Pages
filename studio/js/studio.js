@@ -1051,7 +1051,9 @@ function extractDrafts(pages) {
           const cw = word.replace(/[^a-z]/g, '');
           if (!/s$/.test(cw) || cw.length < 4) return false;
           if (/ss$/.test(cw)) return false;
-          if (/(ions|ations|ers|ors|ists|ies|ves|oes|xes|ches|shes|sses)$/.test(cw)) return false;
+          if (/(ions|ations|ies|ves|oes|xes|ches|shes|sses)$/.test(cw)) return false;
+          // Note: "ers|ors|ists" removed (2026-10-10): in NOUN+WORD-s context, "refers"/"offers"
+          // are verbs, not plural nouns. Plural agent nouns have DET prev, not NOUN/ADJ.
           return true;
         }
         const rawTags = words.map(w => {
@@ -1075,7 +1077,15 @@ function extractDrafts(pages) {
         // "viruses living", "cells dividing" -> VERB (participle: viruses that live).
         // Distinguish: gerunds are abstract process nouns; participles describe the noun.
         const GERUND_NOUNS = new Set(['processing', 'building', 'learning', 'training', 'binding', 'coding', 'signaling']);
-        tags = rawTags.map((t, i) => {
+        // Infinitive verbs: "to" + WORD (not DET) = VERB. "to help", "to behave", "to test".
+        // General syntactic rule, not a word list. "to the store" keeps NOUN (has DET).
+        const withInfinitives = rawTags.map((t, i) => {
+          if (t === 'NOUN' && i > 0 && words[i-1].replace(/[^a-z]/g, '') === 'to') {
+            return 'VERB';
+          }
+          return t;
+        });
+        tags = withInfinitives.map((t, i) => {
           if (t === 'VERB_ING') {
             const w = words[i].replace(/[^a-z]/g, '');
             if (GERUND_NOUNS.has(w)) return 'NOUN';
@@ -1084,8 +1094,8 @@ function extractDrafts(pages) {
           if (t === 'NOUN' && i > 0) {
             // Look back past ADV/CONJ to find the subject noun
             let prevIdx = i - 1;
-            while (prevIdx >= 0 && ['ADV', 'CONJ'].includes(rawTags[prevIdx])) prevIdx--;
-            if (prevIdx >= 0 && isThirdPersonVerb(words[i], rawTags[prevIdx])) return 'VERB';
+            while (prevIdx >= 0 && ['ADV', 'CONJ'].includes(withInfinitives[prevIdx])) prevIdx--;
+            if (prevIdx >= 0 && isThirdPersonVerb(words[i], withInfinitives[prevIdx])) return 'VERB';
           }
           return t;
         });
