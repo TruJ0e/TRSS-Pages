@@ -943,6 +943,11 @@ function extractDrafts(pages) {
     // (ADJ NOUN), "density of a substance" (NOUN PREP DET NOUN) are each ONE card.
     // This is recall-first: capture everything, rank by frequency.
     function extractAllNouns(text) {
+      // DISABLED 2026-10-11 (Truman: Option 2 - back to selective extraction)
+      // All-noun found everything but ranking couldn't separate terms from descriptions.
+      // Selective pipeline with stronger POS engine is the path forward.
+      return { freq: {}, firstSeen: {} };
+      // Original implementation below (unreachable)
       const freq = {};
       const firstSeen = {}; // phrase -> first sentence containing it (for definition)
       const sentences = text.split(/(?:[.!?]+\s+|\n+)/);
@@ -1198,7 +1203,8 @@ function extractDrafts(pages) {
       // TERM-NESS RANKING (2026-10-10): score by general linguistic signals.
       // Terms name concepts; descriptions describe instances. All cards kept,
       // but best float to top.
-      const allNounSent = allNounSeen[phrase.toLowerCase()];
+      const allNounSent = null; // DISABLED 2026-10-11 Option 2
+      // const allNounSent = allNounSeen[phrase.toLowerCase()];
       if (allNounSent) {
         let score = 0;
         const freq = capFreq[phrase] || 1;
