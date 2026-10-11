@@ -1033,7 +1033,7 @@ function extractDrafts(pages) {
       } catch (e) { tags = null; }
       // Heuristic fallback: classify by word lists + morphology
       if (!tags) {
-        const CONJ = new Set(['or', 'and', 'nor', 'but', 'yet', 'so']);
+        const CONJ = new Set(['or', 'and', 'nor', 'but', 'yet', 'so', 'as', 'if', 'while', 'although', 'though', 'because', 'since', 'unless', 'until', 'whereas']);
         const PREP = new Set(['to', 'of', 'in', 'on', 'for', 'with', 'by', 'from', 'at', 'into', 'through', 'toward', 'towards', 'against', 'among', 'between', 'like', 'unlike']);
         const DET = new Set(['the', 'a', 'an', 'this', 'that', 'these', 'those']);
         const PRON = new Set(['it', 'its', 'itself', 'they', 'them', 'themselves', 'he', 'she', 'him', 'her', 'himself', 'herself', 'we', 'us', 'ourselves', 'you', 'yourself']);
@@ -1195,9 +1195,34 @@ function extractDrafts(pages) {
       // ALL-NOUN MODE (Truman 2026-10-10: "make cards for all nouns"):
       // Every noun phrase becomes a card. The first-seen sentence is the context.
       // Compounds are already strung together by extractAllNouns.
+      // TERM-NESS RANKING (2026-10-10): score by general linguistic signals.
+      // Terms name concepts; descriptions describe instances. All cards kept,
+      // but best float to top.
       const allNounSent = allNounSeen[phrase.toLowerCase()];
       if (allNounSent) {
-        drafts.push({ term: phrase, simple: allNounSent, source: 'all-noun', srcSentence: allNounSent, _verified: true, _layoutBold: true });
+        let score = 0;
+        const freq = capFreq[phrase] || 1;
+        // Frequency: terms repeat, descriptions don't
+        if (freq >= 3) score += 2; else if (freq >= 2) score += 1;
+        // POS signals: adverbs and participles mark descriptions
+        try {
+          const tagged = classifyWords(phrase);
+          const tags = tagged.map(t => t.tag);
+          if (tags.includes('ADV')) score -= 2; // "quite far apart" = description
+          if (tags[0] === 'VERB') score -= 2; // "given to..." = participle phrase
+          // Length: very long phrases are descriptive
+          if (tagged.length > 6) score -= 1;
+          // Short, clean noun phrases are more term-like
+          if (tagged.length <= 3 && tags[tags.length-1] === 'NOUN') score += 1;
+        } catch (e) {}
+        // Structural prominence: standalone line = term
+        const phraseLower = phrase.toLowerCase();
+        const lines = fullTextN.split(/\n/);
+        for (const line of lines) {
+          const lc = line.trim().toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+          if (lc === phraseLower) { score += 2; break; }
+        }
+        drafts.push({ term: phrase, simple: allNounSent, source: 'all-noun', srcSentence: allNounSent, _verified: true, _layoutBold: true, _termScore: score, _freq: freq });
         continue;
       }
       if (seen.has(phrase.toLowerCase())) continue;
@@ -2351,6 +2376,9 @@ function extractDrafts(pages) {
 /* RANKING: Score drafts by importance for chapter-scale filtering */
 function scoreDraft(d) {
   let score = 5; // base
+  // Term-ness score from all-noun extraction (2026-10-10): general linguistic signals
+  // Terms name concepts; descriptions describe instances. Higher = more term-like.
+  if (d._termScore !== undefined) score += d._termScore;
   if (d._layoutBold) score += 5; // bold in source = author-marked key term (near-100%)
   if (d._fallback) score -= 5; // fallback extractions rank below pattern matches
   const term = d.term || "";
