@@ -936,12 +936,72 @@ function extractDrafts(pages) {
       if (pw.some(w => /^(is|are|was|were|has|have)$/i.test(w))) continue;
       capFreq[pphrase] = (capFreq[pphrase] || 0) + 1;
     }
+    const _posCache = {}; // shared POS cache (must precede extractAllNouns)
+    // ALL-NOUN EXTRACTION (2026-10-10, Truman: "make cards for all nouns"):
+    // Every noun phrase in the text becomes a candidate. Consecutive nouns
+    // are strung together: "hydrogen gas" (NOUN NOUN), "chemical change"
+    // (ADJ NOUN), "density of a substance" (NOUN PREP DET NOUN) are each ONE card.
+    // This is recall-first: capture everything, rank by frequency.
+    function extractAllNouns(text) {
+      const freq = {};
+      const firstSeen = {}; // phrase -> first sentence containing it (for definition)
+      const sentences = text.split(/(?:[.!?]+\s+|\n+)/);
+      for (const sent of sentences) {
+        const clean = sent.trim().replace(/\s+/g, ' ');
+        if (clean.length < 3 || clean.length > 600) continue;
+        const tagged = classifyWords(clean);
+        if (tagged.length === 0 || tagged.length > 60) continue;
+        let i = 0;
+        while (i < tagged.length) {
+          // Start at DET, ADJ, or NOUN
+          if (!['DET', 'ADJ', 'NOUN'].includes(tagged[i].tag)) { i++; continue; }
+          // Greedy expand: keep going through ADJ, NOUN, CONJ, PREP, DET
+          // Stop at VERB, ADV, PRON, NEG
+          let j = i;
+          while (j < tagged.length && ['DET', 'ADJ', 'NOUN', 'CONJ', 'PREP'].includes(tagged[j].tag)) j++;
+          // Must end with NOUN (the head)
+          // Back off trailing non-nouns (e.g., "density of" -> "density")
+          while (j > i && tagged[j-1].tag !== 'NOUN') j--;
+          // Must start with ADJ or NOUN (not PREP, CONJ, DET)
+          while (j > i && !['ADJ', 'NOUN'].includes(tagged[i].tag)) i++;
+          if (j > i && tagged[j-1].tag === 'NOUN') {
+            const words = tagged.slice(i, j).map(t => t.word);
+            let phrase = words.join(' ');
+            // Strip leading determiners: "the density" -> "density"
+            phrase = phrase.replace(/^(the|a|an)\s+/i, '').trim();
+            phrase = phrase.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '').trim();
+            // Reject if contains comma or ends with connector
+            if (/[,]/.test(phrase)) { i = j; continue; }
+            if (phrase.length >= 2 && phrase.length <= 80 && isNounPhrase(phrase)) {
+              const key = phrase.toLowerCase();
+              freq[key] = (freq[key] || 0) + 1;
+              if (!firstSeen[key]) firstSeen[key] = clean.slice(0, 300);
+            }
+            i = j;
+          } else {
+            i++;
+          }
+        }
+      }
+      return { freq, firstSeen };
+    }
+    // Run all-noun extraction and merge into capFreq (Truman 2026-10-10: all nouns)
+    // This is the primary candidate source now; specific extractors add more.
+    const allNounSeen = {}; // phrase -> first sentence (definition context)
+    try {
+      const allNounResult = extractAllNouns(fullTextN);
+      for (const [key, count] of Object.entries(allNounResult.freq)) {
+        if (seen.has(key)) continue;
+        if (!autodraftTermOk(key)) continue;
+        capFreq[key] = (capFreq[key] || 0) + count;
+        if (!allNounSeen[key]) allNounSeen[key] = allNounResult.firstSeen[key];
+      }
+    } catch (e) { /* all-noun failed */ }
     const listNouns = {}; // term (lower) -> list sentence (definition context)
     // GENERAL POS CLASSIFIER (2026-10-10, Truman: "classify words on noun, verb, adverb, conjunction..."):
     // Not specific word lists - general part-of-speech tagging. Uses compromise.js (window.nlp)
     // when available in the browser, falls back to heuristic rules in Node/test.
     // Every word gets a tag: NOUN, VERB, ADJ, ADV, CONJ, PREP, DET, PRON, NEG, NUM, UNK
-    const _posCache = {};
     function classifyWords(phrase) {
       const key = phrase.toLowerCase();
       if (_posCache[key]) return _posCache[key];
@@ -1120,6 +1180,14 @@ function extractDrafts(pages) {
         // List-nouns: source sentence IS from the text, mark verified by construction
         // (Truman: lists of nouns are cards - the list itself is the definition context)
         drafts.push({ term: phrase, simple: listSent, source: 'list', srcSentence: listSent, _verified: true, _layoutBold: true });
+        continue;
+      }
+      // ALL-NOUN MODE (Truman 2026-10-10: "make cards for all nouns"):
+      // Every noun phrase becomes a card. The first-seen sentence is the context.
+      // Compounds are already strung together by extractAllNouns.
+      const allNounSent = allNounSeen[phrase.toLowerCase()];
+      if (allNounSent) {
+        drafts.push({ term: phrase, simple: allNounSent, source: 'all-noun', srcSentence: allNounSent, _verified: true, _layoutBold: true });
         continue;
       }
       if (seen.has(phrase.toLowerCase())) continue;
