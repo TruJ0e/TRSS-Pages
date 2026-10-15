@@ -31,13 +31,13 @@
   function buildScopedQuizQueue(targets) {
     if (!targets || targets.length === 0) return [];
 
-    // Level 3: Application Scenario
-    const level3Questions = targets.map(card => {
-      const applyPrompt = (card.apply && card.apply.length > 0)
-        ? card.apply[0]
-        : `Which concept applies to this scenario: "${card.examples ? card.examples[0] : card.simple}"?`;
-      return {
-        id: `${card.id}-apply`,
+    // Level 3: Application Scenario (one question per apply prompt)
+    const level3Questions = targets.flatMap(card => {
+      const prompts = (card.apply && card.apply.length > 0)
+        ? card.apply
+        : [`Which concept applies to this scenario: "${card.examples ? card.examples[0] : card.simple}"?`];
+      return prompts.map((applyPrompt, idx) => ({
+        id: `${card.id}-apply-${idx}`,
         cardId: card.id,
         term: card.term,
         category: card.category,
@@ -47,7 +47,7 @@
         levelNum: 3,
         level: "Level 3: Application Scenario",
         prompt: applyPrompt
-      };
+      }));
     });
 
     // Level 2: Lesson Context Scenario
