@@ -56,28 +56,28 @@
             <div class="launcher-card">
               <div class="launcher-header">
                 <span class="launcher-icon">📇</span>
-                <span class="badge badge-primary">28 Flashcards</span>
+                <span class="badge badge-primary">24 Flashcards</span>
               </div>
               <h3 class="launcher-title">Interactive Flashcards</h3>
               <p class="launcher-desc">
                 Scaffolded learning breakdown presenting Term &rarr; Quick Cue &rarr; Plain Meaning &rarr; Lesson Examples &rarr; Distinctions naturally on every card.
               </p>
               <a href="./?mode=flashcards" class="btn-primary launcher-btn" id="launchFlashcardsBtn">
-                Launch Flashcards (28) →
+                Launch Flashcards (24) →
               </a>
             </div>
 
             <div class="launcher-card">
               <div class="launcher-header">
                 <span class="launcher-icon">📝</span>
-                <span class="badge badge-accent">84 Questions</span>
+                <span class="badge badge-accent">72 Questions</span>
               </div>
               <h3 class="launcher-title">Practice Quiz</h3>
               <p class="launcher-desc">
                 3 scenario-based questions per study item designed to test actual application and conceptual distinctions, complete with real-time feedback and cues.
               </p>
               <a href="./?mode=quiz" class="btn-primary launcher-btn" id="launchQuizBtn">
-                Start Practice Quiz (84) →
+                Start Practice Quiz (72) →
               </a>
             </div>
           </div>
@@ -89,10 +89,10 @@
               <p class="section-desc">Study concepts organized by textbook and lecture sections.</p>
             </div>
             <div class="topic-tags-grid">
-              <div class="topic-tag-item"><span>Biological Psychology</span> <span class="tag-count">(7 cards)</span></div>
-              <div class="topic-tag-item"><span>Culture and Diversity as Cross-cutting Themes in Psychology</span> <span class="tag-count">(1 cards)</span></div>
-              <div class="topic-tag-item"><span>How Did the Science of Psychology Begin?</span> <span class="tag-count">(19 cards)</span></div>
-              <div class="topic-tag-item"><span>Why Is Psychology a Hub Science?</span> <span class="tag-count">(1 cards)</span></div>
+              <div class="topic-tag-item"><span>What Is Science?</span> <span class="tag-count">(3 cards)</span></div>
+              <div class="topic-tag-item"><span>How Do Psychologists Conduct Research?</span> <span class="tag-count">(14 cards)</span></div>
+              <div class="topic-tag-item"><span>How Can We Conduct Ethical Research?</span> <span class="tag-count">(5 cards)</span></div>
+              <div class="topic-tag-item"><span>Research in the Real World</span> <span class="tag-count">(2 cards)</span></div>
             </div>
           </div>
 
@@ -113,11 +113,11 @@
         <div class="mode-tabs" role="tablist" aria-label="Study modes">
           <button id="modeFlashcardsBtn" class="mode-btn active" role="tab" aria-selected="true" type="button">
             <span class="mode-icon">📇</span>
-            <span>Flashcards <span class="tab-count">(28)</span></span>
+            <span>Flashcards <span class="tab-count">(24)</span></span>
           </button>
           <button id="modeQuizBtn" class="mode-btn" role="tab" aria-selected="false" type="button">
             <span class="mode-icon">📝</span>
-            <span>Practice Quiz <span class="tab-count">(84)</span></span>
+            <span>Practice Quiz <span class="tab-count">(72)</span></span>
           </button>
         </div>
 
@@ -139,17 +139,17 @@
           <div class="control-item trss-dropdown" id="setDropdown">
             <button type="button" class="dropdown-trigger" id="typeFilterBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by Set">
               <span class="control-label" id="typeFilterLabel">Set</span>
-              <span class="dropdown-value" id="typeFilterValue">All cards (28)</span>
+              <span class="dropdown-value" id="typeFilterValue">All cards (24)</span>
               <span class="dropdown-arrow" aria-hidden="true">▾</span>
             </button>
             <div class="dropdown-menu" id="typeFilterMenu" role="listbox" aria-label="Filter by Set">
               <button type="button" class="dropdown-option selected" role="option" aria-selected="true" data-value="all">
                 <span class="option-check">✓</span>
-                <span class="option-text">All cards (28)</span>
+                <span class="option-text">All cards (24)</span>
               </button>
               <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="book-term">
                 <span class="option-check"></span>
-                <span class="option-text">Book terms (28)</span>
+                <span class="option-text">Book terms (24)</span>
               </button>
               <button type="button" class="dropdown-option" role="option" aria-selected="false" data-value="lesson-concept">
                 <span class="option-check"></span>
@@ -161,8 +161,8 @@
               </button>
             </div>
             <select id="typeFilter" class="sr-only" tabindex="-1" aria-hidden="true">
-              <option value="all">All cards (28)</option>
-              <option value="book-term">Book terms (28)</option>
+              <option value="all">All cards (24)</option>
+              <option value="book-term">Book terms (24)</option>
               <option value="lesson-concept">Lesson concepts (0)</option>
               <option value="research-skill">Research &amp; detail (0)</option>
             </select>
@@ -187,7 +187,7 @@
         <!-- Status Bar -->
         <section class="status-bar" aria-live="polite">
           <div class="status-left">
-            <span id="deckStatus" class="status-pill">28 cards available</span>
+            <span id="deckStatus" class="status-pill">24 cards available</span>
             <span id="categoryStatus" class="status-meta"></span>
           </div>
         </section>
@@ -210,7 +210,7 @@
                     <span id="fcTypeBadge" class="badge">Book term</span>
                     <span id="fcCategoryBadge" class="badge badge-muted">Section</span>
                   </div>
-                  <span id="fcCardNumber" class="card-counter">1 / 28</span>
+                  <span id="fcCardNumber" class="card-counter">1 / 24</span>
                 </div>
 
                 <div class="card-front-content">
@@ -235,7 +235,7 @@
                     <span id="fcBackTypeBadge" class="badge">Book term</span>
                     <span id="fcBackCategoryBadge" class="badge badge-muted">Section</span>
                   </div>
-                  <span id="fcBackCardNumber" class="card-counter">1 / 28</span>
+                  <span id="fcBackCardNumber" class="card-counter">1 / 24</span>
                 </div>
 
                 <div class="card-back-content">
@@ -290,7 +290,7 @@
             <div class="quiz-card">
               <div class="quiz-header">
                 <span id="quizCategoryBadge" class="badge badge-muted">Category</span>
-                <span id="quizQuestionNumber" class="card-counter">1 / 84</span>
+                <span id="quizQuestionNumber" class="card-counter">1 / 72</span>
               </div>
 
               <div class="quiz-prompt-box">
