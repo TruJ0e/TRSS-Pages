@@ -5,14 +5,14 @@ window.CH7_CORE_CARDS = [
     "type": "book-term",
     "category": "Emotion basics",
     "cue": "body + feeling",
-    "simple": "a body reaction plus a feeling",
+    "simple": "A response involving subjective feelings, physiological changes, and often behavioral expression.",
     "examples": [
-      "The lesson uses bodily sensations such as butterflies in the stomach together with a conscious feeling."
+      "A frightening sound causes a racing heart, fear, and an urge to escape."
     ],
     "apply": [
-      "An event causes body changes and a felt emotional experience. Which concept fits?"
+      "A response combines bodily arousal, a conscious feeling, and an urge to act. What is it?"
     ],
-    "compare": "Different from mood: an emotion is a shorter response to a more specific event."
+    "compare": "Emotions are generally more event-specific and shorter-lived than moods."
   },
   {
     "id": "motivation",
@@ -35,14 +35,14 @@ window.CH7_CORE_CARDS = [
     "type": "book-term",
     "category": "Emotion theories",
     "cue": "body -> feeling",
-    "simple": "the body reacts first, then the feeling comes",
+    "simple": "Physiological responses to a stimulus contribute to the conscious experience of emotion.",
     "examples": [
-      "The lesson contrasts this theory with approaches in which thinking or simultaneous responses come first."
+      "Seeing a threat produces bodily arousal, and perceiving those changes contributes to fear."
     ],
     "apply": [
-      "A scary event causes a racing heart, and the bodily response leads to the felt fear. Which theory fits?"
+      "Which theory proposes that perceiving bodily changes produces emotional experience?"
     ],
-    "compare": "James-Lange: body first. Cannon-Bard: body and feeling together."
+    "compare": "James-Lange emphasizes emotion following bodily responses; Cannon-Bard proposes that emotional experience and physiological arousal occur in parallel."
   },
   {
     "id": "catharsis",
@@ -125,16 +125,14 @@ window.CH7_CORE_CARDS = [
     "type": "book-term",
     "category": "Arousal and performance",
     "cue": "arousal affects performance",
-    "simple": "performance changes with arousal and task difficulty",
+    "simple": "The relationship between arousal and performance depends on task difficulty; complex tasks generally benefit from lower optimal arousal than simple tasks.",
     "examples": [
-      "A highly aroused student taking a difficult final is expected to perform worse.",
-      "A prepared 5K runner at an ideal arousal level benefits from that arousal.",
-      "A baseball player with too much arousal may choke in a high-pressure at-bat."
+      "Very high anxiety may impair performance on a difficult exam, while moderate arousal may improve alertness."
     ],
     "apply": [
-      "A difficult task goes worse when arousal becomes too high. Which law fits?"
+      "A student performs worse on a difficult task when arousal becomes excessive. Which principle explains this?"
     ],
-    "compare": "For difficult tasks, both too little and too much arousal can hurt performance."
+    "compare": "Optimal arousal is generally lower for difficult tasks and higher for simple tasks."
   },
   {
     "id": "insula",
@@ -142,14 +140,14 @@ window.CH7_CORE_CARDS = [
     "type": "book-term",
     "category": "Brain and emotion",
     "cue": "body feelings",
-    "simple": "brain area that links body sensations with emotional awareness",
+    "simple": "A cortical region involved in processing internal bodily signals, emotional awareness, and experiences such as disgust.",
     "examples": [
-      "The lesson connects the insula with heartbeat or butterflies in the stomach and especially with disgust."
+      "Noticing nausea and experiencing disgust involves processing associated with the insula."
     ],
     "apply": [
-      "A brain area helps turn internal body sensations into emotional awareness. Which term fits?"
+      "Which cortical region helps integrate internal bodily sensations with emotional experience?"
     ],
-    "compare": "The book flashcard describes its location; the lesson emphasizes what it does."
+    "compare": "Unlike the amygdala, which is especially important in threat and emotional salience processing, the insula is strongly associated with interoception and subjective bodily states."
   },
   {
     "id": "display-rule",
@@ -157,14 +155,14 @@ window.CH7_CORE_CARDS = [
     "type": "book-term",
     "category": "Emotion expression",
     "cue": "culture rules",
-    "simple": "culture guides when and how emotions are shown",
+    "simple": "A culturally learned expectation about when, where, and how emotions should be expressed.",
     "examples": [
-      "The lesson contrasts greater restraint in Japanese settings with greater expressiveness in American settings."
+      "Someone smiles politely despite disappointment because their social setting discourages openly expressing negative emotions."
     ],
     "apply": [
-      "A culture teaches that anger should be hidden in one setting but shown in another. Which concept fits?"
+      "A workplace expects employees to conceal frustration when speaking with customers. Which concept describes this expectation?"
     ],
-    "compare": ""
+    "compare": "Display rules concern outward emotional expression; emotion regulation also includes changing emotional experiences."
   },
   {
     "id": "homeostasis",
@@ -234,14 +232,14 @@ window.CH7_CORE_CARDS = [
     "type": "book-term",
     "category": "Rewards and behavior",
     "cue": "reward pulls",
-    "simple": "a reward that pulls behavior toward something",
+    "simple": "An external stimulus or anticipated outcome that attracts or discourages behavior.",
     "examples": [
-      "The lesson uses rewards as reasons behavior may move in a particular direction."
+      "A student studies to earn a scholarship, while another avoids losing eligibility."
     ],
     "apply": [
-      "The possibility of a reward changes what someone chooses to do. Which concept fits?"
+      "A promised bonus encourages an employee to complete a project. Which motivational concept explains this?"
     ],
-    "compare": "An incentive is the pull of a reward; extrinsic reward describes where the reward comes from."
+    "compare": "Incentives are external motivating outcomes; intrinsic motivation involves engaging in an activity for its inherent satisfaction."
   },
   {
     "id": "intrinsic-reward",
