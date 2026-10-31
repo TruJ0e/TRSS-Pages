@@ -116,10 +116,7 @@
             <div class="lectures-grid">
               <figure class="lecture-card">
                 <div class="lecture-embed">
-                  <iframe src="https://www.youtube-nocookie.com/embed/gAMbkJk6gnE"
-                          title="Feeling All the Feels: Crash Course Psychology #25" loading="lazy"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowfullscreen></iframe>
+                  <a class="lecture-open" href="https://www.youtube.com/watch?v=gAMbkJk6gnE" target="_blank" rel="noopener noreferrer" aria-label="Watch Feeling All the Feels: Crash Course Psychology #25 on YouTube"><span class="lecture-play" aria-hidden="true">▶</span><span>Watch lecture on YouTube ↗</span></a>
                 </div>
                 <figcaption class="lecture-caption">
                   <span class="lecture-title">Feeling All the Feels: Crash Course Psychology #25</span>
@@ -128,10 +125,7 @@
               </figure>
               <figure class="lecture-card">
                 <div class="lecture-embed">
-                  <iframe src="https://www.youtube-nocookie.com/embed/9hdSLiHaJz8"
-                          title="The Power of Motivation: Crash Course Psychology #17" loading="lazy"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowfullscreen></iframe>
+                  <a class="lecture-open" href="https://www.youtube.com/watch?v=9hdSLiHaJz8" target="_blank" rel="noopener noreferrer" aria-label="Watch The Power of Motivation: Crash Course Psychology #17 on YouTube"><span class="lecture-play" aria-hidden="true">▶</span><span>Watch lecture on YouTube ↗</span></a>
                 </div>
                 <figcaption class="lecture-caption">
                   <span class="lecture-title">The Power of Motivation: Crash Course Psychology #17</span>
@@ -140,10 +134,7 @@
               </figure>
               <figure class="lecture-card">
                 <div class="lecture-embed">
-                  <iframe src="https://www.youtube-nocookie.com/embed/4KbSRXP0wik"
-                          title="Emotion, Stress, and Health: Crash Course Psychology #26" loading="lazy"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowfullscreen></iframe>
+                  <a class="lecture-open" href="https://www.youtube.com/watch?v=4KbSRXP0wik" target="_blank" rel="noopener noreferrer" aria-label="Watch Emotion, Stress, and Health: Crash Course Psychology #26 on YouTube"><span class="lecture-play" aria-hidden="true">▶</span><span>Watch lecture on YouTube ↗</span></a>
                 </div>
                 <figcaption class="lecture-caption">
                   <span class="lecture-title">Emotion, Stress, and Health: Crash Course Psychology #26</span>
@@ -156,7 +147,10 @@
           .lectures-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1rem}
           .lecture-card{margin:0}
           .lecture-embed{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:.5rem;background:#000}
-          .lecture-embed iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0}
+          .lecture-open{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;color:#fff;background:linear-gradient(135deg,#172554,#334155);text-decoration:none;font-weight:600}
+          .lecture-open:hover{background:#1e3a8a}
+          .lecture-open:focus-visible{outline:3px solid #60a5fa;outline-offset:-4px}
+          .lecture-play{font-size:2.5rem}
           .lecture-caption{display:flex;flex-direction:column;gap:.2rem;margin-top:.5rem;font-size:.85rem}
           .lecture-title{font-weight:600}
           .lecture-source{opacity:.75;font-size:.8rem}
